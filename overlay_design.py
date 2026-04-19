@@ -21,6 +21,8 @@ prev_p = None
 prev_t = None
 prev_pid = None
 xdotool_warning_shown = False
+last_pid_error = None
+last_pid_error_time = 0
 
 
 def log_error(message):
@@ -31,10 +33,13 @@ def log_error(message):
 
 def get_active_pid():
     global xdotool_warning_shown
+    global last_pid_error
+    global last_pid_error_time
 
     try:
         result = subprocess.check_output(
-            ["xdotool", "getwindowfocus", "getwindowpid"]
+            ["xdotool", "getwindowfocus", "getwindowpid"],
+            stderr=subprocess.DEVNULL,
         )
         return int(result.strip())
     except FileNotFoundError:
@@ -42,8 +47,21 @@ def get_active_pid():
             log_error("xdotool is not installed or not available in PATH")
             xdotool_warning_shown = True
         return None
-    except (subprocess.SubprocessError, ValueError) as exc:
-        log_error(f"could not determine active window PID: {exc}")
+    except subprocess.CalledProcessError as exc:
+        now = time.time()
+        error_key = ("xdotool_exit", exc.returncode)
+        if last_pid_error != error_key or now - last_pid_error_time > 5:
+            log_error("could not determine active window PID; skipping this sample")
+            last_pid_error = error_key
+            last_pid_error_time = now
+        return None
+    except ValueError as exc:
+        now = time.time()
+        error_key = ("pid_parse", str(exc))
+        if last_pid_error != error_key or now - last_pid_error_time > 5:
+            log_error(f"could not parse active window PID: {exc}")
+            last_pid_error = error_key
+            last_pid_error_time = now
         return None
 
 
