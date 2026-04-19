@@ -4,6 +4,16 @@ import subprocess
 
 num_cpus = os.cpu_count()
 
+# ---------------- STATE ----------------
+high_cpu_count = 0
+mem_history = []
+
+prev_p = None
+prev_t = None
+prev_pid = None
+
+# ---------------- SYSTEM ----------------
+
 def get_active_pid():
     try:
         result = subprocess.check_output(
@@ -34,23 +44,27 @@ def get_memory(pid):
 # ---------------- PATTERNS ----------------
 
 def detect_high_cpu(cpu):
+    global high_cpu_count
+
     if cpu > 70:
-        return "⚠️ High CPU usage"
+        high_cpu_count += 1
+    else:
+        high_cpu_count = 0
+
+    if high_cpu_count >= 3:
+        return "⚠️ Sustained High CPU"
     return None
 
-def detect_memory_growth(prev_mem, curr_mem):
-    if prev_mem is None:
+
+def detect_memory_growth(mem_history):
+    if len(mem_history) < 3:
         return None
-    if curr_mem > prev_mem + 50:  # MB threshold
-        return "📈 Memory increasing"
+
+    if mem_history[0] < mem_history[1] < mem_history[2]:
+        return "📈 Memory growing trend"
     return None
 
 # ------------------------------------------
-
-prev_p = None
-prev_t = None
-prev_pid = None
-prev_mem = None
 
 while True:
     pid = get_active_pid()
@@ -63,14 +77,19 @@ while True:
         p = get_process_time(pid)
         t = get_total_time()
         mem_kb = get_memory(pid)
-        mem_mb = mem_kb / 1024
+        mem_mb = round(mem_kb / 1024)
 
         # 🔴 RESET when PID changes
         if pid != prev_pid:
             prev_p = p
             prev_t = t
             prev_pid = pid
-            prev_mem = mem_mb
+
+            mem_history.clear()
+            mem_history.append(mem_mb)
+
+            high_cpu_count = 0
+
             time.sleep(1)
             continue
 
@@ -84,11 +103,16 @@ while True:
             cpu = 0
 
         cpu = round(cpu)
-        mem_mb = round(mem_mb)
+
+        # -------- MEMORY HISTORY --------
+        mem_history.append(mem_mb)
+        if len(mem_history) > 3:
+            mem_history.pop(0)
+        # --------------------------------
 
         # -------- PATTERN DETECTION --------
         cpu_alert = detect_high_cpu(cpu)
-        mem_alert = detect_memory_growth(prev_mem, mem_mb)
+        mem_alert = detect_memory_growth(mem_history)
         # ----------------------------------
 
         print(f"PID: {pid}")
@@ -106,12 +130,12 @@ while True:
         prev_p = p
         prev_t = t
         prev_pid = pid
-        prev_mem = mem_mb
 
     except:
         prev_p = None
         prev_t = None
         prev_pid = None
-        prev_mem = None
+        mem_history.clear()
+        high_cpu_count = 0
 
     time.sleep(1)
