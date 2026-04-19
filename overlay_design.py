@@ -9,6 +9,10 @@ num_cpus = os.cpu_count() or 1
 # ---------------- STATE ----------------
 high_cpu_count = 0
 mem_history = []
+diagnosis_hold_until = 0
+last_sections = []
+is_frozen = False
+is_expanded = False
 
 prev_p = None
 prev_t = None
@@ -122,6 +126,54 @@ def build_issue_lines(cpu_alert, mem_alert):
     return sections
 
 
+def get_display_sections(sections):
+    global diagnosis_hold_until
+    global last_sections
+
+    now = time.time()
+
+    if sections:
+        diagnosis_hold_until = now + 3
+        last_sections = sections
+        return sections
+
+    if now < diagnosis_hold_until:
+        return last_sections
+
+    last_sections = []
+    return []
+
+
+def toggle_freeze():
+    global is_frozen
+
+    is_frozen = not is_frozen
+    freeze_button.config(
+        text="RESUME" if is_frozen else "FREEZE",
+        bg=palette["warn"] if is_frozen else palette["title"],
+        fg="#1b1327" if is_frozen else palette["title_text"],
+    )
+    update_overlay(
+        metrics_cache["pid"],
+        metrics_cache["cpu"],
+        metrics_cache["mem"],
+        current_sections,
+    )
+
+
+def toggle_details():
+    global is_expanded
+
+    is_expanded = not is_expanded
+    details_button.config(text="HIDE" if is_expanded else "DETAILS")
+    update_overlay(
+        metrics_cache["pid"],
+        metrics_cache["cpu"],
+        metrics_cache["mem"],
+        current_sections,
+    )
+
+
 def make_draggable(widget):
     def start_drag(event):
         root._drag_x = event.x
@@ -137,6 +189,13 @@ def make_draggable(widget):
 
 
 def update_overlay(pid_text, cpu_text, mem_text, sections):
+    global current_sections
+
+    current_sections = sections
+    metrics_cache["pid"] = pid_text
+    metrics_cache["cpu"] = cpu_text
+    metrics_cache["mem"] = mem_text
+
     status_text = "STABLE"
     status_color = palette["ok"]
 
@@ -145,9 +204,8 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
         status_color = palette["warn"]
 
     status_value.config(text=status_text, fg=status_color)
-    metrics_value.config(
-        text=f"PID  {pid_text}\nCPU  {cpu_text}\nMEM  {mem_text}"
-    )
+    summary_value.config(text=f"CPU {cpu_text}   MEM {mem_text}   PID {pid_text}")
+    should_show_details = is_expanded or is_frozen or bool(sections)
 
     if sections:
         lines = []
@@ -155,16 +213,24 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
             lines.append(f"[{title}]")
             lines.extend(items)
             lines.append("")
-        issues_value.config(text="\n".join(lines).rstrip(), fg=palette["text"])
-        issues_frame.pack(fill="x", padx=12, pady=(0, 12))
+        issues_text = "\n".join(lines).rstrip()
+        issues_color = palette["text"]
     else:
-        issues_value.config(text="No active alerts. System behavior looks normal.")
-        issues_frame.pack(fill="x", padx=12, pady=(0, 12))
+        issues_text = "No active alerts. System behavior looks normal."
+        issues_color = palette["muted"]
 
-    line_count = metrics_value.cget("text").count("\n") + 1
-    line_count += issues_value.cget("text").count("\n") + 1
-    target_height = max(250, min(430, 120 + (line_count * 18)))
-    root.geometry(f"430x{target_height}+40+40")
+    issues_value.config(text=issues_text, fg=issues_color)
+
+    if should_show_details:
+        issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
+        footer.pack(fill="x", padx=8, pady=(0, 8))
+        line_count = issues_value.cget("text").count("\n") + 1
+        target_height = max(180, min(300, 108 + (line_count * 18)))
+        root.geometry(f"430x{target_height}+40+40")
+    else:
+        issues_frame.pack_forget()
+        footer.pack_forget()
+        root.geometry("430x92+40+40")
 
 
 # ---------------- UI ----------------
@@ -188,7 +254,10 @@ palette = {
     "warn": "#ffd45d",
 }
 
-root.geometry("430x260+40+40")
+metrics_cache = {"pid": "--", "cpu": "--", "mem": "--"}
+current_sections = []
+
+root.geometry("430x92+40+40")
 
 panel = tk.Frame(
     root,
@@ -234,34 +303,61 @@ status_value.pack(side="right")
 body = tk.Frame(panel, bg=palette["panel"])
 body.pack(fill="both", expand=True, padx=4, pady=4)
 
-metrics_frame = tk.Frame(
+hud_bar = tk.Frame(
     body,
     bg=palette["panel_alt"],
     bd=2,
     relief="sunken",
+    height=34,
 )
-metrics_frame.pack(fill="x", padx=12, pady=(12, 10))
+hud_bar.pack(fill="x", padx=8, pady=(8, 6))
+hud_bar.pack_propagate(False)
 
-metrics_header = tk.Label(
-    metrics_frame,
-    text="LIVE METRICS",
-    anchor="w",
-    bg=palette["panel_alt"],
-    fg=palette["muted"],
-    font=("Helvetica", 9, "bold"),
-)
-metrics_header.pack(fill="x", padx=10, pady=(8, 2))
-
-metrics_value = tk.Label(
-    metrics_frame,
-    text="PID  --\nCPU  --\nMEM  --",
+summary_value = tk.Label(
+    hud_bar,
+    text="CPU --   MEM --   PID --",
     justify="left",
     anchor="w",
     bg=palette["panel_alt"],
     fg=palette["text"],
-    font=("Courier New", 12, "bold"),
+    font=("Courier New", 10, "bold"),
 )
-metrics_value.pack(fill="x", padx=10, pady=(0, 10))
+summary_value.pack(side="left", fill="x", expand=True, padx=8, pady=5)
+
+button_bar = tk.Frame(hud_bar, bg=palette["panel_alt"])
+button_bar.pack(side="right", padx=6, pady=3)
+
+freeze_button = tk.Button(
+    button_bar,
+    text="FREEZE",
+    command=toggle_freeze,
+    bg=palette["title"],
+    fg=palette["title_text"],
+    activebackground=palette["warn"],
+    activeforeground="#1b1327",
+    relief="raised",
+    bd=2,
+    font=("Helvetica", 8, "bold"),
+    padx=5,
+    pady=0,
+)
+freeze_button.pack(side="left", padx=(0, 4))
+
+details_button = tk.Button(
+    button_bar,
+    text="DETAILS",
+    command=toggle_details,
+    bg=palette["chrome"],
+    fg="#111111",
+    activebackground=palette["muted"],
+    activeforeground="#111111",
+    relief="raised",
+    bd=2,
+    font=("Helvetica", 8, "bold"),
+    padx=5,
+    pady=0,
+)
+details_button.pack(side="left")
 
 issues_frame = tk.Frame(
     body,
@@ -284,22 +380,22 @@ issues_value = tk.Label(
     issues_frame,
     text="Booting monitor...",
     justify="left",
-    anchor="w",
+    anchor="nw",
     bg=palette["panel_alt"],
     fg=palette["text"],
     font=("Courier New", 10),
+    wraplength=400,
 )
-issues_value.pack(fill="x", padx=10, pady=(0, 10))
+issues_value.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
 footer = tk.Label(
     body,
-    text="Drag the title bar to move",
+    text="Freeze to inspect. Details opens diagnostics.",
     anchor="w",
     bg=palette["panel"],
     fg="#8579a0",
     font=("Helvetica", 8),
 )
-footer.pack(fill="x", padx=12, pady=(0, 10))
 
 make_draggable(title_bar)
 update_overlay("--", "--", "--", [])
@@ -308,6 +404,11 @@ update_overlay("--", "--", "--", [])
 # ---------------- LOOP ----------------
 
 while True:
+    if is_frozen:
+        root.update()
+        time.sleep(0.1)
+        continue
+
     pid = get_active_pid()
 
     if pid is None:
@@ -359,7 +460,7 @@ while True:
 
         cpu_alert = detect_high_cpu(cpu)
         mem_alert = detect_memory_growth(mem_history)
-        sections = build_issue_lines(cpu_alert, mem_alert)
+        sections = get_display_sections(build_issue_lines(cpu_alert, mem_alert))
 
         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
 
@@ -374,7 +475,7 @@ while True:
         prev_pid = None
         mem_history.clear()
         high_cpu_count = 0
-        update_overlay(str(pid), "--", "--", [("READ ERROR", [str(exc)])])
+        update_overlay(str(pid), "--", "--", get_display_sections([("READ ERROR", [str(exc)])]))
 
     root.update()
     time.sleep(1)
