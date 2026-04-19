@@ -31,9 +31,26 @@ def get_memory(pid):
             if line.startswith("VmRSS"):
                 return int(line.split()[1])  # KB
 
+# ---------------- PATTERNS ----------------
+
+def detect_high_cpu(cpu):
+    if cpu > 70:
+        return "⚠️ High CPU usage"
+    return None
+
+def detect_memory_growth(prev_mem, curr_mem):
+    if prev_mem is None:
+        return None
+    if curr_mem > prev_mem + 50:  # MB threshold
+        return "📈 Memory increasing"
+    return None
+
+# ------------------------------------------
+
 prev_p = None
 prev_t = None
 prev_pid = None
+prev_mem = None
 
 while True:
     pid = get_active_pid()
@@ -45,17 +62,19 @@ while True:
     try:
         p = get_process_time(pid)
         t = get_total_time()
-        mem = get_memory(pid)
+        mem_kb = get_memory(pid)
+        mem_mb = mem_kb / 1024
 
-        
+        # 🔴 RESET when PID changes
         if pid != prev_pid:
             prev_p = p
             prev_t = t
             prev_pid = pid
+            prev_mem = mem_mb
             time.sleep(1)
             continue
 
-        # calculate only if same PID
+        # CPU calculation
         delta_p = p - prev_p
         delta_t = t - prev_t
 
@@ -64,18 +83,35 @@ while True:
         else:
             cpu = 0
 
+        cpu = round(cpu)
+        mem_mb = round(mem_mb)
+
+        # -------- PATTERN DETECTION --------
+        cpu_alert = detect_high_cpu(cpu)
+        mem_alert = detect_memory_growth(prev_mem, mem_mb)
+        # ----------------------------------
+
         print(f"PID: {pid}")
-        print(f"CPU: {round(cpu)}%")
-        print(f"Memory: {mem / 1024:.0f} MB")
+        print(f"CPU: {cpu}%")
+        print(f"Memory: {mem_mb} MB")
+
+        if cpu_alert:
+            print(cpu_alert)
+        if mem_alert:
+            print(mem_alert)
+
         print("-" * 20)
 
+        # update previous values
         prev_p = p
         prev_t = t
         prev_pid = pid
+        prev_mem = mem_mb
 
     except:
         prev_p = None
         prev_t = None
         prev_pid = None
+        prev_mem = None
 
     time.sleep(1)
