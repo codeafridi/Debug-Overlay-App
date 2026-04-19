@@ -1,8 +1,10 @@
 import time
 import os
 import subprocess
+import sys
 
-num_cpus = os.cpu_count()
+num_cpus = os.cpu_count() or 1
+
 
 # ---------------- STATE ----------------
 high_cpu_count = 0
@@ -11,16 +13,29 @@ mem_history = []
 prev_p = None
 prev_t = None
 prev_pid = None
+xdotool_warning_shown = False
+
+def log_error(message):
+    print(f"[process_time] {message}", file=sys.stderr)
+
 
 # ---------------- SYSTEM ----------------
 
 def get_active_pid():
+    global xdotool_warning_shown
+
     try:
         result = subprocess.check_output(
             ["xdotool", "getwindowfocus", "getwindowpid"]
         )
         return int(result.strip())
-    except:
+    except FileNotFoundError:
+        if not xdotool_warning_shown:
+            log_error("xdotool is not installed or not available in PATH")
+            xdotool_warning_shown = True
+        return None
+    except (subprocess.SubprocessError, ValueError) as exc:
+        log_error(f"could not determine active window PID: {exc}")
         return None
 
 def get_process_time(pid):
@@ -40,6 +55,7 @@ def get_memory(pid):
         for line in f:
             if line.startswith("VmRSS"):
                 return int(line.split()[1])  # KB
+    return None
 
 # ---------------- PATTERNS ----------------
 
@@ -52,17 +68,19 @@ def detect_high_cpu(cpu):
         high_cpu_count = 0
 
     if high_cpu_count >= 3:
-        return "⚠️ Sustained High CPU"
-    return None
+        return True
+    return False
 
 
 def detect_memory_growth(mem_history):
     if len(mem_history) < 3:
-        return None
+        return False
 
     if mem_history[0] < mem_history[1] < mem_history[2]:
-        return "⚠️ Memory usage rising continuously"
-    return None
+        return True
+    return False
+
+# ---------------- INSIGHTS ----------------
 
 def cpu_insight():
     return [
@@ -103,6 +121,11 @@ while True:
         p = get_process_time(pid)
         t = get_total_time()
         mem_kb = get_memory(pid)
+        if mem_kb is None:
+            log_error(f"memory usage is unavailable for PID {pid}")
+            time.sleep(1)
+            continue
+
         mem_mb = round(mem_kb / 1024)
 
         # 🔴 RESET when PID changes
@@ -146,18 +169,22 @@ while True:
         print(f"Memory: {mem_mb} MB")
 
         if cpu_alert:
-            print(cpu_alert)
+            for line in cpu_insight():
+                print(line)
+
         if mem_alert:
-            print(mem_alert)
+            for line in memory_insight():
+                print(line)
 
         print("-" * 20)
 
-        # update previous values
+        # ✅ UPDATE STATE (CRITICAL)
         prev_p = p
         prev_t = t
         prev_pid = pid
 
-    except:
+    except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
+        log_error(f"failed to read process metrics for PID {pid}: {exc}")
         prev_p = None
         prev_t = None
         prev_pid = None
