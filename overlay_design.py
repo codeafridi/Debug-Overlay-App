@@ -13,6 +13,9 @@ diagnosis_hold_until = 0
 last_sections = []
 is_frozen = False
 is_expanded = False
+is_dragging = False
+details_visible = False
+window_height = 88
 
 prev_p = None
 prev_t = None
@@ -149,7 +152,7 @@ def toggle_freeze():
 
     is_frozen = not is_frozen
     freeze_button.config(
-        text="RESUME" if is_frozen else "FREEZE",
+        text="RES" if is_frozen else "FRZ",
         bg=palette["warn"] if is_frozen else palette["title"],
         fg="#1b1327" if is_frozen else palette["title_text"],
     )
@@ -165,7 +168,7 @@ def toggle_details():
     global is_expanded
 
     is_expanded = not is_expanded
-    details_button.config(text="HIDE" if is_expanded else "DETAILS")
+    details_button.config(text="HIDE" if is_expanded else "MORE")
     update_overlay(
         metrics_cache["pid"],
         metrics_cache["cpu"],
@@ -176,20 +179,33 @@ def toggle_details():
 
 def make_draggable(widget):
     def start_drag(event):
-        root._drag_x = event.x
-        root._drag_y = event.y
+        global is_dragging
+
+        is_dragging = True
+        root._drag_x = event.x_root
+        root._drag_y = event.y_root
+        root._window_x = root.winfo_x()
+        root._window_y = root.winfo_y()
 
     def drag(event):
-        x = event.x_root - root._drag_x
-        y = event.y_root - root._drag_y
+        x = root._window_x + (event.x_root - root._drag_x)
+        y = root._window_y + (event.y_root - root._drag_y)
         root.geometry(f"+{x}+{y}")
+
+    def stop_drag(_event):
+        global is_dragging
+
+        is_dragging = False
 
     widget.bind("<Button-1>", start_drag)
     widget.bind("<B1-Motion>", drag)
+    widget.bind("<ButtonRelease-1>", stop_drag)
 
 
 def update_overlay(pid_text, cpu_text, mem_text, sections):
     global current_sections
+    global details_visible
+    global window_height
 
     current_sections = sections
     metrics_cache["pid"] = pid_text
@@ -200,15 +216,22 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
     status_color = palette["ok"]
 
     if sections:
-        status_text = "WATCH"
+        status_text = "WARN"
         status_color = palette["warn"]
 
-    status_value.config(text=status_text, fg=status_color)
-    summary_value.config(text=f"CPU {cpu_text}   MEM {mem_text}   PID {pid_text}")
+    if status_value.cget("text") != status_text or status_value.cget("fg") != status_color:
+        status_value.config(text=status_text, fg=status_color)
+
+    summary_text = f"CPU {cpu_text} | MEM {mem_text} | {status_text}"
+    if summary_value.cget("text") != summary_text:
+        summary_value.config(text=summary_text)
+
     should_show_details = is_expanded or is_frozen or bool(sections)
 
     if sections:
         lines = []
+        lines.append(f"PID: {pid_text}")
+        lines.append("")
         for title, items in sections:
             lines.append(f"[{title}]")
             lines.extend(items)
@@ -216,21 +239,39 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
         issues_text = "\n".join(lines).rstrip()
         issues_color = palette["text"]
     else:
-        issues_text = "No active alerts. System behavior looks normal."
+        issues_text = f"PID: {pid_text}\n\nNo active alerts. System behavior looks normal."
         issues_color = palette["muted"]
 
-    issues_value.config(text=issues_text, fg=issues_color)
+    current_text = issues_value.get("1.0", "end-1c")
+    if current_text != issues_text or issues_value.cget("fg") != issues_color:
+        issues_value.config(state="normal", fg=issues_color)
+        issues_value.delete("1.0", "end")
+        issues_value.insert("1.0", issues_text)
+        issues_value.config(state="disabled")
+        issues_value.yview_moveto(0)
+
+    current_x = root.winfo_x()
+    current_y = root.winfo_y()
 
     if should_show_details:
-        issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
-        footer.pack(fill="x", padx=8, pady=(0, 8))
-        line_count = issues_value.cget("text").count("\n") + 1
-        target_height = max(180, min(300, 108 + (line_count * 18)))
-        root.geometry(f"430x{target_height}+40+40")
+        if not details_visible:
+            issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
+            footer.pack(fill="x", padx=8, pady=(0, 8))
+            details_visible = True
+        line_count = issues_text.count("\n") + 1
+        footer_lines = footer.cget("text").count("\n") + 1
+        target_height = max(240, min(360, 112 + (min(line_count, 9) * 18) + (footer_lines * 14)))
+        if not is_dragging and target_height != window_height:
+            root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+            window_height = target_height
     else:
-        issues_frame.pack_forget()
-        footer.pack_forget()
-        root.geometry("430x92+40+40")
+        if details_visible:
+            issues_frame.pack_forget()
+            footer.pack_forget()
+            details_visible = False
+        if not is_dragging and window_height != 88:
+            root.geometry(f"430x88+{current_x}+{current_y}")
+            window_height = 88
 
 
 # ---------------- UI ----------------
@@ -257,7 +298,7 @@ palette = {
 metrics_cache = {"pid": "--", "cpu": "--", "mem": "--"}
 current_sections = []
 
-root.geometry("430x92+40+40")
+root.geometry("430x88+40+40")
 
 panel = tk.Frame(
     root,
@@ -275,30 +316,21 @@ title_bar.pack_propagate(False)
 
 title_label = tk.Label(
     title_bar,
-    text=" DEBUG OVERLAY 95 ",
+    text=" DEBUG HUD ",
     bg=palette["title"],
     fg=palette["title_text"],
     font=("Helvetica", 10, "bold"),
 )
 title_label.pack(side="left", padx=8)
 
-status_label = tk.Label(
-    title_bar,
-    text="STATUS",
-    bg=palette["title"],
-    fg=palette["muted"],
-    font=("Helvetica", 8, "bold"),
-)
-status_label.pack(side="right", padx=(0, 6))
-
 status_value = tk.Label(
     title_bar,
-    text="BOOT",
+    text="OK",
     bg=palette["title"],
     fg=palette["ok"],
     font=("Courier New", 9, "bold"),
 )
-status_value.pack(side="right")
+status_value.pack(side="right", padx=8)
 
 body = tk.Frame(panel, bg=palette["panel"])
 body.pack(fill="both", expand=True, padx=4, pady=4)
@@ -308,28 +340,28 @@ hud_bar = tk.Frame(
     bg=palette["panel_alt"],
     bd=2,
     relief="sunken",
-    height=34,
+    height=36,
 )
-hud_bar.pack(fill="x", padx=8, pady=(8, 6))
+hud_bar.pack(fill="x", padx=8, pady=(8, 8))
 hud_bar.pack_propagate(False)
 
 summary_value = tk.Label(
     hud_bar,
-    text="CPU --   MEM --   PID --",
+    text="CPU --%   MEM --- MB   OK",
     justify="left",
     anchor="w",
     bg=palette["panel_alt"],
     fg=palette["text"],
     font=("Courier New", 10, "bold"),
 )
-summary_value.pack(side="left", fill="x", expand=True, padx=8, pady=5)
+summary_value.pack(side="left", fill="x", expand=True, padx=10, pady=5)
 
 button_bar = tk.Frame(hud_bar, bg=palette["panel_alt"])
 button_bar.pack(side="right", padx=6, pady=3)
 
 freeze_button = tk.Button(
     button_bar,
-    text="FREEZE",
+    text="FRZ",
     command=toggle_freeze,
     bg=palette["title"],
     fg=palette["title_text"],
@@ -338,14 +370,14 @@ freeze_button = tk.Button(
     relief="raised",
     bd=2,
     font=("Helvetica", 8, "bold"),
-    padx=5,
-    pady=0,
+    width=4,
+    pady=1,
 )
 freeze_button.pack(side="left", padx=(0, 4))
 
 details_button = tk.Button(
     button_bar,
-    text="DETAILS",
+    text="MORE",
     command=toggle_details,
     bg=palette["chrome"],
     fg="#111111",
@@ -354,8 +386,8 @@ details_button = tk.Button(
     relief="raised",
     bd=2,
     font=("Helvetica", 8, "bold"),
-    padx=5,
-    pady=0,
+    width=5,
+    pady=1,
 )
 details_button.pack(side="left")
 
@@ -376,17 +408,29 @@ issues_header = tk.Label(
 )
 issues_header.pack(fill="x", padx=10, pady=(8, 2))
 
-issues_value = tk.Label(
-    issues_frame,
-    text="Booting monitor...",
-    justify="left",
-    anchor="nw",
+issues_content = tk.Frame(issues_frame, bg=palette["panel_alt"])
+issues_content.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+issues_scrollbar = tk.Scrollbar(issues_content, orient="vertical")
+issues_scrollbar.pack(side="right", fill="y")
+
+issues_value = tk.Text(
+    issues_content,
     bg=palette["panel_alt"],
     fg=palette["text"],
+    insertbackground=palette["text"],
     font=("Courier New", 10),
-    wraplength=400,
+    wrap="word",
+    relief="flat",
+    bd=0,
+    highlightthickness=0,
+    height=9,
+    yscrollcommand=issues_scrollbar.set,
 )
-issues_value.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+issues_value.pack(side="left", fill="both", expand=True)
+issues_scrollbar.config(command=issues_value.yview)
+issues_value.insert("1.0", "Booting monitor...")
+issues_value.config(state="disabled")
 
 footer = tk.Label(
     body,
@@ -394,10 +438,22 @@ footer = tk.Label(
     anchor="w",
     bg=palette["panel"],
     fg="#8579a0",
-    font=("Helvetica", 8),
+    font=("Helvetica", 7),
 )
 
-make_draggable(title_bar)
+for draggable in (
+    panel,
+    title_bar,
+    title_label,
+    status_value,
+    hud_bar,
+    summary_value,
+    issues_frame,
+    issues_header,
+    issues_value,
+    footer,
+):
+    make_draggable(draggable)
 update_overlay("--", "--", "--", [])
 
 
