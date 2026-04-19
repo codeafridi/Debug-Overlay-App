@@ -1,4 +1,6 @@
 import time
+import os
+num_cpus = os.cpu_count()
 
 pid = int(input("Enter PID: "))
 
@@ -14,10 +16,16 @@ def get_total_time():
         values = f.readline().split()[1:]
         return sum(map(int, values))
 
+def get_memory(pid):
+    with open(f"/proc/{pid}/status") as f:
+        for line in f:
+            if line.startswith("VmRSS"):
+                return int(line.split()[1])  # in KB
+
 # snapshot 1
 p1 = get_process_time(pid)
 t1 = get_total_time()
-
+mem = get_memory(pid)
 time.sleep(1)
 
 # snapshot 2
@@ -27,6 +35,7 @@ t2 = get_total_time()
 delta_p = p2 - p1
 delta_t = t2 - t1
 
-cpu = (delta_p / delta_t) * 100
+cpu = (delta_p / delta_t) * 100 * num_cpus
 
 print(f"CPU Usage: {cpu:.2f}%")
+print(f"Memory: {mem / 1024:.2f} MB")   
