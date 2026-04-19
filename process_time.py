@@ -33,11 +33,13 @@ def get_memory(pid):
 
 prev_p = None
 prev_t = None
+prev_pid = None
 
 while True:
     pid = get_active_pid()
 
     if pid is None:
+        time.sleep(1)
         continue
 
     try:
@@ -45,23 +47,35 @@ while True:
         t = get_total_time()
         mem = get_memory(pid)
 
-        if prev_p is not None:
-            delta_p = p - prev_p
-            delta_t = t - prev_t
+        
+        if pid != prev_pid:
+            prev_p = p
+            prev_t = t
+            prev_pid = pid
+            time.sleep(1)
+            continue
 
+        # calculate only if same PID
+        delta_p = p - prev_p
+        delta_t = t - prev_t
+
+        if delta_t > 0:
             cpu = (delta_p / delta_t) * 100 * num_cpus
+        else:
+            cpu = 0
 
-            print(f"PID: {pid}")
-            print(f"CPU: {round(cpu)}%")
-            print(f"Memory: {mem / 1024:.0f} MB")
-            print("-" * 20)
+        print(f"PID: {pid}")
+        print(f"CPU: {round(cpu)}%")
+        print(f"Memory: {mem / 1024:.0f} MB")
+        print("-" * 20)
 
         prev_p = p
         prev_t = t
+        prev_pid = pid
 
     except:
-        # process might have closed
         prev_p = None
         prev_t = None
+        prev_pid = None
 
     time.sleep(1)
