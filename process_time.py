@@ -64,6 +64,32 @@ def detect_memory_growth(mem_history):
         return "⚠️ Memory usage rising continuously"
     return None
 
+def cpu_insight():
+    return [
+        "⚠️ Sustained High CPU",
+        "Possible causes:",
+        "- heavy computation",
+        "- infinite loop",
+        "- too many operations",
+        "Check:",
+        "- recent code changes",
+        "- running functions / loops",
+    ]
+
+
+def memory_insight():
+    return [
+        "⚠️ Possible memory growth detected",
+        "Possible causes:",
+        "- increasing allocations",
+        "- unclosed resources",
+        "- caching not released",
+        "Check:",
+        "- loops creating objects",
+        "- data accumulation",
+        "- resource cleanup",
+    ]
+
 # ------------------------------------------
 
 while True:
