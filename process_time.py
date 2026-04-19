@@ -1,14 +1,23 @@
 import time
 import os
+import subprocess
+
 num_cpus = os.cpu_count()
 
-pid = int(input("Enter PID: "))
+def get_active_pid():
+    try:
+        result = subprocess.check_output(
+            ["xdotool", "getwindowfocus", "getwindowpid"]
+        )
+        return int(result.strip())
+    except:
+        return None
 
 def get_process_time(pid):
     with open(f"/proc/{pid}/stat") as f:
         values = f.read().split()
-        utime = int(values[13])  # 14th field
-        stime = int(values[14])  # 15th field
+        utime = int(values[13])
+        stime = int(values[14])
         return utime + stime
 
 def get_total_time():
@@ -20,22 +29,39 @@ def get_memory(pid):
     with open(f"/proc/{pid}/status") as f:
         for line in f:
             if line.startswith("VmRSS"):
-                return int(line.split()[1])  # in KB
+                return int(line.split()[1])  # KB
 
-# snapshot 1
-p1 = get_process_time(pid)
-t1 = get_total_time()
-mem = get_memory(pid)
-time.sleep(1)
+prev_p = None
+prev_t = None
 
-# snapshot 2
-p2 = get_process_time(pid)
-t2 = get_total_time()
+while True:
+    pid = get_active_pid()
 
-delta_p = p2 - p1
-delta_t = t2 - t1
+    if pid is None:
+        continue
 
-cpu = (delta_p / delta_t) * 100 * num_cpus
+    try:
+        p = get_process_time(pid)
+        t = get_total_time()
+        mem = get_memory(pid)
 
-print(f"CPU Usage: {cpu:.2f}%")
-print(f"Memory: {mem / 1024:.2f} MB")   
+        if prev_p is not None:
+            delta_p = p - prev_p
+            delta_t = t - prev_t
+
+            cpu = (delta_p / delta_t) * 100 * num_cpus
+
+            print(f"PID: {pid}")
+            print(f"CPU: {round(cpu)}%")
+            print(f"Memory: {mem / 1024:.0f} MB")
+            print("-" * 20)
+
+        prev_p = p
+        prev_t = t
+
+    except:
+        # process might have closed
+        prev_p = None
+        prev_t = None
+
+    time.sleep(1)
