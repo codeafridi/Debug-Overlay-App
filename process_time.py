@@ -61,7 +61,7 @@ def detect_memory_growth(mem_history):
         return None
 
     if mem_history[0] < mem_history[1] < mem_history[2]:
-        return "📈 Memory growing trend"
+        return "⚠️ Memory usage rising continuously"
     return None
 
 # ------------------------------------------
