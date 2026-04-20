@@ -10,6 +10,7 @@ num_cpus = os.cpu_count() or 1
 # ---------------- STATE ----------------
 high_cpu_count = 0
 last_error_time = 0
+last_pid = None
 mem_history = []
 diagnosis_hold_until = 0
 last_sections = []
@@ -137,6 +138,15 @@ def memory_insight():
         "Check:",
         "- where data is accumulating",
       
+    ]
+
+def crash_insight():
+    return [
+        "⚠️ App restarted or closed",
+        "Likely:",
+        "- crash or manual restart",
+        "Check:",
+        "- recent actions in app"
     ]
 
 
@@ -591,6 +601,10 @@ def update_loop():
             return
 
         mem_mb = round(mem_kb / 1024)
+        
+        crash_detected = False
+        if last_pid is not None and pid != last_pid:
+           crash_detected = True
 
         if pid != prev_pid:
             prev_p = p
@@ -641,5 +655,6 @@ def update_loop():
 
     root.after(1000, update_loop)
 
+last_pid = pid
 update_loop()
 root.mainloop()
