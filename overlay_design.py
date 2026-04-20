@@ -668,3 +668,4 @@ def update_loop():
 update_loop()
 root.mainloop()
 
+# more memory usage detection
