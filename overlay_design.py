@@ -572,7 +572,7 @@ update_overlay("--", "--", "--", [])
 #     root.update()
 #     time.sleep(1)
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid;
 
     if is_frozen:
         root.after(100, update_loop)
@@ -595,16 +595,14 @@ def update_loop():
             root.after(1000, update_loop)
             return
 
-        if mem_kb is None:
-            update_overlay(str(pid), "--", "--", [])
-            root.after(1000, update_loop)
-            return
 
         mem_mb = round(mem_kb / 1024)
         
         crash_detected = False
+
         if last_pid is not None and pid != last_pid:
-           crash_detected = True
+          if not os.path.exists(f"/proc/{last_pid}"):
+            crash_detected = True
 
         if pid != prev_pid:
             prev_p = p
@@ -636,24 +634,25 @@ def update_loop():
         cpu_alert = detect_high_cpu(cpu)
         mem_alert = detect_memory_growth(mem_history)
         
-        issues = []
+        sections = []
 
         if crash_detected:
-           issues.extend(crash_insight())
+            sections.append(("APP EVENT", crash_insight()))
 
         if cpu_alert:
-           issues.extend(cpu_insight())
+            sections.append(("CPU WATCH", cpu_insight()))
 
         if mem_alert:
-           issues.extend(memory_insight())
+            sections.append(("MEM WATCH", memory_insight()))
 
-        sections = get_display_sections(issues)
+        sections = get_display_sections(sections)
 
         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
 
         prev_p = p
         prev_t = t
         prev_pid = pid
+        last_pid = pid
 
     except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
         prev_p = None
@@ -666,6 +665,5 @@ def update_loop():
 
     root.after(1000, update_loop)
 
-last_pid = pid
 update_loop()
 root.mainloop()
