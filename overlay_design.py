@@ -115,7 +115,7 @@ def cpu_insight():
         "Likely:",
         "- heavy computation or loop",
         "Check:",
-        "- recent changes in this app",
+        "- recent changes in this app if it is consuming excessive CPU",
     ]
 
 
