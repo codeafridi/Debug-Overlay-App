@@ -111,27 +111,22 @@ def detect_memory_growth(history):
 
 def cpu_insight():
     return [
-        "CPU pressure detected",
-        "Possible causes:",
-        "  * heavy computation",
-        "  * runaway loop",
-        "  * too many repeated tasks",
-        "Check next:",
-        "  * hot loops or timers",
-        "  * recent logic changes",
+        "⚠️ High CPU usage",
+        "Likely:",
+        "- heavy computation or loop",
+        "Check:",
+        "- recent changes in this app",
     ]
 
 
 def memory_insight():
     return [
-        "Memory is trending upward",
-        "Possible causes:",
-        "  * growing allocations",
-        "  * unreleased resources",
-        "  * cache buildup",
-        "Check next:",
-        "  * objects created in loops",
-        "  * cleanup paths",
+      "⚠️ Memory usage increasing",
+        "Likely:",
+        "- data growing over time",
+        "Check:",
+        "- where data is accumulating",
+      
     ]
 
 
