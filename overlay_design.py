@@ -9,6 +9,7 @@ num_cpus = os.cpu_count() or 1
 
 # ---------------- STATE ----------------
 high_cpu_count = 0
+last_error_time = 0
 mem_history = []
 diagnosis_hold_until = 0
 last_sections = []
@@ -29,6 +30,14 @@ last_pid_error_time = 0
 def log_error(message):
     print(f"[overlay] {message}", file=sys.stderr)
 
+def safe_log_error(message):
+    global last_error_time
+    now = time.time()
+
+    if now - last_error_time > 3:
+        log_error(message)
+        last_error_time = now
+
 
 # ---------------- SYSTEM ----------------
 
@@ -45,14 +54,14 @@ def get_active_pid():
         return int(result.strip())
     except FileNotFoundError:
         if not xdotool_warning_shown:
-            log_error("xdotool is not installed or not available in PATH")
+            safe_log_error("xdotool is not installed or not available in PATH")
             xdotool_warning_shown = True
         return None
     except subprocess.CalledProcessError as exc:
         now = time.time()
         error_key = ("xdotool_exit", exc.returncode)
         if last_pid_error != error_key or now - last_pid_error_time > 5:
-            log_error("could not determine active window PID; skipping this sample")
+            safe_log_error("could not determine active window PID; skipping this sample")
             last_pid_error = error_key
             last_pid_error_time = now
         return None
@@ -60,7 +69,7 @@ def get_active_pid():
         now = time.time()
         error_key = ("pid_parse", str(exc))
         if last_pid_error != error_key or now - last_pid_error_time > 5:
-            log_error(f"could not parse active window PID: {exc}")
+            safe_log_error(f"could not parse active window PID: {exc}")
             last_pid_error = error_key
             last_pid_error_time = now
         return None
@@ -570,6 +579,11 @@ def update_loop():
         p = get_process_time(pid)
         t = get_total_time()
         mem_kb = get_memory(pid)
+        if mem_kb is None:
+            safe_log_error(f"memory usage is unavailable for PID {pid}")
+            update_overlay(str(pid), "--", "--", [])
+            root.after(1000, update_loop)
+            return
 
         if mem_kb is None:
             update_overlay(str(pid), "--", "--", [])
@@ -595,7 +609,11 @@ def update_loop():
         delta_p = p - prev_p
         delta_t = t - prev_t
 
-        cpu = round((delta_p / delta_t) * 100 * num_cpus) if delta_t > 0 else 0
+        if delta_t > 0 and delta_p >= 0:
+          cpu = round((delta_p / delta_t) * 100 * num_cpus)
+        else:
+          cpu = 0
+        cpu = max(0, min(cpu, 999))
 
         mem_history.append(mem_mb)
         if len(mem_history) > 3:
@@ -612,13 +630,14 @@ def update_loop():
         prev_t = t
         prev_pid = pid
 
-    except:
+    except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
         prev_p = None
         prev_t = None
         prev_pid = None
         mem_history.clear()
         high_cpu_count = 0
-        update_overlay("--", "--", "--", [])
+        safe_log_error(f"process read failed for PID {pid}: {exc}")
+        update_overlay(str(pid), "--", "--", get_display_sections([("READ ERROR", [str(exc)])]))
 
     root.after(1000, update_loop)
 
