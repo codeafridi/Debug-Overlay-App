@@ -635,8 +635,19 @@ def update_loop():
 
         cpu_alert = detect_high_cpu(cpu)
         mem_alert = detect_memory_growth(mem_history)
+        
+        issues = []
 
-        sections = get_display_sections(build_issue_lines(cpu_alert, mem_alert))
+        if crash_detected:
+           issues.extend(crash_insight())
+
+        if cpu_alert:
+           issues.extend(cpu_insight())
+
+        if mem_alert:
+           issues.extend(memory_insight())
+
+        sections = get_display_sections(issues)
 
         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
 
