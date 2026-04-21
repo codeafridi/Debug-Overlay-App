@@ -192,14 +192,13 @@ def detect_log_errors(log_text):
 
 
 # ---------------- INSIGHTS ----------------
-
-def cpu_insight():
+def cpu_insight(pid, cpu):
     return [
-        "⚠️ High CPU usage",
-        "Likely:",
-        "- heavy computation or loop",
-        "Check:",
-        "- recent changes in this app if it is consuming excessive CPU",
+        f"CPU high ({cpu}%) on PID {pid}",
+        "Focus:",
+        f"- inspect process: top -p {pid}",
+        "- check active threads or loops",
+        "- look for repeated tasks or timers",
     ]
 
 
