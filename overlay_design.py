@@ -26,6 +26,10 @@ xdotool_warning_shown = False
 last_pid_error = None
 last_pid_error_time = 0
 
+prev_net = None
+low_net_count = 0
+high_net_count = 0
+
 
 def log_error(message):
     print(f"[overlay] {message}", file=sys.stderr)
@@ -142,6 +146,28 @@ def detect_memory_growth(history):
 
 def detect_disk_pressure(disk_percent):
     return disk_percent > 85
+
+
+def detect_low_network(delta):
+    global low_net_count
+
+    if delta < 1000:  # very low activity
+        low_net_count += 1
+    else:
+        low_net_count = 0
+
+    return low_net_count >= 3
+
+
+def detect_high_network(delta):
+    global high_net_count
+
+    if delta > 500000:  # high usage threshold (~500KB/sec)
+        high_net_count += 1
+    else:
+        high_net_count = 0
+
+    return high_net_count >= 3
 
 
 # ---------------- INSIGHTS ----------------
