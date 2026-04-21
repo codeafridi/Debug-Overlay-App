@@ -19,6 +19,7 @@ is_dragging = False
 details_visible = False
 window_height = 88
 
+last_log_check = 0
 prev_p = None
 prev_t = None
 prev_pid = None
@@ -679,7 +680,7 @@ update_overlay("--", "--", "--", [])
 #     root.update()
 #     time.sleep(1)
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net;
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check;
 
     if is_frozen:
         root.after(100, update_loop)
@@ -697,7 +698,7 @@ def update_loop():
         t = get_total_time()
         mem_kb = get_memory(pid)
         net = get_network_bytes()
-
+        #network block
         if prev_net is None:
             prev_net = net
             root.after(1000, update_loop)
@@ -709,6 +710,16 @@ def update_loop():
 
         low_net_alert = detect_low_network(delta_net)
         high_net_alert = detect_high_network(delta_net)
+
+      #log block
+        now = time.time()
+
+        log_alert = False
+        if now - last_log_check > 3:
+            logs = get_recent_logs()
+            log_alert = detect_log_errors(logs)
+            last_log_check = now
+       #fisnished log block
 
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for PID {pid}")
