@@ -96,6 +96,15 @@ def get_memory(pid):
                 return int(line.split()[1])  # KB
     return None
 
+def get_disk_usage():
+    stat = os.statvfs("/")
+    
+    total = stat.f_blocks * stat.f_frsize
+    free = stat.f_bavail * stat.f_frsize
+    used = total - free
+
+    percent = (used / total) * 100
+    return round(percent)
 
 # ---------------- PATTERNS ----------------
 
