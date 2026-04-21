@@ -126,6 +126,10 @@ def detect_memory_growth(history):
     return history[0] < history[1] < history[2]
 
 
+def detect_disk_pressure(disk_percent):
+    return disk_percent > 85
+
+
 # ---------------- INSIGHTS ----------------
 
 def cpu_insight():
@@ -157,6 +161,14 @@ def crash_insight():
         "- recent actions in app"
     ]
 
+def disk_insight():
+    return [
+        "⚠️ Disk usage high",
+        "Likely:",
+        "- logs or temp files growing",
+        "Check:",
+        "- large files or storage usage"
+    ]
 
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
@@ -602,7 +614,9 @@ def update_loop():
             update_overlay(str(pid), "--", "--", [])
             root.after(1000, update_loop)
             return
-
+        
+        disk_percent = get_disk_usage()
+        disk_alert = detect_disk_pressure(disk_percent)
 
         mem_mb = round(mem_kb / 1024)
         
@@ -652,6 +666,9 @@ def update_loop():
 
         if mem_alert:
             sections.append(("MEM WATCH", memory_insight()))
+
+        if disk_alert:
+            sections.append(("DISK WATCH", disk_insight()))
 
         sections = get_display_sections(sections)
 
