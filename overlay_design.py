@@ -231,30 +231,28 @@ def disk_insight():
 
 def network_low_insight():
     return [
-        "⚠️ No network activity",
-        "Likely:",
-        "- waiting for response",
-        "Check:",
-        "- request status or connectivity"
+        "No network activity",
+        "Focus:",
+        "- check if request is stuck",
+        "- verify API or server response",
+        "- confirm connectivity"
     ]
-
-
 def network_high_insight():
     return [
-        "⚠️ High network usage",
-        "Likely:",
-        "- heavy data transfer",
-        "Check:",
-        "- requests or downloads"
+        "High network usage",
+        "Focus:",
+        "- inspect downloads or API calls",
+        "- check for repeated requests",
+        "- monitor bandwidth-heavy tasks"
     ]
 
 def log_insight():
     return [
-        "⚠️ Errors detected in system logs",
-        "Likely:",
-        "- runtime failure or exception",
-        "Check:",
-        "- recent logs or console output"
+        "System errors detected",
+        "Focus:",
+        "- run: journalctl -n 20",
+        "- identify failing service or app",
+        "- check recent commands executed"
     ]
 
 def build_issue_lines(cpu_alert, mem_alert):
@@ -264,7 +262,7 @@ def build_issue_lines(cpu_alert, mem_alert):
         sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
 
     if mem_alert:
-        sections.append(("MEM WATCH", memory_insight()))
+        sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
 
     return sections
 
@@ -704,7 +702,7 @@ def update_loop():
             sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
 
         if mem_alert:
-            sections.append(("MEM WATCH", memory_insight()))
+            sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
 
         if disk_alert:
             sections.append(("DISK WATCH", disk_insight()))
