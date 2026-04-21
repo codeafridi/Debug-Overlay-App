@@ -261,7 +261,7 @@ def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
     if cpu_alert:
-        sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
+        sections.append(("CPU WATCH", "CRITICAL",cpu_insight(pid, cpu)))
 
     if mem_alert:
         sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
@@ -270,8 +270,7 @@ def build_issue_lines(cpu_alert, mem_alert):
 
 
 def get_display_sections(sections):
-    global diagnosis_hold_until
-    global last_sections
+    global diagnosis_hold_until, last_sections
 
     now = time.time()
 
@@ -284,7 +283,7 @@ def get_display_sections(sections):
         return last_sections
 
     last_sections = []
-    return []
+    return [("STATUS", "INFO", ["System stable"])]
 
 
 def toggle_freeze():
@@ -355,9 +354,13 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
     status_text = "STABLE"
     status_color = palette["ok"]
 
-    if sections:
-        status_text = "WARN"
-        status_color = palette["warn"]
+    if any(s[1] == "CRITICAL" for s in sections):
+       status_text = "CRITICAL"
+       status_color = palette["critical"]
+
+    elif any(s[1] == "WARN" for s in sections):
+       status_text = "WARN"
+       status_color = palette["warn"]
 
     if status_value.cget("text") != status_text or status_value.cget("fg") != status_color:
         status_value.config(text=status_text, fg=status_color)
@@ -372,8 +375,8 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
         lines = []
         lines.append(f"PID: {pid_text}")
         lines.append("")
-        for title, items in sections:
-            lines.append(f"[{title}]")
+        for title, severity, items in sections:
+            lines.append(f"[{title}] {severity}")
             lines.extend(items)
             lines.append("")
         issues_text = "\n".join(lines).rstrip()
@@ -698,26 +701,38 @@ def update_loop():
         sections = []
 
         if crash_detected:
-            sections.append(("APP EVENT", crash_insight()))
+            sections.append(("APP EVENT", "CRITICAL", crash_insight()))
 
         if cpu_alert:
-            sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
+            severity = "CRITICAL" if cpu > 90 else "WARN"
+            sections.append(("CPU WATCH", severity, cpu_insight(pid, cpu)))
+
 
         if mem_alert:
-            sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
+           sections.append(("MEM WATCH", "WARN", memory_insight(pid, mem_mb)))
 
         if disk_alert:
-            sections.append(("DISK WATCH", disk_insight(disk_percent)))
+            severity = "CRITICAL" if disk_percent > 90 else "WARN"
+            sections.append(("DISK WATCH", severity, disk_insight(disk_percent)))
 
         if low_net_alert:
-            sections.append(("NET WATCH", network_low_insight()))
+            sections.append(("NET WATCH", "INFO", network_low_insight()))
 
         if high_net_alert:
-            sections.append(("NET LOAD", network_high_insight()))
+            sections.append(("NET LOAD", "WARN", network_high_insight()))
 
         if log_alert:
-            sections.append(("LOG ALERT", log_insight()))
+            sections.append(("LOG ALERT", "WARN", log_insight()))
 
+        priority = {
+           "CRITICAL": 3,
+           "WARN": 2,
+           "INFO": 1
+        }
+
+        sections.sort(key=lambda x: priority[x[1]], reverse=True)
+        sections = sections[:2]
+           
         sections = get_display_sections(sections)
 
         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
