@@ -29,6 +29,7 @@ last_pid_error_time = 0
 
 prev_net = None
 low_net_count = 0
+log_alert_until = 0
 high_net_count = 0
 
 
@@ -603,84 +604,8 @@ update_overlay("--", "--", "--", [])
 
 # ---------------- LOOP ----------------
 
-# while True:
-#     if is_frozen:
-#         root.update()
-#         time.sleep(0.1)
-#         continue
-
-#     pid = get_active_pid()
-
-#     if pid is None:
-#         update_overlay("--", "--", "--", [])
-#         root.update()
-#         time.sleep(1)
-#         continue
-
-#     try:
-#         p = get_process_time(pid)
-#         t = get_total_time()
-#         mem_kb = get_memory(pid)
-#         if mem_kb is None:
-#             log_error(f"memory usage is unavailable for PID {pid}")
-#             update_overlay(
-#                 str(pid),
-#                 "--",
-#                 "--",
-#                 [("MEM WATCH", ["Memory data is unavailable right now"])],
-#             )
-#             root.update()
-#             time.sleep(1)
-#             continue
-
-#         mem_mb = round(mem_kb / 1024)
-
-#         if pid != prev_pid:
-#             prev_p = p
-#             prev_t = t
-#             prev_pid = pid
-
-#             mem_history.clear()
-#             mem_history.append(mem_mb)
-
-#             high_cpu_count = 0
-
-#             update_overlay(str(pid), "warming up", f"{mem_mb} MB", [])
-#             root.update()
-#             time.sleep(1)
-#             continue
-
-#         delta_p = p - prev_p
-#         delta_t = t - prev_t
-#         cpu = round((delta_p / delta_t) * 100 * num_cpus) if delta_t > 0 else 0
-
-#         mem_history.append(mem_mb)
-#         if len(mem_history) > 3:
-#             mem_history.pop(0)
-
-#         cpu_alert = detect_high_cpu(cpu)
-#         mem_alert = detect_memory_growth(mem_history)
-#         sections = get_display_sections(build_issue_lines(cpu_alert, mem_alert))
-
-#         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
-
-#         prev_p = p
-#         prev_t = t
-#         prev_pid = pid
-
-#     except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
-#         log_error(f"failed to read process metrics for PID {pid}: {exc}")
-#         prev_p = None
-#         prev_t = None
-#         prev_pid = None
-#         mem_history.clear()
-#         high_cpu_count = 0
-#         update_overlay(str(pid), "--", "--", get_display_sections([("READ ERROR", [str(exc)])]))
-
-#     root.update()
-#     time.sleep(1)
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check;
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until;
 
     if is_frozen:
         root.after(100, update_loop)
@@ -714,11 +639,15 @@ def update_loop():
       #log block
         now = time.time()
 
-        log_alert = False
         if now - last_log_check > 3:
             logs = get_recent_logs()
-            log_alert = detect_log_errors(logs)
+
+            if detect_log_errors(logs):
+                log_alert_until = now + 5  # keep visible for 5 seconds
+
             last_log_check = now
+
+        log_alert = now < log_alert_until
        #fisnished log block
 
         if mem_kb is None:
@@ -787,6 +716,9 @@ def update_loop():
 
         if high_net_alert:
             sections.append(("NET LOAD", network_high_insight()))
+
+        if log_alert:
+            sections.append(("LOG ALERT", log_insight()))
 
         sections = get_display_sections(sections)
 
