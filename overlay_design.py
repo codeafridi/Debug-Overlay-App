@@ -3,7 +3,6 @@ import subprocess
 import sys
 import time
 import tkinter as tk
-from pynput import keyboard
 
 num_cpus = os.cpu_count() or 1
 
