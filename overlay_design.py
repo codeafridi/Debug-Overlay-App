@@ -210,6 +210,25 @@ def disk_insight():
         "- large files or storage usage"
     ]
 
+def network_low_insight():
+    return [
+        "⚠️ No network activity",
+        "Likely:",
+        "- waiting for response",
+        "Check:",
+        "- request status or connectivity"
+    ]
+
+
+def network_high_insight():
+    return [
+        "⚠️ High network usage",
+        "Likely:",
+        "- heavy data transfer",
+        "Check:",
+        "- requests or downloads"
+    ]
+
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
@@ -632,7 +651,7 @@ update_overlay("--", "--", "--", [])
 #     root.update()
 #     time.sleep(1)
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid;
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net;
 
     if is_frozen:
         root.after(100, update_loop)
@@ -649,6 +668,20 @@ def update_loop():
         p = get_process_time(pid)
         t = get_total_time()
         mem_kb = get_memory(pid)
+        net = get_network_bytes()
+
+        if prev_net is None:
+            prev_net = net
+            root.after(1000, update_loop)
+            return
+
+
+        delta_net = net - prev_net
+        prev_net = net
+
+        low_net_alert = detect_low_network(delta_net)
+        high_net_alert = detect_high_network(delta_net)
+
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for PID {pid}")
             update_overlay(str(pid), "--", "--", [])
@@ -709,6 +742,12 @@ def update_loop():
 
         if disk_alert:
             sections.append(("DISK WATCH", disk_insight()))
+
+        if low_net_alert:
+            sections.append(("NET WATCH", network_low_insight()))
+
+        if high_net_alert:
+            sections.append(("NET LOAD", network_high_insight()))
 
         sections = get_display_sections(sections)
 
