@@ -248,6 +248,15 @@ def network_high_insight():
         "- requests or downloads"
     ]
 
+def log_insight():
+    return [
+        "⚠️ Errors detected in system logs",
+        "Likely:",
+        "- runtime failure or exception",
+        "Check:",
+        "- recent logs or console output"
+    ]
+
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
