@@ -106,6 +106,20 @@ def get_disk_usage():
     percent = (used / total) * 100
     return round(percent)
 
+def get_network_bytes():
+    with open("/proc/net/dev") as f:
+        lines = f.readlines()[2:]
+
+    total_rx = 0
+    total_tx = 0
+
+    for line in lines:
+        parts = line.split()
+        total_rx += int(parts[1])
+        total_tx += int(parts[9])
+
+    return total_rx + total_tx
+
 # ---------------- PATTERNS ----------------
 
 def detect_high_cpu(cpu):
