@@ -129,7 +129,7 @@ def get_network_bytes():
 def get_recent_logs():
     try:
         result = subprocess.check_output(
-            ["journalctl", "-n", "20", "--no-pager"],
+            ["journalctl", "--since", "2 seconds ago", "--no-pager"],
             stderr=subprocess.DEVNULL
         )
         return result.decode().lower()
@@ -183,12 +183,16 @@ def detect_high_network(delta):
 
 def detect_log_errors(log_text):
     keywords = ["error", "failed", "exception", "critical"]
+    ignore = ["gnome-shell", "rtkit-daemon", "audit:", "telegram"]
 
-    for word in keywords:
-        if word in log_text:
-            return True
+    count = 0
 
-    return False
+    for line in log_text.splitlines():
+        if any(word in line for word in keywords):
+            if not any(ig in line for ig in ignore):
+                count += 1
+
+    return count >= 3
 
 
 # ---------------- INSIGHTS ----------------
