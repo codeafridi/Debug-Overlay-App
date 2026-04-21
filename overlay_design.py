@@ -202,14 +202,13 @@ def cpu_insight(pid, cpu):
     ]
 
 
-def memory_insight():
+def memory_insight(pid, mem_mb):
     return [
-      "⚠️ Memory usage increasing",
-        "Likely:",
-        "- data growing over time",
-        "Check:",
-        "- where data is accumulating",
-      
+        f"Memory rising ({mem_mb} MB) on PID {pid}",
+        "Focus:",
+        "- check growing objects or lists",
+        "- verify resources are released",
+        "- inspect long-running loops"
     ]
 
 def crash_insight():
@@ -262,7 +261,7 @@ def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
     if cpu_alert:
-        sections.append(("CPU WATCH", cpu_insight()))
+        sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
 
     if mem_alert:
         sections.append(("MEM WATCH", memory_insight()))
@@ -702,7 +701,7 @@ def update_loop():
             sections.append(("APP EVENT", crash_insight()))
 
         if cpu_alert:
-            sections.append(("CPU WATCH", cpu_insight()))
+            sections.append(("CPU WATCH", cpu_insight(pid, cpu)))
 
         if mem_alert:
             sections.append(("MEM WATCH", memory_insight()))
