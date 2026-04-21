@@ -219,16 +219,14 @@ def crash_insight():
         "Check:",
         "- recent actions in app"
     ]
-
-def disk_insight():
+def disk_insight(disk_percent):
     return [
-        "⚠️ Disk usage high",
-        "Likely:",
-        "- logs or temp files growing",
-        "Check:",
-        "- large files or storage usage"
+        f"Disk usage high ({disk_percent}%)",
+        "Focus:",
+        "- run: df -h",
+        "- locate large files",
+        "- clear logs or temp files"
     ]
-
 def network_low_insight():
     return [
         "No network activity",
@@ -705,7 +703,7 @@ def update_loop():
             sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
 
         if disk_alert:
-            sections.append(("DISK WATCH", disk_insight()))
+            sections.append(("DISK WATCH", disk_insight(disk_percent)))
 
         if low_net_alert:
             sections.append(("NET WATCH", network_low_insight()))
