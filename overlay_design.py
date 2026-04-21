@@ -124,6 +124,16 @@ def get_network_bytes():
 
     return total_rx + total_tx
 
+def get_recent_logs():
+    try:
+        result = subprocess.check_output(
+            ["journalctl", "-n", "20", "--no-pager"],
+            stderr=subprocess.DEVNULL
+        )
+        return result.decode().lower()
+    except:
+        return ""
+
 # ---------------- PATTERNS ----------------
 
 def detect_high_cpu(cpu):
@@ -168,6 +178,15 @@ def detect_high_network(delta):
         high_net_count = 0
 
     return high_net_count >= 3
+
+def detect_log_errors(log_text):
+    keywords = ["error", "failed", "exception", "critical"]
+
+    for word in keywords:
+        if word in log_text:
+            return True
+
+    return False
 
 
 # ---------------- INSIGHTS ----------------
