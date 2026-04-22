@@ -755,5 +755,5 @@ def update_loop():
 
 update_loop()
 root.mainloop()
-
+#more details button
 # more memory usage detection
