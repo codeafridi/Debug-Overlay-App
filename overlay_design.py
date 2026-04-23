@@ -404,17 +404,23 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     is_compact_idle = not overlay_visible and not should_show_details
 
     if is_compact_idle:
-        compact_title = f" PID {pid_text} | CPU {cpu_text} | MEM {mem_text} "
-        if title_label.cget("text") != compact_title:
-            title_label.config(text=compact_title)
+        compact_title = f"PID {pid_text} | CPU {cpu_text} | MEM {mem_text}"
+        if title_label.winfo_manager():
+            title_label.pack_forget()
+        if compact_value.cget("text") != compact_title:
+            compact_value.config(text=compact_title)
+        if not compact_value.winfo_manager():
+            compact_value.pack(side="left", fill="x", expand=True, padx=(14, 8), pady=7)
         if hud_visible:
             hud_bar.pack_forget()
             hud_visible = False
     else:
-        if title_label.cget("text") != " DEBUG HUD ":
-            title_label.config(text=" DEBUG HUD ")
+        if compact_value.winfo_manager():
+            compact_value.pack_forget()
+        if not title_label.winfo_manager():
+            title_label.pack(side="left", padx=12, pady=7)
         if not hud_visible:
-            hud_bar.pack(fill="x", padx=8, pady=(8, 8))
+            hud_bar.pack(fill="x", padx=10, pady=(10, 10))
             hud_visible = True
 
     if sections:
@@ -474,10 +480,10 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             details_visible = False
 
         if not is_dragging:
-            target_height = 38 if is_compact_idle else 70
+            target_height = 46 if is_compact_idle else 82
 
             if window_height != target_height:
-                root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+                root.geometry(f"460x{target_height}+{current_x}+{current_y}")
                 window_height = target_height
 
 
@@ -509,7 +515,7 @@ palette = {
 metrics_cache = {"pid": "--", "name": "unknown", "cpu": "--", "mem": "--"}
 current_sections = []
 
-root.geometry("430x88+40+40")
+root.geometry("460x96+40+40")
 
 panel = tk.Frame(
     root,
@@ -521,39 +527,49 @@ panel = tk.Frame(
 )
 panel.pack(fill="both", expand=True)
 
-title_bar = tk.Frame(panel, bg=palette["title"], height=28)
+title_bar = tk.Frame(panel, bg=palette["title"], height=34)
 title_bar.pack(fill="x")
 title_bar.pack_propagate(False)
 
 title_label = tk.Label(
     title_bar,
-    text=" DEBUG HUD ",
+    text="DEBUG HUD",
     bg=palette["title"],
     fg=palette["title_text"],
-    font=("Helvetica", 10, "bold"),
+    font=("Helvetica", 11, "bold"),
 )
-title_label.pack(side="left", padx=8)
+title_label.pack(side="left", padx=12, pady=7)
+
+compact_value = tk.Label(
+    title_bar,
+    text="PID -- | CPU -- | MEM --",
+    justify="left",
+    anchor="w",
+    bg=palette["title"],
+    fg="#c9d6ea",
+    font=("Courier New", 10, "bold"),
+)
 
 status_value = tk.Label(
     title_bar,
     text="OK",
     bg=palette["title"],
     fg=palette["ok"],
-    font=("Courier New", 9, "bold"),
+    font=("Courier New", 10, "bold"),
 )
-status_value.pack(side="right", padx=8)
+status_value.pack(side="right", padx=12, pady=7)
 
 body = tk.Frame(panel, bg=palette["panel"])
-body.pack(fill="both", expand=True, padx=4, pady=4)
+body.pack(fill="both", expand=True, padx=6, pady=6)
 
 hud_bar = tk.Frame(
     body,
     bg=palette["panel_alt"],
     bd=2,
     relief="sunken",
-    height=36,
+    height=44,
 )
-hud_bar.pack(fill="x", padx=8, pady=(8, 8))
+hud_bar.pack(fill="x", padx=10, pady=(10, 10))
 hud_bar.pack_propagate(False)
 
 summary_value = tk.Label(
@@ -565,10 +581,10 @@ summary_value = tk.Label(
     fg=palette["text"],
     font=("Courier New", 10, "bold"),
 )
-summary_value.pack(side="left", fill="x", expand=True, padx=10, pady=5)
+summary_value.pack(side="left", fill="x", expand=True, padx=14, pady=8)
 
 button_bar = tk.Frame(hud_bar, bg=palette["panel_alt"])
-button_bar.pack(side="right", padx=6, pady=3)
+button_bar.pack(side="right", padx=10, pady=6)
 
 freeze_button = tk.Button(
     button_bar,
@@ -582,9 +598,9 @@ freeze_button = tk.Button(
     bd=2,
     font=("Helvetica", 8, "bold"),
     width=4,
-    pady=1,
+    pady=2,
 )
-freeze_button.pack(side="left", padx=(0, 4))
+freeze_button.pack(side="left", padx=(0, 6))
 
 details_button = tk.Button(
     button_bar,
@@ -598,7 +614,7 @@ details_button = tk.Button(
     bd=2,
     font=("Helvetica", 8, "bold"),
     width=5,
-    pady=1,
+    pady=2,
 )
 details_button.pack(side="left")
 
