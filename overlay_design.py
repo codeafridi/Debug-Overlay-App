@@ -470,7 +470,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             )
 
             if window_height != target_height:
-                root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+                root.geometry(f"460x{target_height}+{current_x}+{current_y}")
                 window_height = target_height
 
     else:
