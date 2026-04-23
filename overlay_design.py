@@ -38,6 +38,12 @@ low_net_count = 0
 log_alert_until = 0
 high_net_count = 0
 
+IGNORE_PROCESSES = [
+    "gnome-shell",
+    "Xorg",
+    "systemd",
+]
+
 def get_process_name(pid):
     try:
         with open(f"/proc/{pid}/comm") as f:
@@ -351,7 +357,7 @@ def make_draggable(widget):
     widget.bind("<ButtonRelease-1>", stop_drag)
 
 
-def update_overlay(pid_text, cpu_text, mem_text, sections):
+def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     global current_sections
     global details_visible
     global window_height
@@ -610,7 +616,7 @@ for draggable in (
     footer,
 ):
     make_draggable(draggable)
-update_overlay("--", "--", "--", [])
+update_overlay("--", "unknown", "--", "--", [])
 
 
 
@@ -624,8 +630,15 @@ def update_loop():
 
     pid = get_active_pid()
     name = get_process_name(pid)
+    if name in IGNORE_PROCESSES:
+        update_overlay("--", "idle", "--", "--", [])
+        root.after(1000, update_loop)
+        return
+    root.after(1000, update_loop)
+    return
+
     if pid is None:
-        update_overlay("--", "--", "--", [])
+        update_overlay("--", "unknown", "--", "--", [])
         root.after(1000, update_loop)
         return
 
@@ -688,7 +701,7 @@ def update_loop():
 
             high_cpu_count = 0
 
-            update_overlay(str(pid), "warming up", f"{mem_mb} MB", [])
+            update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
             root.after(1000, update_loop)
             return
 
@@ -761,7 +774,7 @@ def update_loop():
            alert_hold_until = now + 3  
         sections = get_display_sections(sections)
 
-        update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
+        update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
 
         prev_p = p
         prev_t = t
