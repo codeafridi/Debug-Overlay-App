@@ -258,9 +258,9 @@ def log_insight():
     return [
         "System errors detected",
         "Focus:",
-        "- run: journalctl -n 20",
+        "- view logs: journalctl -n 50",
+        "- filter errors: journalctl -p err",
         "- identify failing service or app",
-        "- check recent commands executed"
     ]
 
 def build_issue_lines(cpu_alert, mem_alert):
