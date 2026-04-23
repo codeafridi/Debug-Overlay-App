@@ -615,7 +615,7 @@ update_overlay("--", "--", "--", [])
 
 
 def update_loop():
-    name = get_process_name(pid)
+    
     global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until,last_alert_key, alert_hold_until, last_cpu, last_mem;
 
     if is_frozen:
@@ -623,7 +623,7 @@ def update_loop():
         return
 
     pid = get_active_pid()
-
+    name = get_process_name(pid)
     if pid is None:
         update_overlay("--", "--", "--", [])
         root.after(1000, update_loop)
