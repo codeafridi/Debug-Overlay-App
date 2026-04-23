@@ -388,11 +388,14 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     if status_value.cget("text") != status_text or status_value.cget("fg") != status_color:
         status_value.config(text=status_text, fg=status_color)
 
-    summary_text = f"CPU {cpu_text} | MEM {mem_text} | {status_text}"
+    if sections:
+      summary_text = f"{name} (PID {pid_text}) | CPU {cpu_text} | MEM {mem_text} | {status_text}"
+    else:
+      summary_text = f"{name} (PID {pid_text}) | CPU {cpu_text} | MEM {mem_text}"
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
-    should_show_details = is_expanded or is_frozen or overlay_visible
+    should_show_details = bool(sections) or is_expanded or is_frozen
 
     if sections:
         lines = []
@@ -405,7 +408,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         issues_text = "\n".join(lines).rstrip()
         issues_color = palette["text"]
     else:
-        issues_text = f"PID: {pid_text}\n\nNo active alerts. System behavior looks normal."
+        issues_text = ""
         issues_color = palette["muted"]
 
     current_text = issues_value.get("1.0", "end-1c")
@@ -451,7 +454,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             details_visible = False
 
         if not is_dragging:
-            target_height = 60
+            target_height = 70
 
             if window_height != target_height:
                 root.geometry(f"430x{target_height}+{current_x}+{current_y}")
@@ -659,7 +662,7 @@ def update_loop():
     pid = get_active_pid()
     name = get_process_name(pid)
     if name in IGNORE_PROCESSES or pid is None:
-        update_overlay("--", "idle", "--", "--", [])
+        update_overlay(str(pid or "--"), name or "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
 
@@ -740,7 +743,8 @@ def update_loop():
         else:
           cpu = 0
         
-        is_warming = False
+        if delta_t > 0:
+          is_warming = False
         cpu = max(0, min(cpu, 999))
 
         mem_history.append(mem_mb)
@@ -815,7 +819,7 @@ def update_loop():
           root.attributes("-alpha", 1.0)
         else:
             root.attributes("-alpha", 0.5)
-            root.lift()
+            
         
         if is_warming:
           update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
