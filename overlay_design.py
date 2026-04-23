@@ -21,6 +21,7 @@ window_height = 88
 
 is_warming = True
 
+
 last_alert_key = None
 alert_hold_until = 0
 
@@ -304,7 +305,7 @@ def get_display_sections(sections):
         return last_sections
 
     last_sections = []
-    return [("STATUS", "INFO", ["System stable"])]
+    return []
 
 
 def toggle_freeze():
@@ -699,18 +700,19 @@ def update_loop():
             crash_detected = True
 
         if pid != prev_pid:
-            prev_p = p
-            prev_t = t
-            prev_pid = pid
+             prev_p = p
+             prev_t = t
+             prev_pid = pid
 
-            mem_history.clear()
-            mem_history.append(mem_mb)
+             mem_history.clear()
+             mem_history.append(mem_mb)
 
-            high_cpu_count = 0
+             high_cpu_count = 0
+             is_warming = True
 
-            update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
-            root.after(1000, update_loop)
-            return
+             update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
+             root.after(1000, update_loop)
+             return
 
         delta_p = p - prev_p
         delta_t = t - prev_t
@@ -794,8 +796,11 @@ def update_loop():
         else:
             root.attributes("-alpha", 0.5)
             root.lift()
-            root.focus_force()
-        update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
+        
+        if is_warming:
+          update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
+        else:
+          update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
 
         prev_p = p
         prev_t = t
