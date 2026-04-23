@@ -19,6 +19,8 @@ is_dragging = False
 details_visible = False
 window_height = 88
 
+is_warming = True
+
 last_alert_key = None
 alert_hold_until = 0
 
@@ -37,6 +39,9 @@ prev_net = None
 low_net_count = 0
 log_alert_until = 0
 high_net_count = 0
+
+overlay_visible = False
+overlay_hold_until = 0
 
 IGNORE_PROCESSES = [
     "gnome-shell",
@@ -385,7 +390,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
-    should_show_details = is_expanded or is_frozen or bool(sections)
+    should_show_details = is_expanded or is_frozen or overlay_visible
 
     if sections:
         lines = []
@@ -428,9 +433,11 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             issues_frame.pack_forget()
             footer.pack_forget()
             details_visible = False
-        if not is_dragging and window_height != 88:
-            root.geometry(f"430x88+{current_x}+{current_y}")
-            window_height = 88
+        if not is_dragging:
+           target_height = 60 if not overlay_visible else 140
+           if window_height != target_height:
+             root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+             window_height = target_height
 
 
 # ---------------- KEY TOGGLE ----------------
@@ -621,8 +628,10 @@ update_overlay("--", "unknown", "--", "--", [])
 
 
 def update_loop():
-    
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until,last_alert_key, alert_hold_until, last_cpu, last_mem;
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net
+    global last_log_check, log_alert_until, last_alert_key, alert_hold_until
+    global last_cpu, last_mem
+    global overlay_visible, overlay_hold_until
 
     if is_frozen:
         root.after(100, update_loop)
@@ -634,8 +643,6 @@ def update_loop():
         update_overlay("--", "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
-    root.after(1000, update_loop)
-    return
 
     if pid is None:
         update_overlay("--", "unknown", "--", "--", [])
@@ -774,6 +781,20 @@ def update_loop():
            alert_hold_until = now + 3  
         sections = get_display_sections(sections)
 
+
+        now = time.time()
+        if sections:
+          overlay_visible = True
+          overlay_hold_until = now + 3
+        elif now > overlay_hold_until:
+          overlay_visible = False
+
+        if overlay_visible:
+          root.attributes("-alpha", 1.0)
+        else:
+            root.attributes("-alpha", 0.5)
+            root.lift()
+            root.focus_force()
         update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
 
         prev_p = p
@@ -781,6 +802,10 @@ def update_loop():
         prev_pid = pid
         last_pid = pid
 
+        
+
+
+    
     except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
         prev_p = None
         prev_t = None
@@ -788,7 +813,13 @@ def update_loop():
         mem_history.clear()
         high_cpu_count = 0
         safe_log_error(f"process read failed for PID {pid}: {exc}")
-        update_overlay(str(pid), "--", "--", get_display_sections([("READ ERROR", [str(exc)])]))
+        update_overlay(
+          str(pid),
+          "error",
+          "--",
+          "--",
+    get_display_sections([("READ ERROR", "CRITICAL", [str(exc)])])
+)
 
     root.after(1000, update_loop)
 
