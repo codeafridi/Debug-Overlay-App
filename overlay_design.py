@@ -44,6 +44,7 @@ high_net_count = 0
 
 overlay_visible = False
 overlay_hold_until = 0
+hud_visible = True
 
 IGNORE_PROCESSES = [
     "gnome-shell",
@@ -369,6 +370,7 @@ def make_draggable(widget):
 def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     global current_sections
     global details_visible
+    global hud_visible
     global window_height
 
     current_sections = sections
@@ -399,6 +401,21 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         summary_value.config(text=summary_text)
 
     should_show_details = bool(sections) or is_expanded or is_frozen
+    is_compact_idle = not overlay_visible and not should_show_details
+
+    if is_compact_idle:
+        compact_title = f" PID {pid_text} | CPU {cpu_text} | MEM {mem_text} "
+        if title_label.cget("text") != compact_title:
+            title_label.config(text=compact_title)
+        if hud_visible:
+            hud_bar.pack_forget()
+            hud_visible = False
+    else:
+        if title_label.cget("text") != " DEBUG HUD ":
+            title_label.config(text=" DEBUG HUD ")
+        if not hud_visible:
+            hud_bar.pack(fill="x", padx=8, pady=(8, 8))
+            hud_visible = True
 
     if sections:
         lines = []
@@ -457,7 +474,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             details_visible = False
 
         if not is_dragging:
-            target_height = 70
+            target_height = 38 if is_compact_idle else 70
 
             if window_height != target_height:
                 root.geometry(f"430x{target_height}+{current_x}+{current_y}")
