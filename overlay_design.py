@@ -418,27 +418,39 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     current_x = root.winfo_x()
     current_y = root.winfo_y()
 
-    if should_show_details:
-        if not details_visible:
-            issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
-            footer.pack(fill="x", padx=8, pady=(0, 8))
-            details_visible = True
-        line_count = issues_text.count("\n") + 1
+    # ----- DETAILS VISIBILITY + HEIGHT CONTROL -----
+
+if overlay_visible or is_expanded or is_frozen:
+    if not details_visible:
+        issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
+        footer.pack(fill="x", padx=8, pady=(0, 8))
+        details_visible = True
+
+    if not is_dragging:
+        line_count = issues_value.get("1.0", "end-1c").count("\n") + 1
         footer_lines = footer.cget("text").count("\n") + 1
-        target_height = max(240, min(360, 112 + (min(line_count, 9) * 18) + (footer_lines * 14)))
-        if not is_dragging and target_height != window_height:
+
+        target_height = max(
+            240,
+            min(360, 112 + (min(line_count, 9) * 18) + (footer_lines * 14))
+        )
+
+        if window_height != target_height:
             root.geometry(f"430x{target_height}+{current_x}+{current_y}")
             window_height = target_height
-    else:
-        if details_visible:
-            issues_frame.pack_forget()
-            footer.pack_forget()
-            details_visible = False
-        if not is_dragging:
-           target_height = 60 if not overlay_visible else 140
-           if window_height != target_height:
-             root.geometry(f"430x{target_height}+{current_x}+{current_y}")
-             window_height = target_height
+
+else:
+    if details_visible:
+        issues_frame.pack_forget()
+        footer.pack_forget()
+        details_visible = False
+
+    if not is_dragging:
+        target_height = 60
+
+        if window_height != target_height:
+            root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+            window_height = target_height
 
 
 # ---------------- KEY TOGGLE ----------------
