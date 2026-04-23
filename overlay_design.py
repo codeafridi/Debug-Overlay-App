@@ -212,13 +212,13 @@ def cpu_insight(pid, cpu):
     ]
 
 
-def memory_insight(pid, mem_mb):
+def memory_insight(pid, mem):
     return [
-        f"Memory rising ({mem_mb} MB) on PID {pid}",
+        f"Memory high ({mem} MB) on PID {pid}",
         "Focus:",
-        "- check growing objects or lists",
-        "- verify resources are released",
-        "- inspect long-running loops"
+        f"- inspect: top -p {pid}",
+        f"- check leaks: pmap -x {pid}",
+        "- look for growing data structures",
     ]
 
 def crash_insight():
