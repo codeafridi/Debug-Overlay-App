@@ -730,6 +730,7 @@ def update_loop():
            "INFO": 1
         }
 #this is the priority system for the sections
+#this is the priority system for the sections
         sections.sort(key=lambda x: priority[x[1]], reverse=True)
         sections = sections[:2]
            
