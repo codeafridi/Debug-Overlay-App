@@ -3,6 +3,7 @@ import subprocess
 import sys
 import time
 import tkinter as tk
+root = tk.Tk()
 
 num_cpus = os.cpu_count() or 1
 
@@ -418,39 +419,43 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     current_x = root.winfo_x()
     current_y = root.winfo_y()
 
-    # ----- DETAILS VISIBILITY + HEIGHT CONTROL -----
 
-if overlay_visible or is_expanded or is_frozen:
-    if not details_visible:
-        issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
-        footer.pack(fill="x", padx=8, pady=(0, 8))
-        details_visible = True
 
-    if not is_dragging:
-        line_count = issues_value.get("1.0", "end-1c").count("\n") + 1
-        footer_lines = footer.cget("text").count("\n") + 1
 
-        target_height = max(
-            240,
-            min(360, 112 + (min(line_count, 9) * 18) + (footer_lines * 14))
-        )
+##for design 
 
-        if window_height != target_height:
-            root.geometry(f"430x{target_height}+{current_x}+{current_y}")
-            window_height = target_height
 
-else:
-    if details_visible:
-        issues_frame.pack_forget()
-        footer.pack_forget()
-        details_visible = False
+    if overlay_visible or is_expanded or is_frozen:
+        if not details_visible:
+            issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
+            footer.pack(fill="x", padx=8, pady=(0, 8))
+            details_visible = True
 
-    if not is_dragging:
-        target_height = 60
+        if not is_dragging:
+            line_count = issues_value.get("1.0", "end-1c").count("\n") + 1
+            footer_lines = footer.cget("text").count("\n") + 1
 
-        if window_height != target_height:
-            root.geometry(f"430x{target_height}+{current_x}+{current_y}")
-            window_height = target_height
+            target_height = max(
+                240,
+                min(360, 112 + (min(line_count, 9) * 18) + (footer_lines * 14))
+            )
+
+            if window_height != target_height:
+                root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+                window_height = target_height
+
+    else:
+        if details_visible:
+            issues_frame.pack_forget()
+            footer.pack_forget()
+            details_visible = False
+
+        if not is_dragging:
+            target_height = 60
+
+            if window_height != target_height:
+                root.geometry(f"430x{target_height}+{current_x}+{current_y}")
+                window_height = target_height
 
 
 # ---------------- KEY TOGGLE ----------------
@@ -458,7 +463,7 @@ else:
 
 # ---------------- UI ----------------
 
-root = tk.Tk()
+
 root.title("Debug Overlay")
 root.attributes("-topmost", True)
 root.overrideredirect(True)
@@ -645,6 +650,7 @@ def update_loop():
     global last_log_check, log_alert_until, last_alert_key, alert_hold_until
     global last_cpu, last_mem
     global overlay_visible, overlay_hold_until
+    global is_warming
 
     if is_frozen:
         root.after(100, update_loop)
@@ -652,7 +658,7 @@ def update_loop():
 
     pid = get_active_pid()
     name = get_process_name(pid)
-    if name in IGNORE_PROCESSES:
+    if name in IGNORE_PROCESSES or pid is None:
         update_overlay("--", "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
