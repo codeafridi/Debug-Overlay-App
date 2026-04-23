@@ -38,6 +38,12 @@ low_net_count = 0
 log_alert_until = 0
 high_net_count = 0
 
+def get_process_name(pid):
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except:
+        return "unknown"
 
 def log_error(message):
     print(f"[overlay] {message}", file=sys.stderr)
@@ -377,7 +383,7 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
 
     if sections:
         lines = []
-        lines.append(f"PID: {pid_text}")
+        lines.append(f"PID: {pid_text} ({name})")
         lines.append("")
         for title, severity, items in sections:
             lines.append(f"[{title}] {severity}")
@@ -609,6 +615,7 @@ update_overlay("--", "--", "--", [])
 
 
 def update_loop():
+    name = get_process_name(pid)
     global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until,last_alert_key, alert_hold_until, last_cpu, last_mem;
 
     if is_frozen:
@@ -737,7 +744,7 @@ def update_loop():
         sections.sort(key=lambda x: priority[x[1]], reverse=True)
         if any(s[1] != "INFO" for s in sections):
            sections = [s for s in sections if s[1] != "INFO"]
-        sections = sections[:2]
+        sections = sections[:1]
 
         now = time.time()
 
