@@ -284,10 +284,10 @@ def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
     if cpu_alert:
-        sections.append(("CPU WATCH", "CRITICAL",cpu_insight(pid, cpu)))
+        sections.append(("CPU WATCH", "CRITICAL", []))
 
     if mem_alert:
-        sections.append(("MEM WATCH", memory_insight(pid, mem_mb)))
+        sections.append(("MEM WATCH", "WARN", []))
 
     return sections
 
@@ -320,6 +320,7 @@ def toggle_freeze():
     )
     update_overlay(
         metrics_cache["pid"],
+        metrics_cache["name"],
         metrics_cache["cpu"],
         metrics_cache["mem"],
         current_sections,
@@ -333,6 +334,7 @@ def toggle_details():
     details_button.config(text="HIDE" if is_expanded else "MORE")
     update_overlay(
         metrics_cache["pid"],
+        metrics_cache["name"],
         metrics_cache["cpu"],
         metrics_cache["mem"],
         current_sections,
@@ -371,6 +373,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
 
     current_sections = sections
     metrics_cache["pid"] = pid_text
+    metrics_cache["name"] = name
     metrics_cache["cpu"] = cpu_text
     metrics_cache["mem"] = mem_text
 
@@ -428,7 +431,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
 ##for design 
 
 
-    if overlay_visible or is_expanded or is_frozen:
+    if should_show_details:
         if not details_visible:
             issues_frame.pack(fill="both", expand=True, padx=8, pady=(6, 8))
             footer.pack(fill="x", padx=8, pady=(0, 8))
@@ -483,9 +486,10 @@ palette = {
     "muted": "#86d8ff",
     "ok": "#79ffb0",
     "warn": "#ffd45d",
+    "critical": "#ff6b6b",
 }
 
-metrics_cache = {"pid": "--", "cpu": "--", "mem": "--"}
+metrics_cache = {"pid": "--", "name": "unknown", "cpu": "--", "mem": "--"}
 current_sections = []
 
 root.geometry("430x88+40+40")
@@ -660,14 +664,14 @@ def update_loop():
         return
 
     pid = get_active_pid()
-    name = get_process_name(pid)
-    if name in IGNORE_PROCESSES or pid is None:
-        update_overlay(str(pid or "--"), name or "idle", "--", "--", [])
+    if pid is None:
+        update_overlay("--", "unknown", "--", "--", [])
         root.after(1000, update_loop)
         return
 
-    if pid is None:
-        update_overlay("--", "unknown", "--", "--", [])
+    name = get_process_name(pid)
+    if name in IGNORE_PROCESSES:
+        update_overlay(str(pid or "--"), name or "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
 
@@ -705,7 +709,7 @@ def update_loop():
        
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for PID {pid}")
-            update_overlay(str(pid), "--", "--", [])
+            update_overlay(str(pid), name, "--", "--", [])
             root.after(1000, update_loop)
             return
         
@@ -843,12 +847,12 @@ def update_loop():
         high_cpu_count = 0
         safe_log_error(f"process read failed for PID {pid}: {exc}")
         update_overlay(
-          str(pid),
-          "error",
-          "--",
-          "--",
-    get_display_sections([("READ ERROR", "CRITICAL", [str(exc)])])
-)
+            str(pid),
+            "error",
+            "--",
+            "--",
+            get_display_sections([("READ ERROR", "CRITICAL", [str(exc)])]),
+        )
 
     root.after(1000, update_loop)
 
