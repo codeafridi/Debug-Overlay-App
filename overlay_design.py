@@ -241,9 +241,8 @@ def network_low_insight():
     return [
         "No network activity",
         "Focus:",
-        "- check if request is stuck",
-        "- verify API or server response",
-        "- confirm connectivity"
+        "- check API/server response",
+        "- verify request is not stuck",
     ]
 def network_high_insight():
     return [
