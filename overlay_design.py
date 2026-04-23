@@ -207,8 +207,8 @@ def cpu_insight(pid, cpu):
         f"CPU high ({cpu}%) on PID {pid}",
         "Focus:",
         f"- inspect process: top -p {pid}",
-        "- check active threads or loops",
-        "- look for repeated tasks or timers",
+        f"- trace system calls: strace -p {pid}",
+        "- check for infinite loops or heavy tasks",
     ]
 
 
