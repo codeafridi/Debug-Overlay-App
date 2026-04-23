@@ -721,6 +721,8 @@ def update_loop():
           cpu = round((delta_p / delta_t) * 100 * num_cpus)
         else:
           cpu = 0
+        
+        is_warming = False
         cpu = max(0, min(cpu, 999))
 
         mem_history.append(mem_mb)
