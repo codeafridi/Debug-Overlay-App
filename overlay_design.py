@@ -247,11 +247,10 @@ def network_low_insight():
     ]
 def network_high_insight():
     return [
-        "High network usage",
+        "High network activity",
         "Focus:",
-        "- inspect downloads or API calls",
-        "- check for repeated requests",
-        "- monitor bandwidth-heavy tasks"
+        "- check connections: netstat -tulnp",
+        "- inspect process traffic: nethogs",
     ]
 
 def log_insight():
