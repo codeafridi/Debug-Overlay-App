@@ -603,7 +603,6 @@ for draggable in (
 update_overlay("--", "--", "--", [])
 
 
-# ---------------- LOOP ----------------
 
 def update_loop():
     global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until;
@@ -650,7 +649,7 @@ def update_loop():
 
         log_alert = now < log_alert_until
        #fisnished log block
-
+       
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for PID {pid}")
             update_overlay(str(pid), "--", "--", [])
