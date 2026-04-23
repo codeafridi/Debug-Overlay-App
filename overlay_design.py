@@ -19,6 +19,12 @@ is_dragging = False
 details_visible = False
 window_height = 88
 
+last_alert_key = None
+alert_hold_until = 0
+
+last_cpu = 0
+last_mem = 0
+
 last_log_check = 0
 prev_p = None
 prev_t = None
@@ -377,7 +383,7 @@ def update_overlay(pid_text, cpu_text, mem_text, sections):
         lines.append("")
         for title, severity, items in sections:
             lines.append(f"[{title}] {severity}")
-            lines.extend(items)
+            lines.extend(items[:5])
             lines.append("")
         issues_text = "\n".join(lines).rstrip()
         issues_color = palette["text"]
@@ -605,7 +611,7 @@ update_overlay("--", "--", "--", [])
 
 
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until;
+    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net, last_log_check, log_alert_until,last_alert_key, alert_hold_until, last_cpu, last_mem;
 
     if is_frozen:
         root.after(100, update_loop)
@@ -731,8 +737,23 @@ def update_loop():
 #this is the priority system for the sections
 #this is the priority system for the sections
         sections.sort(key=lambda x: priority[x[1]], reverse=True)
+        if any(s[1] != "INFO" for s in sections):
+           sections = [s for s in sections if s[1] != "INFO"]
         sections = sections[:2]
-           
+
+        now = time.time()
+
+        if sections:
+            top = sections[0]  
+            alert_key = f"{top[0]}-{top[1]}"
+        else:
+             alert_key = None
+
+        if alert_key == last_alert_key and now < alert_hold_until:
+             sections = []
+        else:
+           last_alert_key = alert_key
+           alert_hold_until = now + 3  
         sections = get_display_sections(sections)
 
         update_overlay(str(pid), f"{cpu}%", f"{mem_mb} MB", sections)
