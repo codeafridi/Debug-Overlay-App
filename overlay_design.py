@@ -679,6 +679,7 @@ for draggable in (
     panel,
     title_bar,
     title_label,
+    compact_value,
     status_value,
     hud_bar,
     summary_value,
