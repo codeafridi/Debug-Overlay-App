@@ -39,7 +39,7 @@ If `journalctl` is not available, the overlay will still run, but log-based aler
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/codeafridi/Debug-Overlay-App.git
 cd Debug-overlay
 ```
 
@@ -248,7 +248,7 @@ That can happen with unusual sandboxed or multi-process apps. The grouping logic
 If you just want the shortest version:
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/codeafridi/Debug-Overlay-App.git
 cd Debug-overlay
 sudo apt install python3 python3-venv python3-tk xdotool
 python3 -m venv venv
