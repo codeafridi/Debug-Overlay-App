@@ -21,11 +21,6 @@ details_visible = False
 window_height = 88
 
 is_warming = True
-
-
-last_alert_key = None
-alert_hold_until = 0
-
 last_cpu = 0
 last_mem = 0
 
@@ -43,7 +38,6 @@ log_alert_until = 0
 high_net_count = 0
 
 overlay_visible = False
-overlay_hold_until = 0
 hud_visible = True
 
 IGNORE_PROCESSES = [
@@ -303,10 +297,20 @@ def get_display_sections(sections):
         last_sections = sections
         return sections
 
-
+    if now < diagnosis_hold_until:
+        return last_sections
 
     last_sections = []
     return []
+
+
+def sync_overlay_visibility(has_alert):
+    global overlay_visible
+
+    overlay_visible = has_alert or is_expanded or is_frozen
+
+    alpha = 1.0 if (overlay_visible or is_expanded or is_frozen) else 0.5
+    root.attributes("-alpha", alpha)
 
 
 def toggle_freeze():
@@ -318,6 +322,7 @@ def toggle_freeze():
         bg=palette["warn"] if is_frozen else palette["title"],
         fg="#1b1327" if is_frozen else palette["title_text"],
     )
+    sync_overlay_visibility(bool(current_sections))
     update_overlay(
         metrics_cache["pid"],
         metrics_cache["name"],
@@ -332,6 +337,7 @@ def toggle_details():
 
     is_expanded = not is_expanded
     details_button.config(text="HIDE" if is_expanded else "MORE")
+    sync_overlay_visibility(bool(current_sections))
     update_overlay(
         metrics_cache["pid"],
         metrics_cache["name"],
@@ -688,11 +694,10 @@ update_overlay("--", "unknown", "--", "--", [])
 
 def update_loop():
     global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net
-    global last_log_check, log_alert_until, last_alert_key, alert_hold_until
+    global last_log_check, log_alert_until
     global last_cpu, last_mem
-    global overlay_visible, overlay_hold_until
+    global overlay_visible
     global is_warming
-    global last_sections
 
     if is_frozen:
         root.after(100, update_loop)
@@ -700,12 +705,14 @@ def update_loop():
 
     pid = get_active_pid()
     if pid is None:
+        sync_overlay_visibility(False)
         update_overlay("--", "unknown", "--", "--", [])
         root.after(1000, update_loop)
         return
 
     name = get_process_name(pid)
     if name in IGNORE_PROCESSES:
+        sync_overlay_visibility(False)
         update_overlay(str(pid or "--"), name or "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
@@ -744,6 +751,7 @@ def update_loop():
        
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for PID {pid}")
+            sync_overlay_visibility(False)
             update_overlay(str(pid), name, "--", "--", [])
             root.after(1000, update_loop)
             return
@@ -770,6 +778,7 @@ def update_loop():
              high_cpu_count = 0
              is_warming = True
 
+             sync_overlay_visibility(False)
              update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
              root.after(1000, update_loop)
              return
@@ -830,40 +839,14 @@ def update_loop():
            sections = [s for s in sections if s[1] != "INFO"]
         sections = sections[:1]
 
-        now = time.time()
-
-        if sections:
-            top = sections[0]  
-            alert_key = f"{top[0]}-{top[1]}"
-        else:
-             alert_key = None
-
-        if alert_key != last_alert_key:
-          last_alert_key = alert_key
-          alert_hold_until = now + 3 
-        
-        if not sections:
-           sections = last_sections
-        else:
-           last_sections = sections
-
-
-        now = time.time()
-        if sections:
-          overlay_visible = True
-          overlay_hold_until = now + 3
-        elif now > overlay_hold_until:
-          overlay_visible = False
-
-        if overlay_visible:
-          root.attributes("-alpha", 1.0)
-        else:
-            root.attributes("-alpha", 0.5)
+        sections = get_display_sections(sections)
+        sync_overlay_visibility(bool(sections))
 
         
             
         
         if is_warming:
+          sync_overlay_visibility(False)
           update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
         else:
           update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
