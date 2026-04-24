@@ -16,6 +16,9 @@ This overlay watches the currently focused app and shows:
 
 For apps like Firefox, Chrome, VS Code, and other multi-process apps, the overlay does not rely only on one child PID. It tries to group related processes so the numbers are more useful.
 
+<img width="1154" height="774" alt="image" src="https://github.com/user-attachments/assets/1a6cc9d0-1164-48ba-831e-abed1bbc1701" />
+
+
 ## Before you start
 
 This project is meant for Linux.
