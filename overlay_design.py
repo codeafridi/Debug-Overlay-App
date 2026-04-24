@@ -295,7 +295,7 @@ def get_recent_logs():
     except:
         return ""
 
-# ---------------- PATTERNS ----------------
+# ---------------- Patterns
 
 def detect_high_cpu(cpu):
     global high_cpu_count
@@ -659,10 +659,10 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
                 window_height = target_height
 
 
-# ---------------- KEY TOGGLE ----------------
+
 #removed not needed
 
-# ---------------- UI ----------------
+# ---------------- ui
 
 
 root.title("Debug Overlay")
@@ -916,7 +916,7 @@ def update_loop():
             logs = get_recent_logs()
 
             if detect_log_errors(logs):
-                log_alert_until = now + 5  # keep visible for 5 seconds
+                log_alert_until = now + 7  # keep visible for 7 seconds
 
             last_log_check = now
 
