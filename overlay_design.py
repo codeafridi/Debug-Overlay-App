@@ -39,6 +39,10 @@ high_net_count = 0
 
 overlay_visible = False
 hud_visible = True
+root._drag_x = 0
+root._drag_y = 0
+root._window_x = 0
+root._window_y = 0
 
 IGNORE_PROCESSES = [
     "gnome-shell",
@@ -358,6 +362,9 @@ def make_draggable(widget):
         root._window_y = root.winfo_y()
 
     def drag(event):
+        if not is_dragging:
+            return
+
         x = root._window_x + (event.x_root - root._drag_x)
         y = root._window_y + (event.y_root - root._drag_y)
         root.geometry(f"+{x}+{y}")
