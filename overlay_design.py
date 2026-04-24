@@ -78,6 +78,36 @@ def get_active_pid():
     global last_pid_error
     global last_pid_error_time
 
+    session_type = os.environ.get("XDG_SESSION_TYPE", "")
+    current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+    # Wayland compositors
+    if session_type == "wayland":
+        match current_desktop:
+            case desktop if "hyprland" in desktop or os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+                try:
+                    result = subprocess.check_output(
+                        "hyprctl activewindow | grep -oP 'pid: \\K\\d+'",
+                        shell=True,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return int(result.strip())
+                except (subprocess.CalledProcessError, ValueError, FileNotFoundError) as exc:
+                    now = time.time()
+                    error_key = ("hyprctl", str(exc))
+                    if last_pid_error != error_key or now - last_pid_error_time > 5:
+                        safe_log_error(f"could not get active window from hyprctl: {exc}")
+                        last_pid_error = error_key
+                        last_pid_error_time = now
+                    return None
+
+            case _:
+                if last_pid_error != "wayland_unsupported":
+                    safe_log_error(f"Wayland compositor '{current_desktop}' not supported yet. Currently supported: Hyprland")
+                    last_pid_error = "wayland_unsupported"
+                return None
+
+    # X11 fallback
     try:
         result = subprocess.check_output(
             ["xdotool", "getwindowfocus", "getwindowpid"],
