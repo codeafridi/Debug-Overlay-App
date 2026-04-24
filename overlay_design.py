@@ -692,6 +692,7 @@ def update_loop():
     global last_cpu, last_mem
     global overlay_visible, overlay_hold_until
     global is_warming
+    global last_sections
 
     if is_frozen:
         root.after(100, update_loop)
