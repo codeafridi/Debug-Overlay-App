@@ -303,8 +303,7 @@ def get_display_sections(sections):
         last_sections = sections
         return sections
 
-    if now < diagnosis_hold_until:
-        return last_sections
+
 
     last_sections = []
     return []
@@ -379,6 +378,8 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     metrics_cache["cpu"] = cpu_text
     metrics_cache["mem"] = mem_text
 
+    should_show_details = bool(sections) or is_expanded or is_frozen
+
     status_text = "STABLE"
     status_color = palette["ok"]
 
@@ -400,7 +401,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
-    should_show_details = bool(sections) or is_expanded or is_frozen
+
     is_compact_idle = not overlay_visible and not should_show_details
 
     if is_compact_idle:
@@ -780,8 +781,7 @@ def update_loop():
         else:
           cpu = 0
         
-        if delta_t > 0:
-          is_warming = False
+        is_warming = (delta_t == 0)
         cpu = max(0, min(cpu, 999))
 
         mem_history.append(mem_mb)
@@ -837,11 +837,9 @@ def update_loop():
         else:
              alert_key = None
 
-        if alert_key == last_alert_key and now < alert_hold_until:
-             sections = []
-        else:
-           last_alert_key = alert_key
-           alert_hold_until = now + 3  
+        if alert_key != last_alert_key:
+          last_alert_key = alert_key
+          alert_hold_until = now + 3 
         sections = get_display_sections(sections)
 
 
