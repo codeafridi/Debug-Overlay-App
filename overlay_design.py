@@ -10,7 +10,7 @@ num_cpus = os.cpu_count() or 1
 # ---------------- STATE ----------------
 high_cpu_count = 0
 last_error_time = 0
-last_pid = None
+last_focus_pid = None
 mem_history = []
 diagnosis_hold_until = 0
 last_sections = []
@@ -29,7 +29,7 @@ alert_hold_until = 0
 last_log_check = 0
 prev_p = None
 prev_t = None
-prev_pid = None
+prev_app_key = None
 xdotool_warning_shown = False
 last_pid_error = None
 last_pid_error_time = 0
@@ -128,6 +128,139 @@ def get_memory(pid):
                 return int(line.split()[1])  # KB
     return None
 
+
+def read_proc_stat(pid):
+    with open(f"/proc/{pid}/stat") as f:
+        text = f.read().strip()
+
+    end = text.rfind(")")
+    tail = text[end + 2 :].split()
+    return tail
+
+
+def get_parent_pid(pid):
+    values = read_proc_stat(pid)
+    return int(values[1])
+
+
+def get_process_exe(pid):
+    try:
+        return os.readlink(f"/proc/{pid}/exe")
+    except OSError:
+        return None
+
+
+def list_process_ids():
+    pids = []
+    for entry in os.listdir("/proc"):
+        if entry.isdigit():
+            pids.append(int(entry))
+    return pids
+
+
+def get_app_group(pid):
+    focused_name = get_process_name(pid)
+    focused_exe = get_process_exe(pid)
+    root_pid = pid
+    current_pid = pid
+
+    while True:
+        try:
+            parent_pid = get_parent_pid(current_pid)
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
+            break
+
+        if parent_pid <= 1:
+            break
+
+        parent_name = get_process_name(parent_pid)
+        parent_exe = get_process_exe(parent_pid)
+        same_app = False
+
+        if focused_exe and parent_exe and parent_exe == focused_exe:
+            same_app = True
+        elif parent_name == focused_name:
+            same_app = True
+
+        if not same_app:
+            break
+
+        root_pid = parent_pid
+        current_pid = parent_pid
+
+    parent_map = {}
+    for proc_pid in list_process_ids():
+        try:
+            parent_map[proc_pid] = get_parent_pid(proc_pid)
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
+            continue
+
+    group_pids = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for proc_pid, parent_pid in parent_map.items():
+            if parent_pid in group_pids and proc_pid not in group_pids:
+                group_pids.add(proc_pid)
+                changed = True
+
+    root_name = get_process_name(root_pid)
+    app_name = root_name if root_name != "unknown" else focused_name
+    return {
+        "app_key": f"{app_name}:{root_pid}",
+        "app_name": app_name,
+        "focus_name": focused_name,
+        "focus_pid": pid,
+        "root_pid": root_pid,
+        "pids": sorted(group_pids),
+    }
+
+
+def get_group_process_time(pids):
+    total = 0
+    live_pids = []
+
+    for pid in pids:
+        try:
+            total += get_process_time(pid)
+            live_pids.append(pid)
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
+            continue
+
+    return total, live_pids
+
+
+def get_group_memory(pids):
+    total = 0
+    seen = 0
+
+    for pid in pids:
+        try:
+            mem_kb = get_memory(pid)
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
+            continue
+
+        if mem_kb is None:
+            continue
+
+        total += mem_kb
+        seen += 1
+
+    if seen == 0:
+        return None
+
+    return total
+
+
+def format_memory_kb(mem_kb):
+    if mem_kb is None:
+        return "--"
+
+    mem_mb = mem_kb / 1024
+    if mem_mb >= 1024:
+        return f"{mem_mb / 1024:.1f} GB"
+    return f"{round(mem_mb)} MB"
+
 def get_disk_usage():
     stat = os.statvfs("/")
     
@@ -222,23 +355,23 @@ def detect_log_errors(log_text):
 
 
 # ---------------- Insights ----------------
-def cpu_insight(pid, cpu):
+def cpu_insight(app_name, focus_pid, cpu, process_count):
     return [
-        f"CPU high ({cpu}%) on PID {pid}",
+        f"{app_name} CPU high ({cpu}%) across {process_count} processes",
         "Focus:",
-        f"- inspect process: top -p {pid}",
-        f"- trace system calls: strace -p {pid}",
-        "- check for infinite loops or heavy tasks",
+        f"- focused PID: {focus_pid}",
+        f"- inspect main process: top -p {focus_pid}",
+        "- check busy tabs, workers, or helper processes",
     ]
 
 
-def memory_insight(pid, mem):
+def memory_insight(app_name, focus_pid, mem_text, process_count):
     return [
-        f"Memory high ({mem} MB) on PID {pid}",
+        f"{app_name} app RSS sum rising ({mem_text}) across {process_count} processes",
         "Focus:",
-        f"- inspect: top -p {pid}",
-        f"- check leaks: pmap -x {pid}",
-        "- look for growing data structures",
+        f"- focused PID: {focus_pid}",
+        f"- inspect main process: top -p {focus_pid}",
+        "- look for tabs, workers, or helpers growing together",
     ]
 
 def crash_insight():
@@ -310,7 +443,7 @@ def get_display_sections(sections):
     return []
 
 
-def dedupe_alert_sections(sections):
+def dedupe_alert_sections(app_key, sections):
     global last_alert_key, alert_hold_until
 
     now = time.time()
@@ -321,7 +454,7 @@ def dedupe_alert_sections(sections):
         return sections
 
     title, severity, _items = sections[0]
-    alert_key = f"{title}-{severity}"
+    alert_key = f"{app_key}:{title}-{severity}"
 
     if alert_key == last_alert_key and now < alert_hold_until:
         return []
@@ -431,9 +564,9 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         status_value.config(text=status_text, fg=status_color)
 
     if sections:
-      summary_text = f"{name} (PID {pid_text}) | CPU {cpu_text} | MEM {mem_text} | {status_text}"
+      summary_text = f"{name} | PID {pid_text} | CPU {cpu_text} | RSS {mem_text} | {status_text}"
     else:
-      summary_text = f"{name} (PID {pid_text}) | CPU {cpu_text} | MEM {mem_text}"
+      summary_text = f"{name} | PID {pid_text} | CPU {cpu_text} | RSS {mem_text}"
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
@@ -441,7 +574,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     is_compact_idle = not overlay_visible and not should_show_details
 
     if is_compact_idle:
-        compact_title = f"PID {pid_text} | CPU {cpu_text} | MEM {mem_text}"
+        compact_title = f"PID {pid_text} | CPU {cpu_text} | RSS {mem_text}"
         if title_label.winfo_manager():
             title_label.pack_forget()
         if compact_value.cget("text") != compact_title:
@@ -462,7 +595,9 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
 
     if sections:
         lines = []
-        lines.append(f"PID: {pid_text} ({name})")
+        lines.append(f"App: {name}")
+        lines.append(f"Focus PID: {pid_text}")
+        lines.append(f"App RSS Sum: {mem_text}")
         lines.append("")
         for title, severity, items in sections:
             lines.append(f"[{title}] {severity}")
@@ -507,7 +642,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             )
 
             if window_height != target_height:
-                root.geometry(f"460x{target_height}+{current_x}+{current_y}")
+                root.geometry(f"520x{target_height}+{current_x}+{current_y}")
                 window_height = target_height
 
     else:
@@ -520,7 +655,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             target_height = 46 if is_compact_idle else 82
 
             if window_height != target_height:
-                root.geometry(f"460x{target_height}+{current_x}+{current_y}")
+                root.geometry(f"520x{target_height}+{current_x}+{current_y}")
                 window_height = target_height
 
 
@@ -552,7 +687,7 @@ palette = {
 metrics_cache = {"pid": "--", "name": "unknown", "cpu": "--", "mem": "--"}
 current_sections = []
 
-root.geometry("460x96+40+40")
+root.geometry("520x96+40+40")
 
 panel = tk.Frame(
     root,
@@ -724,7 +859,7 @@ update_overlay("--", "unknown", "--", "--", [])
 
 
 def update_loop():
-    global prev_p, prev_t, prev_pid, high_cpu_count, last_pid, prev_net
+    global prev_p, prev_t, prev_app_key, high_cpu_count, last_focus_pid, prev_net
     global last_log_check, log_alert_until
     global last_cpu, last_mem
     global overlay_visible
@@ -742,17 +877,24 @@ def update_loop():
         root.after(1000, update_loop)
         return
 
-    name = get_process_name(pid)
-    if name in IGNORE_PROCESSES:
+    focused_name = get_process_name(pid)
+    if focused_name in IGNORE_PROCESSES:
         sync_overlay_visibility(False)
-        update_overlay(str(pid or "--"), name or "idle", "--", "--", [])
+        update_overlay(str(pid or "--"), focused_name or "idle", "--", "--", [])
         root.after(1000, update_loop)
         return
 
     try:
-        p = get_process_time(pid)
+        app_group = get_app_group(pid)
+        app_key = app_group["app_key"]
+        app_name = app_group["app_name"]
+        focus_pid = app_group["focus_pid"]
+        root_pid = app_group["root_pid"]
+        group_pids = app_group["pids"]
+
+        p, live_group_pids = get_group_process_time(group_pids)
         t = get_total_time()
-        mem_kb = get_memory(pid)
+        mem_kb = get_group_memory(live_group_pids)
         net = get_network_bytes()
         #network block
         if prev_net is None:
@@ -782,9 +924,9 @@ def update_loop():
        #fisnished log block
        
         if mem_kb is None:
-            safe_log_error(f"memory usage is unavailable for PID {pid}")
+            safe_log_error(f"memory usage is unavailable for app group rooted at PID {root_pid}")
             sync_overlay_visibility(False)
-            update_overlay(str(pid), name, "--", "--", [])
+            update_overlay(str(focus_pid), app_name, "--", "--", [])
             root.after(1000, update_loop)
             return
         
@@ -795,14 +937,14 @@ def update_loop():
         
         crash_detected = False
 
-        if last_pid is not None and pid != last_pid:
-          if not os.path.exists(f"/proc/{last_pid}"):
+        if last_focus_pid is not None and focus_pid != last_focus_pid:
+          if not os.path.exists(f"/proc/{last_focus_pid}"):
             crash_detected = True
 
-        if pid != prev_pid:
+        if app_key != prev_app_key:
              prev_p = p
              prev_t = t
-             prev_pid = pid
+             prev_app_key = app_key
 
              mem_history.clear()
              mem_history.append(mem_mb)
@@ -813,7 +955,7 @@ def update_loop():
              alert_hold_until = 0
 
              sync_overlay_visibility(False)
-             update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
+             update_overlay(str(focus_pid), app_name, "warming up", f"{mem_mb} MB", [])
              root.after(1000, update_loop)
              return
 
@@ -842,11 +984,11 @@ def update_loop():
 
         if cpu_alert:
             severity = "CRITICAL" if cpu > 90 else "WARN"
-            sections.append(("CPU WATCH", severity, cpu_insight(pid, cpu)))
+            sections.append(("CPU WATCH", severity, cpu_insight(app_name, focus_pid, cpu, len(live_group_pids))))
 
 
         if mem_alert:
-           sections.append(("MEM WATCH", "WARN", memory_insight(pid, mem_mb)))
+           sections.append(("MEM WATCH", "WARN", memory_insight(app_name, focus_pid, mem_mb, len(live_group_pids))))
 
         if disk_alert:
             severity = "CRITICAL" if disk_percent > 90 else "WARN"
@@ -873,7 +1015,7 @@ def update_loop():
            sections = [s for s in sections if s[1] != "INFO"]
         sections = sections[:1]
 
-        sections = dedupe_alert_sections(sections)
+        sections = dedupe_alert_sections(app_key, sections)
         sections = get_display_sections(sections)
         sync_overlay_visibility(bool(sections))
 
@@ -882,14 +1024,14 @@ def update_loop():
         
         if is_warming:
           sync_overlay_visibility(False)
-          update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
+          update_overlay(str(focus_pid), app_name, "warming up", f"{mem_mb} MB", [])
         else:
-          update_overlay(str(pid), name, f"{cpu}%", f"{mem_mb} MB", sections)
+          update_overlay(str(focus_pid), app_name, f"{cpu}%", f"{mem_mb} MB", sections)
 
         prev_p = p
         prev_t = t
-        prev_pid = pid
-        last_pid = pid
+        prev_app_key = app_key
+        last_focus_pid = focus_pid
 
         
 
@@ -898,7 +1040,7 @@ def update_loop():
     except (FileNotFoundError, ProcessLookupError, PermissionError, IndexError, ValueError) as exc:
         prev_p = None
         prev_t = None
-        prev_pid = None
+        prev_app_key = None
         mem_history.clear()
         high_cpu_count = 0
         safe_log_error(f"process read failed for PID {pid}: {exc}")
