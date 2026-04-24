@@ -574,7 +574,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     is_compact_idle = not overlay_visible and not should_show_details
 
     if is_compact_idle:
-        compact_title = f"PID {pid_text} | CPU {cpu_text} | RSS {mem_text}"
+        compact_title = f"{name} | PID {pid_text} | CPU {cpu_text} | RSS {mem_text}"
         if title_label.winfo_manager():
             title_label.pack_forget()
         if compact_value.cget("text") != compact_title:
@@ -934,6 +934,7 @@ def update_loop():
         disk_alert = detect_disk_pressure(disk_percent)
 
         mem_mb = round(mem_kb / 1024)
+        mem_text = format_memory_kb(mem_kb)
         
         crash_detected = False
 
@@ -955,7 +956,7 @@ def update_loop():
              alert_hold_until = 0
 
              sync_overlay_visibility(False)
-             update_overlay(str(focus_pid), app_name, "warming up", f"{mem_mb} MB", [])
+             update_overlay(str(focus_pid), app_name, "warming up", mem_text, [])
              root.after(1000, update_loop)
              return
 
@@ -988,7 +989,7 @@ def update_loop():
 
 
         if mem_alert:
-           sections.append(("MEM WATCH", "WARN", memory_insight(app_name, focus_pid, mem_mb, len(live_group_pids))))
+           sections.append(("MEM WATCH", "WARN", memory_insight(app_name, focus_pid, mem_text, len(live_group_pids))))
 
         if disk_alert:
             severity = "CRITICAL" if disk_percent > 90 else "WARN"
@@ -1024,9 +1025,9 @@ def update_loop():
         
         if is_warming:
           sync_overlay_visibility(False)
-          update_overlay(str(focus_pid), app_name, "warming up", f"{mem_mb} MB", [])
+          update_overlay(str(focus_pid), app_name, "warming up", mem_text, [])
         else:
-          update_overlay(str(focus_pid), app_name, f"{cpu}%", f"{mem_mb} MB", sections)
+          update_overlay(str(focus_pid), app_name, f"{cpu}%", mem_text, sections)
 
         prev_p = p
         prev_t = t
