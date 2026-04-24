@@ -840,7 +840,11 @@ def update_loop():
         if alert_key != last_alert_key:
           last_alert_key = alert_key
           alert_hold_until = now + 3 
-        sections = get_display_sections(sections)
+        
+        if not sections:
+           sections = last_sections
+        else:
+           last_sections = sections
 
 
         now = time.time()
@@ -854,6 +858,8 @@ def update_loop():
           root.attributes("-alpha", 1.0)
         else:
             root.attributes("-alpha", 0.5)
+
+        
             
         
         if is_warming:
