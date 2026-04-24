@@ -23,6 +23,8 @@ window_height = 88
 is_warming = True
 last_cpu = 0
 last_mem = 0
+last_alert_key = None
+alert_hold_until = 0
 
 last_log_check = 0
 prev_p = None
@@ -187,7 +189,7 @@ def detect_disk_pressure(disk_percent):
 def detect_low_network(delta):
     global low_net_count
 
-    if delta < 1000:  # very low activity
+    if delta < 1000: 
         low_net_count += 1
     else:
         low_net_count = 0
@@ -219,7 +221,7 @@ def detect_log_errors(log_text):
     return count >= 3
 
 
-# ---------------- INSIGHTS ----------------
+# ---------------- Insights ----------------
 def cpu_insight(pid, cpu):
     return [
         f"CPU high ({cpu}%) on PID {pid}",
@@ -306,6 +308,27 @@ def get_display_sections(sections):
 
     last_sections = []
     return []
+
+
+def dedupe_alert_sections(sections):
+    global last_alert_key, alert_hold_until
+
+    now = time.time()
+
+    if not sections:
+        if now >= alert_hold_until:
+            last_alert_key = None
+        return sections
+
+    title, severity, _items = sections[0]
+    alert_key = f"{title}-{severity}"
+
+    if alert_key == last_alert_key and now < alert_hold_until:
+        return []
+
+    last_alert_key = alert_key
+    alert_hold_until = now + 3
+    return sections
 
 
 def sync_overlay_visibility(has_alert):
@@ -706,6 +729,7 @@ def update_loop():
     global last_cpu, last_mem
     global overlay_visible
     global is_warming
+    global last_alert_key, alert_hold_until
 
     if is_frozen:
         root.after(100, update_loop)
@@ -785,6 +809,8 @@ def update_loop():
 
              high_cpu_count = 0
              is_warming = True
+             last_alert_key = None
+             alert_hold_until = 0
 
              sync_overlay_visibility(False)
              update_overlay(str(pid), name, "warming up", f"{mem_mb} MB", [])
@@ -847,6 +873,7 @@ def update_loop():
            sections = [s for s in sections if s[1] != "INFO"]
         sections = sections[:1]
 
+        sections = dedupe_alert_sections(sections)
         sections = get_display_sections(sections)
         sync_overlay_visibility(bool(sections))
 
