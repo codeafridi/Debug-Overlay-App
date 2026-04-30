@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import time
+import json
 import tkinter as tk
 root = tk.Tk()
 
@@ -87,12 +88,15 @@ def get_active_pid():
             case desktop if "hyprland" in desktop or os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
                 try:
                     result = subprocess.check_output(
-                        "hyprctl activewindow | grep -oP 'pid: \\K\\d+'",
-                        shell=True,
+                        ["hyprctl", "activewindow", "-j"],
                         stderr=subprocess.DEVNULL,
                     )
-                    return int(result.strip())
-                except (subprocess.CalledProcessError, ValueError, FileNotFoundError) as exc:
+                    data = json.loads(result)
+                    return data.get("pid")
+                except FileNotFoundError:
+                    safe_log_error("hyprctl not found; Hyprland detected but command unavailable")
+                    return None
+                except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as exc:
                     now = time.time()
                     error_key = ("hyprctl", str(exc))
                     if last_pid_error != error_key or now - last_pid_error_time > 5:
