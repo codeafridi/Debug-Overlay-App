@@ -9,11 +9,11 @@ if [[ -x "$ROOT_DIR/venv/bin/python" ]]; then
   PYTHON_BIN="$ROOT_DIR/venv/bin/python"
 fi
 
-# xdotool enables automatic focus tracking on X11. The overlay can still run
-# without it by selecting a process with its TARGET button.
+# xdotool provides automatic focus tracking on X11.
 if [[ "${XDG_SESSION_TYPE:-}" != "wayland" ]]; then
   if ! command -v xdotool >/dev/null 2>&1; then
-    echo "xdotool is unavailable: use the TARGET button to choose a PID, or install xdotool for automatic focus tracking." >&2
+    echo "xdotool is required for automatic focus tracking on X11. Install it, then run this script again." >&2
+    exit 1
   fi
 fi
 

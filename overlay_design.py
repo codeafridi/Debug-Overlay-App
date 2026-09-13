@@ -4,7 +4,6 @@ import sys
 import time
 import json
 import tkinter as tk
-from tkinter import simpledialog
 root = tk.Tk()
 
 num_cpus = os.cpu_count() or 1
@@ -43,7 +42,6 @@ high_net_count = 0
 
 overlay_visible = False
 hud_visible = True
-manual_pid = None
 root._drag_x = 0
 root._drag_y = 0
 root._window_x = 0
@@ -76,76 +74,26 @@ def safe_log_error(message):
 
 # ---------------- SYSTEM ----------------
 
-def is_automatic_focus_supported():
-    """Return whether this session has an implemented active-window backend."""
-    session_type = os.environ.get("XDG_SESSION_TYPE", "").lower()
-    current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
-    return (
-        session_type != "wayland"
-        or "hyprland" in current_desktop
-        or bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"))
-    )
-
-
-def reset_monitor_state():
-    global prev_p, prev_t, prev_app_key, high_cpu_count, last_focus_pid
-    global mem_history, is_warming, last_alert_key, alert_hold_until
-
-    prev_p = None
-    prev_t = None
-    prev_app_key = None
-    high_cpu_count = 0
-    last_focus_pid = None
-    mem_history.clear()
-    is_warming = True
-    last_alert_key = None
-    alert_hold_until = 0
-
-
-def set_manual_pid(pid):
-    global manual_pid
-
-    manual_pid = pid
-    reset_monitor_state()
-    safe_log_error(f"monitoring selected PID {pid} ({get_process_name(pid)})")
-
-
-def choose_target_pid():
-    """Let Wayland users select an app when focus access is unavailable."""
-    value = simpledialog.askstring(
-        "Monitor a process",
-        "Enter a Linux process ID (PID).\n"
-        "Find one with: ps -e -o pid,comm | less",
-        parent=root,
-    )
-    if value is None:
-        return
+def get_gnome_focused_pid():
+    """Read the focused-window PID published by our GNOME Shell extension."""
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime_dir:
+        return None
 
     try:
-        pid = int(value.strip())
-        if pid <= 0 or not os.path.isdir(f"/proc/{pid}"):
-            raise ValueError
-    except ValueError:
-        safe_log_error("invalid PID selected; choose a running process ID")
-        return
+        with open(os.path.join(runtime_dir, "debug-overlay-active-pid")) as pid_file:
+            pid = int(pid_file.read().strip())
+        if pid > 0 and os.path.isdir(f"/proc/{pid}"):
+            return pid
+    except (FileNotFoundError, OSError, ValueError):
+        pass
 
-    set_manual_pid(pid)
-
-
-def prompt_for_target_if_needed():
-    if manual_pid is None and not is_automatic_focus_supported():
-        choose_target_pid()
+    return None
 
 def get_active_pid():
-    global xdotool_warning_shown, manual_pid
+    global xdotool_warning_shown
     global last_pid_error
     global last_pid_error_time
-
-    if manual_pid is not None:
-        if os.path.isdir(f"/proc/{manual_pid}"):
-            return manual_pid
-        safe_log_error(f"selected PID {manual_pid} exited; choose another target")
-        manual_pid = None
 
     session_type = os.environ.get("XDG_SESSION_TYPE", "")
     current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
@@ -173,11 +121,23 @@ def get_active_pid():
                         last_pid_error_time = now
                     return None
 
+            case desktop if "gnome" in desktop:
+                pid = get_gnome_focused_pid()
+                if pid is not None:
+                    return pid
+                if last_pid_error != "gnome_extension_missing":
+                    safe_log_error(
+                        "GNOME Wayland focus integration is not enabled. Run "
+                        "./install_gnome_extension.sh, then log out and back in."
+                    )
+                    last_pid_error = "gnome_extension_missing"
+                return None
+
             case _:
                 if last_pid_error != "wayland_unsupported":
                     safe_log_error(
                         f"Wayland compositor '{current_desktop}' cannot expose the focused window. "
-                        "Use the TARGET button to select a PID."
+                        "Install a compositor-specific focus integration."
                     )
                     last_pid_error = "wayland_unsupported"
                 return None
@@ -817,22 +777,6 @@ title_label = tk.Label(
 )
 title_label.pack(side="left", padx=12, pady=7)
 
-target_button = tk.Button(
-    title_bar,
-    text="TARGET",
-    command=choose_target_pid,
-    bg=palette["chrome"],
-    fg="#111111",
-    activebackground=palette["muted"],
-    activeforeground="#111111",
-    relief="raised",
-    bd=1,
-    font=("Helvetica", 7, "bold"),
-    padx=5,
-    pady=1,
-)
-target_button.pack(side="right", padx=(0, 4), pady=6)
-
 compact_value = tk.Label(
     title_bar,
     text="PID -- | CPU -- | MEM --",
@@ -954,7 +898,7 @@ issues_value.config(state="disabled")
 
 footer = tk.Label(
     body,
-    text="TARGET selects a PID. Freeze to inspect. Details opens diagnostics.",
+    text="Freeze to inspect. Details opens diagnostics.",
     anchor="w",
     bg=palette["panel"],
     fg="#8579a0",
@@ -976,7 +920,6 @@ for draggable in (
 ):
     make_draggable(draggable)
 update_overlay("--", "unknown", "--", "--", [])
-root.after(250, prompt_for_target_if_needed)
 
 
 

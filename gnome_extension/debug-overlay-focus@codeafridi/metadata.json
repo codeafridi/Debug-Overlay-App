@@ -1,0 +1,6 @@
+{
+  "uuid": "debug-overlay-focus@codeafridi",
+  "name": "Debug Overlay Focus Bridge",
+  "description": "Shares the focused window PID with the local Debug Overlay application.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"]
+}

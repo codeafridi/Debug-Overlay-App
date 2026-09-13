@@ -47,15 +47,28 @@ the best supported mode for the current session:
 | --- | --- |
 | X11 / Xorg | Automatic focused-window tracking through `xdotool` |
 | Hyprland on Wayland | Automatic focused-window tracking through `hyprctl` |
-| GNOME Wayland, KDE Wayland, Sway, and other Wayland compositors | Select a running process with the `TARGET` button |
-
-The `TARGET` mode monitors the chosen process and its related child processes.
-It works regardless of the Linux distribution or Wayland compositor. Select a
-new target whenever you want to inspect a different app.
+| GNOME Wayland | Automatic tracking through the included GNOME Shell extension |
+| Other Wayland compositors | Require a compositor-specific integration |
 
 Wayland deliberately prevents ordinary applications from reading the focused
 window across all apps. Automatic focus tracking on a Wayland desktop therefore
 requires a compositor-specific integration; it cannot be supplied by `xdotool`.
+
+### GNOME Wayland setup (Ubuntu 25.10+, Fedora Workstation, RHEL GNOME)
+
+Install the included focus bridge once as your normal desktop user:
+
+```bash
+bash ./install_gnome_extension.sh
+```
+
+The extension runs locally in GNOME Shell and writes only the PID of the focused
+window to your per-user runtime directory. The overlay reads that PID and then
+uses `/proc` as usual. No network connection, service, or manual PID entry is
+needed.
+
+Do **not** use `sudo`. GNOME extensions must be installed and enabled in the
+same user account that runs the graphical desktop.
 
 If `journalctl` is not available, the overlay will still run, but log-based alerts may not work properly.
 
@@ -124,6 +137,7 @@ Just run:
 That script:
 
 - uses `xdotool` automatically when it is available on X11
+- uses the installed GNOME Shell focus bridge on GNOME Wayland
 - uses the local virtual environment if it exists
 - starts `overlay_design.py`
 
@@ -164,16 +178,8 @@ This can include:
 ## Basic controls
 
 - drag the overlay to move it
-- `TARGET` selects the PID to monitor; this is required on unsupported Wayland desktops
 - `FRZ` freezes the live updates
 - `MORE` expands the details panel
-
-To find an application PID, run this in a terminal, then enter the PID shown in
-the first column:
-
-```bash
-ps -e -o pid,comm | less
-```
 
 When frozen:
 
@@ -260,9 +266,9 @@ Check:
 - on X11, `xdotool` works in your environment
 - the app is not blocked by special sandboxing/window rules
 
-On GNOME Wayland (including Ubuntu 25.10 and newer), selecting a process with
-`TARGET` is expected. Ubuntu's GNOME session no longer offers the old "Ubuntu
-on Xorg" login option.
+On GNOME Wayland (including Ubuntu 25.10 and newer), install and enable the
+included GNOME focus bridge, then log out and back in. Ubuntu's GNOME session
+no longer offers the old "Ubuntu on Xorg" login option.
 
 You can test `xdotool` manually with:
 
