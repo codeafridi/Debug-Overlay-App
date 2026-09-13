@@ -6,25 +6,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UUID="debug-overlay-focus@codeafridi"
 SOURCE_DIR="$ROOT_DIR/gnome_extension/$UUID"
 
-if ! command -v gnome-extensions >/dev/null 2>&1; then
-  echo "gnome-extensions was not found. Run this from a GNOME desktop session." >&2
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+TARGET_DIR="$DATA_DIR/gnome-shell/extensions/$UUID"
+
+if ! command -v gsettings >/dev/null 2>&1; then
+  echo "gsettings was not found. Run this from a GNOME desktop session." >&2
   exit 1
 fi
-if ! command -v zip >/dev/null 2>&1; then
-  echo "zip was not found. Install zip, then run this installer again." >&2
-  exit 1
+
+mkdir -p "$TARGET_DIR"
+install -m 0644 "$SOURCE_DIR/metadata.json" "$TARGET_DIR/metadata.json"
+install -m 0644 "$SOURCE_DIR/extension.js" "$TARGET_DIR/extension.js"
+
+enabled_extensions="$(gsettings get org.gnome.shell enabled-extensions)"
+if [[ "$enabled_extensions" != *"'$UUID'"* ]]; then
+  enabled_extensions="${enabled_extensions#@as }"
+  if [[ "$enabled_extensions" == "[]" ]]; then
+    enabled_extensions="['$UUID']"
+  else
+    enabled_extensions="${enabled_extensions%]}"
+    enabled_extensions+=" , '$UUID']"
+  fi
+  gsettings set org.gnome.shell enabled-extensions "$enabled_extensions"
 fi
 
-bundle_dir="$(mktemp -d)"
-trap 'rm -rf "$bundle_dir"' EXIT
-
-bundle_path="$bundle_dir/$UUID.shell-extension.zip"
-(
-  cd "$SOURCE_DIR"
-  zip -q -r "$bundle_path" metadata.json extension.js
-)
-
-gnome-extensions install --force "$bundle_path"
-gnome-extensions enable "$UUID"
-
-echo "Installed and enabled $UUID in this GNOME session. Run ./start_overlay.sh."
+echo "Installed $UUID. GNOME loads newly installed extensions at the next login."
