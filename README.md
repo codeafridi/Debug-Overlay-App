@@ -1,6 +1,6 @@
 # Debug Overlay
 
-Small Linux debug overlay for the app you are currently focused on.
+Small Linux debug overlay for a focused or selected app.
 
 It stays on top of the screen, stays compact when things are normal, and expands into a diagnosis panel when it catches something odd like high CPU, rising memory, disk pressure, or log/network signals.
 
@@ -21,19 +21,41 @@ For apps like Firefox, Chrome, VS Code, and other multi-process apps, the overla
 
 ## Before you start
 
-This project is meant for Linux.
+This project is meant for Linux desktop sessions. It supports Ubuntu, Debian,
+Linux Mint, Fedora, Red Hat Enterprise Linux, Arch, and other distributions
+that provide Python, Tk, and the Linux `/proc` filesystem.
 
 You need:
 
 - Python 3
 - Tkinter for Python
-- `xdotool`
+- `xdotool` (for automatic tracking in X11 sessions)
 
 The overlay uses:
 
 - `/proc` for process information
-- `xdotool` to detect the active window PID
+- `xdotool` to detect the active window PID on X11
 - `journalctl` for recent log-based alerts
+
+## Desktop-session support
+
+Linux distributions share the same process interfaces, but desktop sessions do
+not share one universal API for reading the focused window. The overlay uses
+the best supported mode for the current session:
+
+| Session | Tracking mode |
+| --- | --- |
+| X11 / Xorg | Automatic focused-window tracking through `xdotool` |
+| Hyprland on Wayland | Automatic focused-window tracking through `hyprctl` |
+| GNOME Wayland, KDE Wayland, Sway, and other Wayland compositors | Select a running process with the `TARGET` button |
+
+The `TARGET` mode monitors the chosen process and its related child processes.
+It works regardless of the Linux distribution or Wayland compositor. Select a
+new target whenever you want to inspect a different app.
+
+Wayland deliberately prevents ordinary applications from reading the focused
+window across all apps. Automatic focus tracking on a Wayland desktop therefore
+requires a compositor-specific integration; it cannot be supplied by `xdotool`.
 
 If `journalctl` is not available, the overlay will still run, but log-based alerts may not work properly.
 
@@ -101,7 +123,7 @@ Just run:
 
 That script:
 
-- checks for `xdotool`
+- uses `xdotool` automatically when it is available on X11
 - uses the local virtual environment if it exists
 - starts `overlay_design.py`
 
@@ -142,8 +164,16 @@ This can include:
 ## Basic controls
 
 - drag the overlay to move it
+- `TARGET` selects the PID to monitor; this is required on unsupported Wayland desktops
 - `FRZ` freezes the live updates
 - `MORE` expands the details panel
+
+To find an application PID, run this in a terminal, then enter the PID shown in
+the first column:
+
+```bash
+ps -e -o pid,comm | less
+```
 
 When frozen:
 
@@ -227,8 +257,12 @@ sudo pacman -S tk
 Check:
 
 - you are running in a Linux desktop session
-- `xdotool` works in your environment
+- on X11, `xdotool` works in your environment
 - the app is not blocked by special sandboxing/window rules
+
+On GNOME Wayland (including Ubuntu 25.10 and newer), selecting a process with
+`TARGET` is expected. Ubuntu's GNOME session no longer offers the old "Ubuntu
+on Xorg" login option.
 
 You can test `xdotool` manually with:
 
