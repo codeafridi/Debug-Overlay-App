@@ -42,6 +42,7 @@ high_net_count = 0
 
 overlay_visible = False
 hud_visible = True
+compact_alerts = False
 root._drag_x = 0
 root._drag_y = 0
 root._window_x = 0
@@ -74,6 +75,46 @@ def safe_log_error(message):
 
 # ---------------- SYSTEM ----------------
 
+def get_gnome_focused_pid():
+    """Read the focused-window PID published by our GNOME Shell extension."""
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime_dir:
+        return None
+
+    try:
+        with open(os.path.join(runtime_dir, "debug-overlay-active-pid")) as pid_file:
+            pid = int(pid_file.read().strip())
+        if pid > 0 and os.path.isdir(f"/proc/{pid}"):
+            return pid
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    return None
+
+
+def get_sway_focused_pid():
+    """Return the PID of Sway's focused container."""
+    try:
+        result = subprocess.check_output(
+            ["swaymsg", "-t", "get_tree", "-r"],
+            stderr=subprocess.DEVNULL,
+        )
+        tree = json.loads(result)
+    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+        return None
+
+    def find_focused_pid(node):
+        if node.get("focused") and node.get("pid"):
+            return node["pid"]
+
+        for child in node.get("nodes", []) + node.get("floating_nodes", []):
+            pid = find_focused_pid(child)
+            if pid:
+                return pid
+        return None
+
+    return find_focused_pid(tree)
+
 def get_active_pid():
     global xdotool_warning_shown
     global last_pid_error
@@ -105,9 +146,33 @@ def get_active_pid():
                         last_pid_error_time = now
                     return None
 
+            case desktop if "gnome" in desktop:
+                pid = get_gnome_focused_pid()
+                if pid is not None:
+                    return pid
+                if last_pid_error != "gnome_extension_missing":
+                    safe_log_error(
+                        "GNOME Wayland focus integration is not enabled. Run "
+                        "./install_gnome_extension.sh, then log out and back in."
+                    )
+                    last_pid_error = "gnome_extension_missing"
+                return None
+
+            case desktop if "sway" in desktop:
+                pid = get_sway_focused_pid()
+                if pid is not None:
+                    return pid
+                if last_pid_error != "sway_unavailable":
+                    safe_log_error("could not get the focused window from swaymsg")
+                    last_pid_error = "sway_unavailable"
+                return None
+
             case _:
                 if last_pid_error != "wayland_unsupported":
-                    safe_log_error(f"Wayland compositor '{current_desktop}' not supported yet. Currently supported: Hyprland")
+                    safe_log_error(
+                        f"Wayland compositor '{current_desktop}' cannot expose the focused window. "
+                        "Install a compositor-specific focus integration."
+                    )
                     last_pid_error = "wayland_unsupported"
                 return None
 
@@ -530,7 +595,27 @@ def toggle_details():
     global is_expanded
 
     is_expanded = not is_expanded
-    details_button.config(text="HIDE" if is_expanded else "MORE")
+    details_button.config(text="LESS" if is_expanded else "MORE")
+    sync_overlay_visibility(bool(current_sections))
+    update_overlay(
+        metrics_cache["pid"],
+        metrics_cache["name"],
+        metrics_cache["cpu"],
+        metrics_cache["mem"],
+        current_sections,
+    )
+
+
+def toggle_alert_display():
+    """Keep alerts compact until the user chooses to show diagnostics again."""
+    global compact_alerts, is_expanded
+
+    compact_alerts = not compact_alerts
+    if compact_alerts:
+        is_expanded = False
+
+    alert_mode_button.config(text="SHOW" if compact_alerts else "HIDE")
+    details_button.config(text="MORE")
     sync_overlay_visibility(bool(current_sections))
     update_overlay(
         metrics_cache["pid"],
@@ -581,7 +666,11 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     metrics_cache["cpu"] = cpu_text
     metrics_cache["mem"] = mem_text
 
-    should_show_details = bool(sections) or is_expanded or is_frozen
+    should_show_details = (
+        (bool(sections) and not compact_alerts)
+        or is_expanded
+        or is_frozen
+    )
 
     status_text = "STABLE"
     status_color = palette["ok"]
@@ -605,7 +694,9 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         summary_value.config(text=summary_text)
 
 
-    is_compact_idle = not overlay_visible and not should_show_details
+    is_compact_idle = not should_show_details and (
+        not overlay_visible or compact_alerts
+    )
 
     if is_compact_idle:
         compact_title = f"{name} | PID {pid_text} | CPU {cpu_text} | RSS {mem_text}"
@@ -745,6 +836,22 @@ title_label = tk.Label(
     font=("Helvetica", 11, "bold"),
 )
 title_label.pack(side="left", padx=12, pady=7)
+
+alert_mode_button = tk.Button(
+    title_bar,
+    text="HIDE",
+    command=toggle_alert_display,
+    bg=palette["chrome"],
+    fg="#111111",
+    activebackground=palette["muted"],
+    activeforeground="#111111",
+    relief="raised",
+    bd=1,
+    font=("Helvetica", 7, "bold"),
+    padx=5,
+    pady=1,
+)
+alert_mode_button.pack(side="right", padx=(0, 4), pady=6)
 
 compact_value = tk.Label(
     title_bar,
