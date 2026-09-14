@@ -45,6 +45,10 @@ high_net_count = 0
 
 # Docker monitoring
 last_docker_check = 0
+previous_docker_restarts = {}
+docker_restart_alert_until = 0
+docker_restart_detected = False
+
 docker_summary = {
     "available": False,
     "running": 0,
@@ -526,13 +530,15 @@ def log_insight():
         "- identify failing service or app",
     ]
 
-def docker_insight(summary):
+def docker_insight(summary, restart_detected=False):
     unhealthy = summary["unhealthy"]
     restarting = summary["restarting"]
 
     lines = [
         f"Docker: {summary['running']} running",
     ]
+    if restart_detected:
+        lines.append("⚠ Recent container restart detected")
 
     if unhealthy:
         lines.append(f"Unhealthy containers: {len(unhealthy)}")
@@ -1101,6 +1107,7 @@ def update_loop():
     global is_warming
     global last_alert_key, alert_hold_until
     global last_docker_check, docker_summary
+    global docker_restart_alert_until
 
     if is_frozen:
         root.after(100, update_loop)
@@ -1160,15 +1167,34 @@ def update_loop():
        #fisnished log block
 
         # Docker block
+            
+       # Docker block
+
         if now - last_docker_check > 3:
             docker_summary = get_docker_summary()
             last_docker_check = now
+
+            for container in docker_summary["containers"]:
+                name = container["name"]
+                current_restarts = container["restarts"]
+                previous_restarts = previous_docker_restarts.get(name)
+
+                if (
+                    previous_restarts is not None
+                    and current_restarts > previous_restarts
+                ):
+                    docker_restart_alert_until = now + 7
+
+                previous_docker_restarts[name] = current_restarts
+
+        docker_restart_detected = now < docker_restart_alert_until
 
         docker_alert = (
             docker_summary["available"]
             and (
                 bool(docker_summary["unhealthy"])
                 or bool(docker_summary["restarting"])
+                or docker_restart_detected
             )
         )
        
@@ -1254,11 +1280,18 @@ def update_loop():
             sections.append(("LOG ALERT", "WARN", log_insight()))
 
         if docker_alert:
-            sections.append(("DOCKER WATCH", "CRITICAL" if docker_summary["unhealthy"] else "WARN", docker_insight(docker_summary))
-    )
+            sections.append(
+                (
+                    "DOCKER WATCH",
+                    "CRITICAL" if docker_summary["unhealthy"] else "WARN",
+                    docker_insight(docker_summary, docker_restart_detected),
+                )
+            
+            )
 
         priority = {
            "CRITICAL": 3,
+            "DOCKER_WARN": 2.5,
            "WARN": 2,
            "INFO": 1
         }
