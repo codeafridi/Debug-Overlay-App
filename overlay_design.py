@@ -1291,7 +1291,7 @@ def update_loop():
 
         priority = {
            "CRITICAL": 3,
-            "DOCKER_WARN": 2.5
+            "DOCKER_WARN": 2.5,
            "WARN": 2,
            "INFO": 1
         }
