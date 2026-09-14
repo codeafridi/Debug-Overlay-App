@@ -10,7 +10,7 @@ def docker_available():
 
 def get_containers():
     """
-    Return information about currently running Docker containers.
+    Return information about all Docker containers.
 
     Each container contains:
         name
@@ -27,7 +27,7 @@ def get_containers():
             [
                 "docker",
                 "ps",
-                "-q",
+                "-aq",
             ],
             capture_output=True,
             text=True,
@@ -61,6 +61,7 @@ def get_containers():
             state = data.get("State", {})
 
             health_data = state.get("Health")
+
             health = (
                 health_data.get("Status", "none")
                 if health_data
@@ -69,10 +70,12 @@ def get_containers():
 
             containers.append(
                 {
+                    "id": container_id,
                     "name": data.get("Name", "").lstrip("/"),
                     "status": state.get("Status", "unknown"),
                     "health": health,
                     "restarts": data.get("RestartCount", 0),
+                    "exit_code": state.get("ExitCode", 0),
                 }
             )
 
@@ -93,27 +96,47 @@ def get_docker_summary():
 
     containers = get_containers()
 
-    running = len(containers)
+    running = [
+        container
+        for container in containers
+        if container["status"] == "running"
+    ]
 
     unhealthy = [
         container
-        for container in containers
+        for container in running
         if container["health"] == "unhealthy"
     ]
 
     restarting = [
         container
         for container in containers
-        if container["restarts"] > 0
+        if container["status"] == "restarting"
     ]
 
     return {
         "available": docker_available(),
-        "running": running,
+        "running": len(running),
         "unhealthy": unhealthy,
         "restarting": restarting,
         "containers": containers,
     }
+
+
+def get_docker_summary_text(summary):
+    if not summary["available"]:
+        return "docker: unavailable"
+
+    running = summary["running"]
+    unhealthy = len(summary["unhealthy"])
+
+    if running == 0:
+        return "docker: 0 running"
+
+    if unhealthy:
+        return f"docker: {running} running | {unhealthy} unhealthy"
+
+    return f"docker: {running} running | healthy"
 
 
 if __name__ == "__main__":
@@ -121,8 +144,8 @@ if __name__ == "__main__":
 
     if not summary["available"]:
         print("Docker: unavailable")
-    elif summary["running"] == 0:
-        print("Docker: no running containers")
+    elif not summary["containers"]:
+        print("Docker: no containers")
     else:
         print(f"Docker: {summary['running']} running")
 
@@ -131,5 +154,6 @@ if __name__ == "__main__":
                 f"- {container['name']} | "
                 f"{container['status']} | "
                 f"health={container['health']} | "
-                f"restarts={container['restarts']}"
+                f"restarts={container['restarts']} | "
+                f"exit={container['exit_code']}"
             )
