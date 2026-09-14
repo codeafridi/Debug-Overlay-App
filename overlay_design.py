@@ -4,6 +4,9 @@ import sys
 import time
 import json
 import tkinter as tk
+
+from docker_monitor import get_docker_summary
+
 root = tk.Tk()
 
 num_cpus = os.cpu_count() or 1
@@ -39,6 +42,16 @@ prev_net = None
 low_net_count = 0
 log_alert_until = 0
 high_net_count = 0
+
+# Docker monitoring
+last_docker_check = 0
+docker_summary = {
+    "available": False,
+    "running": 0,
+    "unhealthy": [],
+    "restarting": [],
+    "containers": [],
+}
 
 overlay_visible = False
 hud_visible = True
@@ -513,6 +526,54 @@ def log_insight():
         "- identify failing service or app",
     ]
 
+def docker_insight(summary):
+    unhealthy = summary["unhealthy"]
+    restarting = summary["restarting"]
+
+    lines = [
+        f"Docker: {summary['running']} running",
+    ]
+
+    if unhealthy:
+        lines.append(f"Unhealthy containers: {len(unhealthy)}")
+
+        for container in unhealthy[:3]:
+            lines.append(
+                f"- {container['name']} | "
+                f"health={container['health']} | "
+                f"restarts={container['restarts']}"
+            )
+
+    if restarting:
+        lines.append("Containers with restarts:")
+
+        for container in restarting[:3]:
+            lines.append(
+                f"- {container['name']} | "
+                f"restarts={container['restarts']}"
+            )
+
+    lines.extend([
+        "Focus:",
+        "- run: docker ps",
+        "- inspect: docker inspect <container>",
+    ])
+
+    return lines
+
+def get_docker_summary_text(summary):
+    if not summary["available"]:
+        return "docker: unavailable"
+
+    running = summary["running"]
+    unhealthy = len(summary["unhealthy"])
+
+    if unhealthy:
+        return f"docker: {running} running | {unhealthy} unhealthy"
+
+    return f"docker: {running} running | healthy"
+
+
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
@@ -693,6 +754,16 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
+    docker_text = get_docker_summary_text(docker_summary)
+
+    if docker_summary_value.cget("text") != docker_text:
+        docker_summary_value.config(text=docker_text)
+
+    if docker_summary["unhealthy"]:
+        docker_summary_value.config(fg=palette["critical"])
+    else:
+        docker_summary_value.config(fg=palette["muted"])
+
 
     is_compact_idle = not should_show_details and (
         not overlay_visible or compact_alerts
@@ -708,6 +779,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             compact_value.pack(side="left", fill="x", expand=True, padx=(14, 8), pady=7)
         if hud_visible:
             hud_bar.pack_forget()
+            docker_summary_value.pack_forget()
             hud_visible = False
     else:
         if compact_value.winfo_manager():
@@ -717,6 +789,12 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         if not hud_visible:
             hud_bar.pack(fill="x", padx=10, pady=(10, 10))
             hud_visible = True
+        if not docker_summary_value.winfo_manager():
+            docker_summary_value.pack(
+                fill="x",
+                padx=12,
+                pady=(0, 6),
+            )
 
     if sections:
         lines = []
@@ -896,6 +974,22 @@ summary_value = tk.Label(
 )
 summary_value.pack(side="left", fill="x", expand=True, padx=14, pady=8)
 
+docker_summary_value = tk.Label(
+    body,
+    text="docker: checking...",
+    justify="left",
+    anchor="w",
+    bg=palette["panel"],
+    fg=palette["muted"],
+    font=("Courier New", 8, "bold"),
+)
+
+docker_summary_value.pack(
+    fill="x",
+    padx=12,
+    pady=(0, 6),
+)
+
 button_bar = tk.Frame(hud_bar, bg=palette["panel_alt"])
 button_bar.pack(side="right", padx=10, pady=6)
 
@@ -1006,6 +1100,7 @@ def update_loop():
     global overlay_visible
     global is_warming
     global last_alert_key, alert_hold_until
+    global last_docker_check, docker_summary
 
     if is_frozen:
         root.after(100, update_loop)
@@ -1063,6 +1158,19 @@ def update_loop():
 
         log_alert = now < log_alert_until
        #fisnished log block
+
+        # Docker block
+        if now - last_docker_check > 3:
+            docker_summary = get_docker_summary()
+            last_docker_check = now
+
+        docker_alert = (
+            docker_summary["available"]
+            and (
+                bool(docker_summary["unhealthy"])
+                or bool(docker_summary["restarting"])
+            )
+        )
        
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for app group rooted at PID {root_pid}")
@@ -1144,6 +1252,10 @@ def update_loop():
 
         if log_alert:
             sections.append(("LOG ALERT", "WARN", log_insight()))
+
+        if docker_alert:
+            sections.append(("DOCKER WATCH", "CRITICAL" if docker_summary["unhealthy"] else "WARN", docker_insight(docker_summary))
+    )
 
         priority = {
            "CRITICAL": 3,
