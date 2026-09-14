@@ -561,6 +561,18 @@ def docker_insight(summary):
 
     return lines
 
+def get_docker_summary_text(summary):
+    if not summary["available"]:
+        return "docker: unavailable"
+
+    running = summary["running"]
+    unhealthy = len(summary["unhealthy"])
+
+    if unhealthy:
+        return f"docker: {running} running | {unhealthy} unhealthy"
+
+    return f"docker: {running} running | healthy"
+
 
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
@@ -742,6 +754,16 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
     if summary_value.cget("text") != summary_text:
         summary_value.config(text=summary_text)
 
+    docker_text = get_docker_summary_text(docker_summary)
+
+    if docker_summary_value.cget("text") != docker_text:
+        docker_summary_value.config(text=docker_text)
+
+    if docker_summary["unhealthy"]:
+        docker_summary_value.config(fg=palette["critical"])
+    else:
+        docker_summary_value.config(fg=palette["muted"])
+
 
     is_compact_idle = not should_show_details and (
         not overlay_visible or compact_alerts
@@ -757,6 +779,7 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
             compact_value.pack(side="left", fill="x", expand=True, padx=(14, 8), pady=7)
         if hud_visible:
             hud_bar.pack_forget()
+            docker_summary_value.pack_forget()
             hud_visible = False
     else:
         if compact_value.winfo_manager():
@@ -766,6 +789,12 @@ def update_overlay(pid_text, name, cpu_text, mem_text, sections):
         if not hud_visible:
             hud_bar.pack(fill="x", padx=10, pady=(10, 10))
             hud_visible = True
+        if not docker_summary_value.winfo_manager():
+            docker_summary_value.pack(
+                fill="x",
+                padx=12,
+                pady=(0, 6),
+            )
 
     if sections:
         lines = []
