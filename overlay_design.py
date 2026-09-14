@@ -945,6 +945,22 @@ summary_value = tk.Label(
 )
 summary_value.pack(side="left", fill="x", expand=True, padx=14, pady=8)
 
+docker_summary_value = tk.Label(
+    body,
+    text="docker: checking...",
+    justify="left",
+    anchor="w",
+    bg=palette["panel"],
+    fg=palette["muted"],
+    font=("Courier New", 8, "bold"),
+)
+
+docker_summary_value.pack(
+    fill="x",
+    padx=12,
+    pady=(0, 6),
+)
+
 button_bar = tk.Frame(hud_bar, bg=palette["panel_alt"])
 button_bar.pack(side="right", padx=10, pady=6)
 
