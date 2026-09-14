@@ -7,7 +7,8 @@ warnings when something looks wrong.
 It is made for people who want a quick answer while working: "is this app using
 too much CPU or memory?" You do not need to keep `top` open all the time.
 
-<img width="1154" height="774" alt="Debug Overlay screenshot" src="https://github.com/user-attachments/assets/1a6cc9d0-1164-48ba-831e-abed1bbc1701" />
+<img width="1245" height="814" alt="image" src="https://github.com/user-attachments/assets/c89e2016-b378-4567-be0d-a9a73b4ca5c8" />
+
 
 ## What it shows
 
