@@ -526,6 +526,42 @@ def log_insight():
         "- identify failing service or app",
     ]
 
+def docker_insight(summary):
+    unhealthy = summary["unhealthy"]
+    restarting = summary["restarting"]
+
+    lines = [
+        f"Docker: {summary['running']} running",
+    ]
+
+    if unhealthy:
+        lines.append(f"Unhealthy containers: {len(unhealthy)}")
+
+        for container in unhealthy[:3]:
+            lines.append(
+                f"- {container['name']} | "
+                f"health={container['health']} | "
+                f"restarts={container['restarts']}"
+            )
+
+    if restarting:
+        lines.append("Containers with restarts:")
+
+        for container in restarting[:3]:
+            lines.append(
+                f"- {container['name']} | "
+                f"restarts={container['restarts']}"
+            )
+
+    lines.extend([
+        "Focus:",
+        "- run: docker ps",
+        "- inspect: docker inspect <container>",
+    ])
+
+    return lines
+
+
 def build_issue_lines(cpu_alert, mem_alert):
     sections = []
 
