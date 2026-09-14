@@ -1055,6 +1055,7 @@ def update_loop():
     global overlay_visible
     global is_warming
     global last_alert_key, alert_hold_until
+    global last_docker_check, docker_summary
 
     if is_frozen:
         root.after(100, update_loop)
@@ -1112,6 +1113,19 @@ def update_loop():
 
         log_alert = now < log_alert_until
        #fisnished log block
+
+        # Docker block
+        if now - last_docker_check > 3:
+            docker_summary = get_docker_summary()
+            last_docker_check = now
+
+        docker_alert = (
+            docker_summary["available"]
+            and (
+                bool(docker_summary["unhealthy"])
+                or bool(docker_summary["restarting"])
+            )
+        )
        
         if mem_kb is None:
             safe_log_error(f"memory usage is unavailable for app group rooted at PID {root_pid}")
@@ -1193,6 +1207,10 @@ def update_loop():
 
         if log_alert:
             sections.append(("LOG ALERT", "WARN", log_insight()))
+
+        if docker_alert:
+            sections.append(("DOCKER WATCH", "CRITICAL" if docker_summary["unhealthy"] else "WARN", docker_insight(docker_summary))
+    )
 
         priority = {
            "CRITICAL": 3,
