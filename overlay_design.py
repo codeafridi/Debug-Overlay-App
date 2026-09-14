@@ -4,6 +4,9 @@ import sys
 import time
 import json
 import tkinter as tk
+
+from docker_monitor import get_docker_summary
+
 root = tk.Tk()
 
 num_cpus = os.cpu_count() or 1
@@ -39,6 +42,16 @@ prev_net = None
 low_net_count = 0
 log_alert_until = 0
 high_net_count = 0
+
+# Docker monitoring
+last_docker_check = 0
+docker_summary = {
+    "available": False,
+    "running": 0,
+    "unhealthy": [],
+    "restarting": [],
+    "containers": [],
+}
 
 overlay_visible = False
 hud_visible = True
