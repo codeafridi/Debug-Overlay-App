@@ -16,8 +16,20 @@ too much CPU or memory?" You do not need to keep `top` open all the time.
 - the app PID
 - CPU usage
 - RAM usage (RSS)
+- Docker container status
+- unhealthy Docker containers
 - warnings for high CPU, memory growth, disk pressure, network activity, and
   recent system errors
+
+## Docker monitoring
+
+If Docker is installed and accessible to your user, Debug Overlay automatically
+checks Docker containers in the background.
+
+The compact overlay shows a short Docker status such as:
+
+```text
+docker: 2 running | healthy
 
 Apps such as Cursor, VS Code, Chrome, and Firefox use helper processes. The
 overlay groups related child processes, so its CPU and RAM numbers are more
