@@ -30,6 +30,7 @@ The compact overlay shows a short Docker status such as:
 
 ```text
 docker: 2 running | healthy
+```
 
 Apps such as Cursor, VS Code, Chrome, and Firefox use helper processes. The
 overlay groups related child processes, so its CPU and RAM numbers are more
