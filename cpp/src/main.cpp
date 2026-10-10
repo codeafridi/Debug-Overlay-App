@@ -90,45 +90,49 @@ int main(int argc, char *argv[]) {
 
     auto publishFocus = [&](const FocusSample &focus) {
         DisplaySnapshot snap;
-        if (focus.available) {
+        if (!focus.available) {
+            snap.status = QStringLiteral("no-focus");
+        } else {
             snap.appName = focus.appName;
             snap.pid = QString::number(focus.identity.pid);
-            snap.cpu = (focus.identity == cpuIdentity) ? cpuText
-                                                       : QStringLiteral("warming");
-            snap.memory = (focus.identity == cpuIdentity) ? memText
-                                                          : QStringLiteral("--");
+            if (focus.identity == cpuIdentity) {
+                snap.cpu = cpuText;
+                snap.memory = memText;
+            } else {
+                snap.cpu = QStringLiteral("Warming up");
+                snap.memory = QStringLiteral("--");
+            }
             snap.status = QStringLiteral("IDLE");
-        } else {
-            snap.status = QStringLiteral("no-focus");
         }
         hud.setSnapshot(snap);
     };
 
     auto publishSample = [&]() {
         const FocusSample focus = sampler.sample();
-        if (focus.available) {
-            const ProcessGroup &group = groupCache.pidsFor(focus.identity);
-
-            const CpuSample cpu = cpuSampler.sample(group.pids, focus.identity);
-            if (cpu.available && !cpu.warming) {
-                cpuText = QStringLiteral("%1%").arg(qRound(cpu.percent));
-            } else {
-                cpuText = QStringLiteral("warming");
-            }
-
-            unsigned long long rss = 0;
-            if (linuxproc::sumRssKb(group.pids, rss)) {
-                memText = formatMemoryKb(rss);
-            } else {
-                memText = QStringLiteral("--");
-            }
-
-            cpuIdentity = focus.identity;
-        } else {
+        if (!focus.available) {
             cpuText = QStringLiteral("--");
             memText = QStringLiteral("--");
             cpuIdentity = ProcessIdentity{};
+            publishFocus(focus);
+            return;
         }
+
+        const ProcessGroup &group = groupCache.pidsFor(focus.identity);
+        const CpuSample cpu = cpuSampler.sample(group.pids, focus.identity);
+
+        if (!cpu.available) {
+            cpuText = QStringLiteral("--");
+        } else if (cpu.warming) {
+            cpuText = QStringLiteral("Warming up");
+        } else {
+            cpuText = QStringLiteral("%1%").arg(qRound(cpu.percent));
+        }
+
+        unsigned long long rss = 0;
+        memText = linuxproc::sumRssKb(group.pids, rss) ? formatMemoryKb(rss)
+                                                       : QStringLiteral("--");
+
+        cpuIdentity = focus.identity;
         publishFocus(focus);
     };
 

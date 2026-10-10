@@ -55,6 +55,17 @@ int main(int argc, char *argv[]) {
     check(hud.findChild<QLabel *>(QStringLiteral("tick")) == nullptr,
           "temporary tick label removed");
 
+    bool hasMemCaption = false;
+    for (auto *label : hud.findChildren<QLabel *>()) {
+        if (label->text() == QStringLiteral("MEM (RSS)")) {
+            hasMemCaption = true;
+        }
+    }
+    check(hasMemCaption, "metrics caption reads MEM (RSS)");
+    check(compactLabel != nullptr
+              && compactLabel->text().contains(QStringLiteral("MEM (RSS)")),
+          "compact line labels memory as MEM (RSS)");
+
     if (appLabel && pidLabel && cpuLabel && memLabel && statusLabel) {
         hud.setSnapshot(makeSnapshot("alpha", "123", "17%", "8 MB", "WARN"));
         check(appLabel->text() == QStringLiteral("alpha"), "snapshot app rendered");

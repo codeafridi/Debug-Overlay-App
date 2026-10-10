@@ -74,7 +74,7 @@ HudWindow::HudWindow(QWidget *parent)
     metrics->addLayout(makeMetricBlock(QStringLiteral("App"), m_appValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("PID"), m_pidValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("CPU"), m_cpuValue));
-    metrics->addLayout(makeMetricBlock(QStringLiteral("MEM"), m_memoryValue));
+    metrics->addLayout(makeMetricBlock(QStringLiteral("MEM (RSS)"), m_memoryValue));
     metrics->addStretch(1);
 
     m_metricsWidget = new QWidget(this);
@@ -104,7 +104,9 @@ HudWindow::HudWindow(QWidget *parent)
     m_detailsText->setWordWrap(true);
     m_detailsText->setText(QStringLiteral(
         "No issues detected.\n"
-        "Metrics are placeholders (Feature 1)."));
+        "MEM (RSS) is the sum of resident memory (RSS) across the app's "
+        "process group; shared pages may be counted more than once, so it is "
+        "not uniquely owned physical memory."));
 
     detailsLayout->addWidget(detailsTitle);
     detailsLayout->addWidget(m_detailsText);
@@ -221,7 +223,7 @@ void HudWindow::updateCompactText() {
         return;
     }
 
-    m_compactLabel->setText(QStringLiteral("%1  |  PID %2  |  CPU %3  |  MEM %4  |  %5")
+    m_compactLabel->setText(QStringLiteral("%1  |  PID %2  |  CPU %3  |  MEM (RSS) %4  |  %5")
                                 .arg(m_appValue->text(),
                                      m_pidValue->text(),
                                      m_cpuValue->text(),
