@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QByteArray>
+#include <QHash>
 #include <QList>
+#include <QSet>
 #include <QString>
 #include <QtGlobal>
 
@@ -11,6 +13,8 @@ struct DockerContainer {
     QString state;
     QString status;
     QString health;
+    int exitCode = -1;
+    bool crashed = false;
 };
 
 enum class DockerState {
@@ -37,6 +41,8 @@ struct DockerSnapshot {
 
 QList<DockerContainer> parseDockerPs(const QByteArray &stdout, bool *ok);
 
+int parseDockerExitCode(const QString &status);
+
 int dockerRunningCount(const QList<DockerContainer> &containers);
 int dockerIssueCount(const QList<DockerContainer> &containers);
 bool dockerContainerIsIssue(const DockerContainer &container);
@@ -45,3 +51,12 @@ DockerState classifyDockerFailure(const QByteArray &stderr);
 
 QString dockerSummaryText(const DockerSnapshot &snapshot);
 QString dockerDetailText(const DockerSnapshot &snapshot);
+
+class DockerStateTracker {
+public:
+    void update(QList<DockerContainer> &containers);
+
+private:
+    QHash<QString, QString> m_previousState;
+    QSet<QString> m_crashed;
+};

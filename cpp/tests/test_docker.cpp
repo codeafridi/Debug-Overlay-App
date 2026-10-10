@@ -150,6 +150,54 @@ int main() {
     check(!detail.contains(QStringLiteral("web")),
           "detail text omits healthy container");
 
+    check(parseDockerExitCode(QStringLiteral("Exited (137) 2 minutes ago")) == 137,
+          "parse exit code 137");
+    check(parseDockerExitCode(QStringLiteral("Up 2 days (healthy)")) == -1,
+          "no exit code for running container");
+    check(parseDockerExitCode(QStringLiteral("Restarting (3) 5 seconds ago")) == 3,
+          "parse parenthesised count");
+
+    {
+        DockerStateTracker tracker;
+
+        QList<DockerContainer> running;
+        DockerContainer a;
+        a.id = QStringLiteral("a");
+        a.name = QStringLiteral("svc");
+        a.state = QStringLiteral("running");
+        running.append(a);
+        tracker.update(running);
+        check(!running.at(0).crashed, "running container not crashed");
+
+        QList<DockerContainer> exited;
+        DockerContainer b = a;
+        b.state = QStringLiteral("exited");
+        b.status = QStringLiteral("Exited (137) 1 second ago");
+        b.exitCode = parseDockerExitCode(b.status);
+        exited.append(b);
+        tracker.update(exited);
+        check(exited.at(0).crashed, "running->exited(137) is a crash");
+        check(dockerContainerIsIssue(exited.at(0)),
+              "crashed container is an issue");
+        check(dockerDetailText(okSnapshot(exited)).contains(
+                  QStringLiteral("recently exited")),
+              "detail marks recently exited");
+
+        tracker.update(running);
+        check(!running.at(0).crashed, "restarted container clears crash flag");
+
+        QList<DockerContainer> fresh;
+        DockerContainer c;
+        c.id = QStringLiteral("c");
+        c.state = QStringLiteral("exited");
+        c.status = QStringLiteral("Exited (1) 1 second ago");
+        c.exitCode = 1;
+        fresh.append(c);
+        tracker.update(fresh);
+        check(!fresh.at(0).crashed,
+              "never-observed-running exit is not a crash");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

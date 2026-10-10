@@ -215,19 +215,28 @@ file.
 ## Performance
 
 Measured on the reference machine (Ubuntu 26.04, GNOME Wayland, 12 logical cores),
-idle, focused app = Cursor:
+idle, focused app = Cursor (median of 5 × 30 s runs):
 
 | Metric | Python (Tkinter) | C++ / Qt 6 |
 |---|---|---|
-| CPU (% of one core) | 26.2 % | **0.75–0.9 %** |
-| Voluntary wakeups/s | ~4,600 | **~2** |
-| RSS | ~62 MB | ~60 MB |
-| PSS | ~51 MB | **~36 MB** |
+| CPU (% of one core) | 26.2 % | **0.67 %** (0.30–0.70) |
+| Voluntary wakeups/s | ~4,600 | **~2.1** |
+| RSS | ~62 MB | ~60.1 MB |
+| PSS | ~51 MB | **~37.5 MB** |
 
-10-minute soak: **0.74 % CPU**, memory flat (RSS +0.3 MB, PSS +0.1 MB).
+Responsiveness and endurance (C++):
+
+- **Focus-update latency** (focus change → snapshot applied): median **20 ms**
+  (min 18, max 29; n = 12).
+- **GUI event-loop jitter**: no late timer ticks observed while monitoring.
+- **Active load** (focused app pegged at ~100 % CPU): overlay's own CPU **0.20 %**.
+- **10-minute soak**: **0.74 % CPU**, memory flat (RSS +0.3 MB, PSS +0.1 MB).
 
 The design targets: no blocking monitoring on the GUI thread, no unbounded
 queues, no fast idle polling, and correct stale/unavailable states.
+
+Instrumentation is opt-in: set `DEBUG_OVERLAY_LATENCY=1` to print GUI-jitter and
+focus-update latency to stderr (off by default, so it costs nothing normally).
 
 ---
 

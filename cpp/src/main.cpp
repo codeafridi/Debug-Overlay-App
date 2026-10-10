@@ -18,6 +18,7 @@
 #include <QProcessEnvironment>
 #include <QSocketNotifier>
 #include <QThread>
+#include <QTimer>
 #include <QtGlobal>
 
 #include <csignal>
@@ -29,6 +30,16 @@
 namespace {
 
 int g_signalFd[2] = {-1, -1};
+
+bool g_latencyProbe = false;
+qint64 g_focusRequestedAtMs = 0;
+qint64 g_guiLastTickMs = 0;
+qint64 g_guiMaxLateMs = 0;
+
+void latencyLog(const char *name, qint64 value) {
+    std::fprintf(stderr, "[latency] %s=%lld\n", name,
+                 static_cast<long long>(value));
+}
 
 void writeSignalByte(int) {
     const char byte = 0;
@@ -77,6 +88,8 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<DisplaySnapshot>("DisplaySnapshot");
     qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
     qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
+
+    g_latencyProbe = qEnvironmentVariableIsSet("DEBUG_OVERLAY_LATENCY");
 
     struct sigaction ignoreAction;
     ignoreAction.sa_handler = SIG_IGN;
@@ -134,6 +147,12 @@ int main(int argc, char *argv[]) {
                              return;
                          }
                          lastSequence = snapshot.sequence;
+                         if (g_latencyProbe && g_focusRequestedAtMs > 0) {
+                             latencyLog("focus_request_to_apply_ms",
+                                        QDateTime::currentMSecsSinceEpoch()
+                                            - g_focusRequestedAtMs);
+                             g_focusRequestedAtMs = 0;
+                         }
                          hud.setSnapshot(snapshot);
                      });
 
@@ -165,50 +184,70 @@ int main(int argc, char *argv[]) {
                      });
     kubeThread->start();
 
-    if (provider->name() == QStringLiteral("gnome-pidfile")) {
-        const QString pidFilePath = GnomePidFileProvider::defaultPath();
-        QString lastRaw;
-        auto *watcher = new QFileSystemWatcher(&app);
-        if (!pidFilePath.isEmpty()) {
-            const QFileInfo info(pidFilePath);
-            const QString dirPath = info.absolutePath();
-            if (QFileInfo::exists(dirPath)) {
-                watcher->addPath(dirPath);
-            }
-            if (QFileInfo::exists(pidFilePath)) {
-                watcher->addPath(pidFilePath);
-            }
+    const QString pidFilePath = GnomePidFileProvider::defaultPath();
+    QString lastRaw;
+    auto *watcher = new QFileSystemWatcher(&app);
+
+    auto requestSample = [&worker]() {
+        if (g_latencyProbe) {
+            g_focusRequestedAtMs = QDateTime::currentMSecsSinceEpoch();
         }
+        QMetaObject::invokeMethod(worker, "sampleNow", Qt::QueuedConnection);
+    };
 
-        auto requestSample = [&worker]() {
-            QMetaObject::invokeMethod(worker, "sampleNow", Qt::QueuedConnection);
-        };
+    auto refreshIfChanged = [&]() {
+        QFile file(pidFilePath);
+        QString raw;
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            raw = QString::fromUtf8(file.readAll()).trimmed();
+        }
+        if (raw == lastRaw) {
+            return;
+        }
+        lastRaw = raw;
+        requestSample();
+    };
 
-        auto refreshIfChanged = [&]() {
-            QFile file(pidFilePath);
-            QString raw;
-            if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                raw = QString::fromUtf8(file.readAll()).trimmed();
-            }
-            if (raw == lastRaw) {
-                return;
-            }
-            lastRaw = raw;
-            requestSample();
-        };
+    auto onChange = [&]() {
+        refreshIfChanged();
+        if (!pidFilePath.isEmpty() && QFileInfo::exists(pidFilePath)
+            && !watcher->files().contains(pidFilePath)) {
+            watcher->addPath(pidFilePath);
+        }
+    };
 
-        auto onChange = [&]() {
-            refreshIfChanged();
-            if (!pidFilePath.isEmpty() && QFileInfo::exists(pidFilePath)
-                && !watcher->files().contains(pidFilePath)) {
-                watcher->addPath(pidFilePath);
-            }
-        };
+    if (provider->name() == QStringLiteral("gnome-pidfile")
+        && !pidFilePath.isEmpty()) {
+        const QFileInfo info(pidFilePath);
+        const QString dirPath = info.absolutePath();
+        if (QFileInfo::exists(dirPath)) {
+            watcher->addPath(dirPath);
+        }
+        if (QFileInfo::exists(pidFilePath)) {
+            watcher->addPath(pidFilePath);
+        }
 
         QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
                          [&](const QString &) { onChange(); });
         QObject::connect(watcher, &QFileSystemWatcher::fileChanged, &app,
                          [&](const QString &) { onChange(); });
+    }
+
+    if (g_latencyProbe) {
+        g_guiLastTickMs = QDateTime::currentMSecsSinceEpoch();
+        auto *jitterTimer = new QTimer(&app);
+        jitterTimer->setInterval(1000);
+        QObject::connect(jitterTimer, &QTimer::timeout, &app, []() {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            const qint64 late = (now - g_guiLastTickMs) - 1000;
+            g_guiLastTickMs = now;
+            if (late > g_guiMaxLateMs) {
+                g_guiMaxLateMs = late;
+            }
+            latencyLog("gui_tick_late_ms", late);
+            latencyLog("gui_max_late_ms", g_guiMaxLateMs);
+        });
+        jitterTimer->start();
     }
 
     hud.show();

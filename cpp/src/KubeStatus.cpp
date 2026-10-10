@@ -23,19 +23,80 @@ QString badReason(const KubePod &pod) {
     return bad.contains(pod.reason) ? pod.reason : QString();
 }
 
+KubePod parsePod(const QJsonObject &item) {
+    const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
+    const QJsonObject status = item.value(QStringLiteral("status")).toObject();
+
+    KubePod pod;
+    pod.ns = metadata.value(QStringLiteral("namespace")).toString();
+    pod.name = metadata.value(QStringLiteral("name")).toString();
+    pod.phase = status.value(QStringLiteral("phase")).toString();
+
+    const QJsonArray containerStatuses =
+        status.value(QStringLiteral("containerStatuses")).toArray();
+    for (const QJsonValue &csValue : containerStatuses) {
+        if (!csValue.isObject()) {
+            continue;
+        }
+        const QJsonObject cs = csValue.toObject();
+        const QJsonObject state = cs.value(QStringLiteral("state")).toObject();
+
+        const int restarts = cs.value(QStringLiteral("restartCount")).toInt(0);
+        if (restarts > pod.restarts) {
+            pod.restarts = restarts;
+        }
+
+        const QString waitingReason =
+            state.value(QStringLiteral("waiting"))
+                .toObject()
+                .value(QStringLiteral("reason"))
+                .toString();
+        const QString terminatedReason =
+            state.value(QStringLiteral("terminated"))
+                .toObject()
+                .value(QStringLiteral("reason"))
+                .toString();
+        const QString reason =
+            !waitingReason.isEmpty() ? waitingReason : terminatedReason;
+        if (!reason.isEmpty()) {
+            pod.reason = reason;
+        }
+    }
+
+    return pod;
+}
+
+KubeDeployment parseDeployment(const QJsonObject &item) {
+    const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
+    const QJsonObject spec = item.value(QStringLiteral("spec")).toObject();
+    const QJsonObject status = item.value(QStringLiteral("status")).toObject();
+
+    KubeDeployment deployment;
+    deployment.ns = metadata.value(QStringLiteral("namespace")).toString();
+    deployment.name = metadata.value(QStringLiteral("name")).toString();
+    deployment.desired = spec.value(QStringLiteral("replicas")).toInt(1);
+    deployment.available =
+        status.value(QStringLiteral("availableReplicas")).toInt(0);
+    deployment.unavailable =
+        status.value(QStringLiteral("unavailableReplicas")).toInt(0);
+    return deployment;
+}
+
 } // namespace
 
-QList<KubePod> parseKubectlPods(const QByteArray &json, bool *ok) {
+KubeResources parseKubectlResources(const QByteArray &json, bool *ok) {
     if (ok != nullptr) {
         *ok = true;
     }
+
+    KubeResources resources;
 
     const QJsonDocument doc = QJsonDocument::fromJson(json);
     if (!doc.isObject()) {
         if (ok != nullptr) {
             *ok = false;
         }
-        return {};
+        return resources;
     }
 
     const QJsonValue itemsValue = doc.object().value(QStringLiteral("items"));
@@ -43,10 +104,9 @@ QList<KubePod> parseKubectlPods(const QByteArray &json, bool *ok) {
         if (ok != nullptr) {
             *ok = false;
         }
-        return {};
+        return resources;
     }
 
-    QList<KubePod> pods;
     const QJsonArray items = itemsValue.toArray();
     for (const QJsonValue &itemValue : items) {
         if (!itemValue.isObject()) {
@@ -54,51 +114,16 @@ QList<KubePod> parseKubectlPods(const QByteArray &json, bool *ok) {
         }
 
         const QJsonObject item = itemValue.toObject();
-        const QJsonObject metadata =
-            item.value(QStringLiteral("metadata")).toObject();
-        const QJsonObject status = item.value(QStringLiteral("status")).toObject();
+        const QString kind = item.value(QStringLiteral("kind")).toString();
 
-        KubePod pod;
-        pod.ns = metadata.value(QStringLiteral("namespace")).toString();
-        pod.name = metadata.value(QStringLiteral("name")).toString();
-        pod.phase = status.value(QStringLiteral("phase")).toString();
-
-        const QJsonArray containerStatuses =
-            status.value(QStringLiteral("containerStatuses")).toArray();
-        for (const QJsonValue &csValue : containerStatuses) {
-            if (!csValue.isObject()) {
-                continue;
-            }
-            const QJsonObject cs = csValue.toObject();
-            const QJsonObject state = cs.value(QStringLiteral("state")).toObject();
-
-            const int restarts =
-                cs.value(QStringLiteral("restartCount")).toInt(0);
-            if (restarts > pod.restarts) {
-                pod.restarts = restarts;
-            }
-
-            const QString waitingReason =
-                state.value(QStringLiteral("waiting"))
-                    .toObject()
-                    .value(QStringLiteral("reason"))
-                    .toString();
-            const QString terminatedReason =
-                state.value(QStringLiteral("terminated"))
-                    .toObject()
-                    .value(QStringLiteral("reason"))
-                    .toString();
-            const QString reason = !waitingReason.isEmpty() ? waitingReason
-                                                            : terminatedReason;
-            if (!reason.isEmpty()) {
-                pod.reason = reason;
-            }
+        if (kind == QStringLiteral("Deployment")) {
+            resources.deployments.append(parseDeployment(item));
+        } else {
+            resources.pods.append(parsePod(item));
         }
-
-        pods.append(pod);
     }
 
-    return pods;
+    return resources;
 }
 
 bool kubePodIsIssue(const KubePod &pod) {
@@ -112,10 +137,23 @@ bool kubePodIsIssue(const KubePod &pod) {
     return pod.restarts >= 5;
 }
 
-int kubeIssueCount(const QList<KubePod> &pods) {
+bool kubeDeploymentIsIssue(const KubeDeployment &deployment) {
+    if (deployment.unavailable > 0) {
+        return true;
+    }
+    return deployment.desired > 0 && deployment.available < deployment.desired;
+}
+
+int kubeIssueCount(const QList<KubePod> &pods,
+                   const QList<KubeDeployment> &deployments) {
     int issues = 0;
     for (const KubePod &pod : pods) {
         if (kubePodIsIssue(pod)) {
+            ++issues;
+        }
+    }
+    for (const KubeDeployment &deployment : deployments) {
+        if (kubeDeploymentIsIssue(deployment)) {
             ++issues;
         }
     }
@@ -181,7 +219,7 @@ QString kubeDetailText(const KubeSnapshot &snapshot) {
             continue;
         }
 
-        QString detail = QStringLiteral("- %1/%2").arg(pod.ns, pod.name);
+        QString detail = QStringLiteral("- pod %1/%2").arg(pod.ns, pod.name);
         if (!pod.phase.isEmpty()) {
             detail += QStringLiteral(" | %1").arg(pod.phase);
         }
@@ -192,6 +230,17 @@ QString kubeDetailText(const KubeSnapshot &snapshot) {
             detail += QStringLiteral(" | r=%1").arg(pod.restarts);
         }
         lines.append(detail);
+    }
+
+    for (const KubeDeployment &deployment : snapshot.deployments) {
+        if (!kubeDeploymentIsIssue(deployment)) {
+            continue;
+        }
+
+        lines.append(QStringLiteral("- deploy %1/%2 | %3/%4 ready")
+                         .arg(deployment.ns, deployment.name)
+                         .arg(deployment.available)
+                         .arg(deployment.desired));
     }
 
     if (lines.isEmpty()) {

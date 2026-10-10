@@ -103,9 +103,9 @@ void KubeSource::beginQuery() {
     m_aborting = false;
 
     m_process->start(m_kubectlPath,
-                     {QStringLiteral("get"), QStringLiteral("pods"),
-                      QStringLiteral("-A"), QStringLiteral("-o"),
-                      QStringLiteral("json")});
+                     {QStringLiteral("get"),
+                      QStringLiteral("pods,deployments"), QStringLiteral("-A"),
+                      QStringLiteral("-o"), QStringLiteral("json")});
     m_deadlineTimer->start(m_config.timeoutMs);
 }
 
@@ -204,7 +204,7 @@ void KubeSource::onFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     }
 
     bool ok = false;
-    const QList<KubePod> pods = parseKubectlPods(m_stdout, &ok);
+    const KubeResources resources = parseKubectlResources(m_stdout, &ok);
     if (!ok) {
         emitSnapshot(KubeState::ParseFailed,
                      QStringLiteral("unexpected kubectl output"), {}, false);
@@ -212,19 +212,21 @@ void KubeSource::onFinished(int exitCode, QProcess::ExitStatus exitStatus) {
         return;
     }
 
-    const int issues = kubeIssueCount(pods);
-    emitSnapshot(KubeState::Ok, QString(), pods, true);
+    const int issues = kubeIssueCount(resources.pods, resources.deployments);
+    emitSnapshot(KubeState::Ok, QString(), resources, true);
     scheduleNext(nextIntervalMs(KubeState::Ok, issues > 0));
 }
 
 void KubeSource::emitSnapshot(KubeState state, const QString &message,
-                              const QList<KubePod> &pods, bool success) {
+                              const KubeResources &resources, bool success) {
     if (success) {
         KubeSnapshot snapshot;
         snapshot.state = KubeState::Ok;
-        snapshot.pods = pods;
-        snapshot.totalPods = pods.size();
-        snapshot.issueCount = kubeIssueCount(pods);
+        snapshot.pods = resources.pods;
+        snapshot.deployments = resources.deployments;
+        snapshot.totalPods = resources.pods.size();
+        snapshot.issueCount =
+            kubeIssueCount(resources.pods, resources.deployments);
         snapshot.stale = false;
         snapshot.sampledAtMs = QDateTime::currentMSecsSinceEpoch();
         m_lastGood = snapshot;
