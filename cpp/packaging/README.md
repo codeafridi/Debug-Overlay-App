@@ -65,3 +65,28 @@ Optional INI file at `~/.config/debug-overlay/config.ini`
 (`DEBUG_OVERLAY_CONFIG` overrides the path). See the project README / feature
 report for the full key list. Missing file or invalid values fall back to
 defaults.
+
+## Distribution packages
+
+Source templates are provided; only the Debian package is buildable in this
+environment.
+
+| Format | Artifact | Build command |
+| --- | --- | --- |
+| Debian/Ubuntu (`.deb`) | `cpp/packaging/build_deb.sh` | `bash cpp/packaging/build_deb.sh` |
+| Fedora/RHEL (`.rpm`) | `cpp/packaging/rpm/debug-overlay.spec` | `rpmbuild -ba cpp/packaging/rpm/debug-overlay.spec` |
+| Arch (PKGBUILD) | `cpp/packaging/arch/PKGBUILD` | `makepkg -si` |
+
+The `.deb` installs the binary to `/usr/bin/debug-overlay`, a system-wide user
+unit to `/usr/lib/systemd/user/debug-overlay.service`, a launcher `.desktop`, and
+docs. Per-user autostart is then a normal user action:
+
+```bash
+systemctl --user enable --now debug-overlay.service   # systemd
+# or add ~/.config/autostart/debug-overlay.desktop     (non-systemd / desktop)
+```
+
+Other distributions are **not yet packaged** (Arch packages must be built on
+Arch; RPM on an RPM-based distro). The source build + `install.sh` works
+everywhere Qt 6 is available.
+

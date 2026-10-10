@@ -1,0 +1,29 @@
+# Maintainer: Debug Overlay <noreply@example.com>
+pkgname=debug-overlay
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Compact always-on-top HUD for focused-process and infra status"
+arch=('x86_64')
+url="https://github.com/codeafridi/Debug-Overlay-App"
+license=('MIT')
+depends=('qt6-base' 'xdotool')
+makedepends=('cmake' 'gcc')
+source=("$pkgname-$pkgver.tar.gz")
+
+build() {
+    cd "$srcdir"
+    cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+    cmake --build cpp/build -j"$(nproc)"
+}
+
+package() {
+    install -Dm0755 cpp/build/debug_overlay_hud \
+        "$pkgdir/usr/bin/debug-overlay"
+    sed 's|@BINARY@|/usr/bin/debug-overlay|g' \
+        cpp/packaging/debug-overlay.service.in \
+        > debug-overlay.service
+    install -Dm0644 debug-overlay.service \
+        "$pkgdir/usr/lib/systemd/user/debug-overlay.service"
+    install -Dm0644 cpp/packaging/debug-overlay.desktop.in \
+        "$pkgdir/usr/share/applications/debug-overlay.desktop"
+}
