@@ -1,10 +1,12 @@
 #pragma once
 
+#include <QPoint>
 #include <QWidget>
 
 class QLabel;
 class QKeyEvent;
 class QLayout;
+class QMouseEvent;
 
 class HudWindow : public QWidget {
     Q_OBJECT
@@ -20,6 +22,9 @@ public:
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
     QLabel *makeCaption(const QString &text);
@@ -32,4 +37,7 @@ private:
     QLabel *m_cpuValue = nullptr;
     QLabel *m_memoryValue = nullptr;
     QLabel *m_statusValue = nullptr;
+
+    bool m_dragging = false;
+    QPoint m_dragOffset;
 };

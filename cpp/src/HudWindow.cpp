@@ -4,6 +4,7 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QVBoxLayout>
 
 namespace {
@@ -40,7 +41,7 @@ HudWindow::HudWindow(QWidget *parent)
     root->setSpacing(10);
 
     auto *header = new QHBoxLayout();
-    header->setSpacing(8);
+    header->setSpacing(6);
 
     auto *title = new QLabel(QStringLiteral("DEBUG HUD"), this);
     title->setObjectName(QStringLiteral("title"));
@@ -72,16 +73,16 @@ HudWindow::HudWindow(QWidget *parent)
     setStyleSheet(QStringLiteral(
         "#hudRoot {"
         "  background-color:rgb(19, 19, 20);"
-        "  border: 2px solid #4e4a53;"
+        "  border: 2px solidrgb(13, 13, 14);"
         "}"
         "#title {"
         "  color: #f4f8ff;"
-        "  background-color: #102d59;"
+        "  background-color:rgb(124, 128, 134);"
         "  padding: 3px 8px;"
         "}"
-        "#caption { color: #86d8ff; }"
-        "#status  { color: #79ffb0; }"
-        "QLabel   { color: #a7ff83; }"));
+        "#caption { color:rgb(209, 187, 187); }"
+        "#status  { color:rgb(187, 207, 205); }"
+        "QLabel   { color:rgb(198, 205, 195); }"));
 
     applyPlaceholderValues(QStringLiteral("--"),
                            QStringLiteral("--"),
@@ -136,4 +137,36 @@ void HudWindow::keyPressEvent(QKeyEvent *event) {
     }
 
     QWidget::keyPressEvent(event);
+}
+
+void HudWindow::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_dragging = true;
+        m_dragOffset =
+            event->globalPosition().toPoint() - frameGeometry().topLeft();
+        event->accept();
+        return;
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
+void HudWindow::mouseMoveEvent(QMouseEvent *event) {
+    if (m_dragging && event->buttons().testFlag(Qt::LeftButton)) {
+        move(event->globalPosition().toPoint() - m_dragOffset);
+        event->accept();
+        return;
+    }
+
+    QWidget::mouseMoveEvent(event);
+}
+
+void HudWindow::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_dragging = false;
+        event->accept();
+        return;
+    }
+
+    QWidget::mouseReleaseEvent(event);
 }
