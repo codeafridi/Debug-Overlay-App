@@ -224,8 +224,9 @@ void DockerSource::emitSnapshot(DockerState state,
         DockerSnapshot snapshot;
         snapshot.state = DockerState::Ok;
         snapshot.containers = containers;
-        snapshot.runningCount = dockerRunningCount(containers);
-        snapshot.issueCount = dockerIssueCount(containers);
+        m_stateTracker.update(snapshot.containers);
+        snapshot.runningCount = dockerRunningCount(snapshot.containers);
+        snapshot.issueCount = dockerIssueCount(snapshot.containers);
         snapshot.stale = false;
         snapshot.sampledAtMs = QDateTime::currentMSecsSinceEpoch();
         m_lastGood = snapshot;

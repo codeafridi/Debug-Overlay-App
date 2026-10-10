@@ -25,6 +25,22 @@ QString issueText(int issues) {
 
 } // namespace
 
+int parseDockerExitCode(const QString &status) {
+    const int open = status.indexOf(QLatin1Char('('));
+    if (open < 0) {
+        return -1;
+    }
+    const int close = status.indexOf(QLatin1Char(')'), open + 1);
+    if (close < 0) {
+        return -1;
+    }
+
+    bool ok = false;
+    const int code =
+        status.mid(open + 1, close - open - 1).trimmed().toInt(&ok);
+    return ok ? code : -1;
+}
+
 QList<DockerContainer> parseDockerPs(const QByteArray &stdout, bool *ok) {
     if (ok != nullptr) {
         *ok = true;
@@ -53,6 +69,7 @@ QList<DockerContainer> parseDockerPs(const QByteArray &stdout, bool *ok) {
         container.state = QString::fromUtf8(fields.at(2)).trimmed();
         container.status = QString::fromUtf8(fields.at(3)).trimmed();
         container.health = parseHealth(container.status);
+        container.exitCode = parseDockerExitCode(container.status);
         containers.append(container);
     }
 
@@ -60,6 +77,9 @@ QList<DockerContainer> parseDockerPs(const QByteArray &stdout, bool *ok) {
 }
 
 bool dockerContainerIsIssue(const DockerContainer &container) {
+    if (container.crashed) {
+        return true;
+    }
     if (container.state.compare(QStringLiteral("restarting"),
                                 Qt::CaseInsensitive)
         == 0) {
@@ -157,6 +177,9 @@ QString dockerDetailText(const DockerSnapshot &snapshot) {
         if (!container.status.isEmpty()) {
             detail += QStringLiteral(" | %1").arg(container.status);
         }
+        if (container.crashed) {
+            detail += QStringLiteral(" | recently exited");
+        }
         lines.append(detail);
     }
 
@@ -166,3 +189,39 @@ QString dockerDetailText(const DockerSnapshot &snapshot) {
 
     return lines.join(QLatin1Char('\n'));
 }
+
+void DockerStateTracker::update(QList<DockerContainer> &containers) {
+    QSet<QString> present;
+
+    for (DockerContainer &container : containers) {
+        present.insert(container.id);
+
+        const QString previous = m_previousState.value(container.id);
+        if (previous == QStringLiteral("running")
+            && container.state == QStringLiteral("exited")
+            && container.exitCode != 0) {
+            m_crashed.insert(container.id);
+        }
+
+        if (container.state == QStringLiteral("running")) {
+            m_crashed.remove(container.id);
+        }
+
+        container.crashed = m_crashed.contains(container.id);
+    }
+
+    for (auto it = m_crashed.begin(); it != m_crashed.end();) {
+        if (present.contains(*it)) {
+            ++it;
+        } else {
+            it = m_crashed.erase(it);
+        }
+    }
+
+    QHash<QString, QString> next;
+    for (const DockerContainer &container : containers) {
+        next.insert(container.id, container.state);
+    }
+    m_previousState = next;
+}
+

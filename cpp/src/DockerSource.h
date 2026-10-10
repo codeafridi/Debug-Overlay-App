@@ -61,4 +61,5 @@ private:
     QString m_abortMessage;
     int m_backoffMs = 15000;
     DockerSnapshot m_lastGood;
+    DockerStateTracker m_stateTracker;
 };
