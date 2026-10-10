@@ -1,30 +1,34 @@
 #include "FocusProviderFactory.h"
 
+#include "CachingFocusProvider.h"
 #include "GnomePidFileProvider.h"
 #include "HyprctlFocusProvider.h"
 #include "NullFocusProvider.h"
+#include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
 
 #include <QProcessEnvironment>
 
-FocusProviderKind selectProviderKind(const QString &sessionType,
-                                     const QString &desktop,
-                                     bool hasDisplay,
-                                     bool hasHyprlandSignature) {
-    const QString normalizedDesktop = desktop.toLower();
+FocusProviderKind selectProviderKind(const SessionInfo &info) {
+    const QString desktop = info.desktop.toLower();
 
-    if (sessionType.compare(QStringLiteral("wayland"), Qt::CaseInsensitive) == 0) {
-        if (normalizedDesktop.contains(QStringLiteral("gnome"))) {
+    if (info.sessionType.compare(QStringLiteral("wayland"),
+                                 Qt::CaseInsensitive)
+        == 0) {
+        if (desktop.contains(QStringLiteral("gnome"))) {
             return FocusProviderKind::Gnome;
         }
-        if (normalizedDesktop.contains(QStringLiteral("hyprland"))
-            || hasHyprlandSignature) {
+        if (desktop.contains(QStringLiteral("hyprland"))
+            || info.hasHyprlandSignature) {
             return FocusProviderKind::Hyprland;
+        }
+        if (desktop.contains(QStringLiteral("sway")) || info.hasSwaySocket) {
+            return FocusProviderKind::Sway;
         }
         return FocusProviderKind::Null;
     }
 
-    if (hasDisplay) {
+    if (info.hasDisplay) {
         return FocusProviderKind::X11;
     }
 
@@ -37,6 +41,8 @@ QString focusProviderKindName(FocusProviderKind kind) {
         return QStringLiteral("gnome-pidfile");
     case FocusProviderKind::Hyprland:
         return QStringLiteral("hyprctl");
+    case FocusProviderKind::Sway:
+        return QStringLiteral("swaymsg");
     case FocusProviderKind::X11:
         return QStringLiteral("xdotool");
     case FocusProviderKind::Null:
@@ -47,20 +53,27 @@ QString focusProviderKindName(FocusProviderKind kind) {
 
 std::unique_ptr<FocusedWindowProvider> createFocusProvider() {
     const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString sessionType = env.value(QStringLiteral("XDG_SESSION_TYPE"));
-    const QString desktop = env.value(QStringLiteral("XDG_CURRENT_DESKTOP"));
-    const bool hasDisplay = !env.value(QStringLiteral("DISPLAY")).isEmpty();
-    const bool hasHyprlandSignature =
-        !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty();
 
-    switch (selectProviderKind(sessionType, desktop, hasDisplay,
-                               hasHyprlandSignature)) {
+    SessionInfo info;
+    info.sessionType = env.value(QStringLiteral("XDG_SESSION_TYPE"));
+    info.desktop = env.value(QStringLiteral("XDG_CURRENT_DESKTOP"));
+    info.hasDisplay = !env.value(QStringLiteral("DISPLAY")).isEmpty();
+    info.hasHyprlandSignature =
+        !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty();
+    info.hasSwaySocket = !env.value(QStringLiteral("SWAYSOCK")).isEmpty();
+
+    switch (selectProviderKind(info)) {
     case FocusProviderKind::Gnome:
         return std::make_unique<GnomePidFileProvider>();
     case FocusProviderKind::Hyprland:
-        return std::make_unique<HyprctlFocusProvider>();
+        return std::make_unique<CachingFocusProvider>(
+            std::make_unique<HyprctlFocusProvider>());
+    case FocusProviderKind::Sway:
+        return std::make_unique<CachingFocusProvider>(
+            std::make_unique<SwaymsgFocusProvider>());
     case FocusProviderKind::X11:
-        return std::make_unique<XdotoolFocusProvider>();
+        return std::make_unique<CachingFocusProvider>(
+            std::make_unique<XdotoolFocusProvider>());
     case FocusProviderKind::Null:
     default:
         return std::make_unique<NullFocusProvider>();

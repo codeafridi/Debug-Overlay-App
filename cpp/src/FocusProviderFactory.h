@@ -9,14 +9,20 @@ class FocusedWindowProvider;
 enum class FocusProviderKind {
     Gnome,
     Hyprland,
+    Sway,
     X11,
     Null,
 };
 
-FocusProviderKind selectProviderKind(const QString &sessionType,
-                                     const QString &desktop,
-                                     bool hasDisplay,
-                                     bool hasHyprlandSignature = false);
+struct SessionInfo {
+    QString sessionType;
+    QString desktop;
+    bool hasDisplay = false;
+    bool hasHyprlandSignature = false;
+    bool hasSwaySocket = false;
+};
+
+FocusProviderKind selectProviderKind(const SessionInfo &info);
 
 std::unique_ptr<FocusedWindowProvider> createFocusProvider();
 

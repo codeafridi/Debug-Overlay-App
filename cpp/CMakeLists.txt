@@ -49,8 +49,12 @@ add_library(debug_overlay_core STATIC
     src/XdotoolFocusProvider.h
     src/HyprctlFocusProvider.cpp
     src/HyprctlFocusProvider.h
+    src/SwaymsgFocusProvider.cpp
+    src/SwaymsgFocusProvider.h
     src/FocusProviderFactory.cpp
-    src/FocusProviderFactory.h)
+    src/FocusProviderFactory.h
+    src/CachingFocusProvider.cpp
+    src/CachingFocusProvider.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)

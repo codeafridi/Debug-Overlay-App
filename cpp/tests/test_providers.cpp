@@ -1,13 +1,43 @@
 #include "FocusProviderFactory.h"
+#include "CachingFocusProvider.h"
 #include "FocusedWindowProvider.h"
 #include "HyprctlFocusProvider.h"
 #include "LinuxProcess.h"
 #include "NullFocusProvider.h"
+#include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
 
 #include <QCoreApplication>
 
 #include <cstdio>
+#include <memory>
+
+namespace {
+
+class ToggleProvider : public FocusedWindowProvider {
+public:
+    QString name() const override { return QStringLiteral("toggle"); }
+    int focusedPid() const override { return pid; }
+
+    int pid = -1;
+};
+
+} // namespace
+
+namespace {
+
+SessionInfo makeInfo(const char *session, const char *desktop, bool display,
+                     bool hypr = false, bool sway = false) {
+    SessionInfo info;
+    info.sessionType = QString::fromUtf8(session);
+    info.desktop = QString::fromUtf8(desktop);
+    info.hasDisplay = display;
+    info.hasHyprlandSignature = hypr;
+    info.hasSwaySocket = sway;
+    return info;
+}
+
+} // namespace
 
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
@@ -20,32 +50,33 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    check(selectProviderKind(QStringLiteral("wayland"),
-                             QStringLiteral("ubuntu:GNOME"), true)
+    check(selectProviderKind(makeInfo("wayland", "ubuntu:GNOME", true))
               == FocusProviderKind::Gnome,
           "wayland+GNOME -> Gnome");
-    check(selectProviderKind(QStringLiteral("wayland"),
-                             QStringLiteral("KDE"), true)
+    check(selectProviderKind(makeInfo("wayland", "KDE", true))
               == FocusProviderKind::Null,
           "wayland+KDE -> Null (not implemented yet)");
-    check(selectProviderKind(QStringLiteral("wayland"),
-                             QStringLiteral("Hyprland"), true)
+    check(selectProviderKind(makeInfo("wayland", "Hyprland", true))
               == FocusProviderKind::Hyprland,
           "wayland+Hyprland -> Hyprland");
-    check(selectProviderKind(QStringLiteral("wayland"), QString(), false, true)
+    check(selectProviderKind(makeInfo("wayland", "", false, true))
               == FocusProviderKind::Hyprland,
           "wayland + HYPRLAND_INSTANCE_SIGNATURE -> Hyprland");
-    check(selectProviderKind(QStringLiteral("wayland"), QString(), false)
+    check(selectProviderKind(makeInfo("wayland", "sway", true))
+              == FocusProviderKind::Sway,
+          "wayland+sway -> Sway");
+    check(selectProviderKind(makeInfo("wayland", "", false, false, true))
+              == FocusProviderKind::Sway,
+          "wayland + SWAYSOCK -> Sway");
+    check(selectProviderKind(makeInfo("wayland", "", false))
               == FocusProviderKind::Null,
           "wayland+unknown -> Null");
-    check(selectProviderKind(QStringLiteral("x11"),
-                             QStringLiteral("ubuntu:GNOME"), true)
+    check(selectProviderKind(makeInfo("x11", "ubuntu:GNOME", true))
               == FocusProviderKind::X11,
           "x11 -> X11");
-    check(selectProviderKind(QString(), QString(), true) == FocusProviderKind::X11,
+    check(selectProviderKind(makeInfo("", "", true)) == FocusProviderKind::X11,
           "empty session + display -> X11");
-    check(selectProviderKind(QString(), QString(), false)
-              == FocusProviderKind::Null,
+    check(selectProviderKind(makeInfo("", "", false)) == FocusProviderKind::Null,
           "empty session + no display -> Null");
 
     check(focusProviderKindName(FocusProviderKind::Gnome)
@@ -57,6 +88,9 @@ int main(int argc, char *argv[]) {
     check(focusProviderKindName(FocusProviderKind::Hyprland)
               == QStringLiteral("hyprctl"),
           "Hyprland kind name");
+    check(focusProviderKindName(FocusProviderKind::Sway)
+              == QStringLiteral("swaymsg"),
+          "Sway kind name");
 
     check(parseHyprctlPid(
               QByteArrayLiteral("{\"address\":\"0x1\",\"pid\":4242,\"class\":\"x\"}"))
@@ -69,26 +103,63 @@ int main(int argc, char *argv[]) {
     check(parseHyprctlPid(QByteArrayLiteral("{\"address\":\"0x1\"}")) == -1,
           "parseHyprctlPid missing pid -> -1");
 
+    const QByteArray swayTree = QByteArrayLiteral(
+        "{\"type\":\"root\",\"nodes\":["
+        "{\"type\":\"output\",\"nodes\":["
+        "{\"type\":\"workspace\",\"focused\":false,\"nodes\":["
+        "{\"type\":\"con\",\"focused\":true,\"pid\":777,\"nodes\":[]}]}]},"
+        "{\"type\":\"output\",\"nodes\":[]}]}");
+    check(parseSwayFocusedPid(swayTree) == 777,
+          "parseSwayFocusedPid finds nested focused pid");
+    check(parseSwayFocusedPid(
+              QByteArrayLiteral("{\"type\":\"root\",\"focused\":true,\"pid\":99}"))
+              == 99,
+          "parseSwayFocusedPid finds top-level focused pid");
+    check(parseSwayFocusedPid(QByteArrayLiteral("{}")) == -1,
+          "parseSwayFocusedPid empty -> -1");
+    check(parseSwayFocusedPid(QByteArrayLiteral("not json")) == -1,
+          "parseSwayFocusedPid non-json -> -1");
+
     HyprctlFocusProvider missingHyprctl(QStringLiteral("/nonexistent/hyprctl"));
     check(missingHyprctl.name() == QStringLiteral("hyprctl"),
           "hyprctl provider name");
-    check(missingHyprctl.focusedPid() == -1,
-          "missing hyprctl command -> -1");
+    check(missingHyprctl.focusedPid() == -1, "missing hyprctl command -> -1");
+
+    SwaymsgFocusProvider missingSway(QStringLiteral("/nonexistent/swaymsg"));
+    check(missingSway.name() == QStringLiteral("swaymsg"), "swaymsg provider name");
+    check(missingSway.focusedPid() == -1, "missing swaymsg command -> -1");
 
     NullFocusProvider nullProvider;
     check(nullProvider.name() == QStringLiteral("null"), "null provider name");
     check(nullProvider.focusedPid() == -1, "null provider returns -1");
 
-    XdotoolFocusProvider missing(QStringLiteral("/nonexistent/xdotool"));
-    check(missing.name() == QStringLiteral("xdotool"), "xdotool provider name");
-    check(missing.focusedPid() == -1, "missing xdotool command -> -1");
+    XdotoolFocusProvider missingXdotool(QStringLiteral("/nonexistent/xdotool"));
+    check(missingXdotool.name() == QStringLiteral("xdotool"),
+          "xdotool provider name");
+    check(missingXdotool.focusedPid() == -1, "missing xdotool command -> -1");
 
-    XdotoolFocusProvider real;
-    const int pid = real.focusedPid();
-    check(pid == -1 || linuxproc::exists(pid),
-          "xdotool provider returns -1 or a live pid");
+    {
+        qint64 fakeNow = 1000;
+        auto clock = [&fakeNow]() { return fakeNow; };
+        auto inner = std::make_unique<ToggleProvider>();
+        ToggleProvider *raw = inner.get();
+        CachingFocusProvider cache(std::move(inner), 1500, clock);
 
-    std::printf("xdotool focusedPid() now = %d\n", pid);
+        check(cache.name() == QStringLiteral("toggle"), "cache delegates name");
+
+        raw->pid = 42;
+        check(cache.focusedPid() == 42, "cache passes through valid pid");
+
+        raw->pid = -1;
+        fakeNow += 1000;
+        check(cache.focusedPid() == 42, "cache returns last valid within TTL");
+
+        fakeNow += 1000;
+        check(cache.focusedPid() == -1, "cache expires after TTL");
+
+        raw->pid = 7;
+        check(cache.focusedPid() == 7, "cache updates on new valid pid");
+    }
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
