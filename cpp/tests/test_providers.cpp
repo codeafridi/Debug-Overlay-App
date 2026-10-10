@@ -2,6 +2,9 @@
 #include "CachingFocusProvider.h"
 #include "FocusedWindowProvider.h"
 #include "HyprctlFocusProvider.h"
+#include "KdeFocusProvider.h"
+#include "KdeFocusService.h"
+#include "KdeFocusState.h"
 #include "LinuxProcess.h"
 #include "NullFocusProvider.h"
 #include "SwaymsgFocusProvider.h"
@@ -54,8 +57,11 @@ int main(int argc, char *argv[]) {
               == FocusProviderKind::Gnome,
           "wayland+GNOME -> Gnome");
     check(selectProviderKind(makeInfo("wayland", "KDE", true))
-              == FocusProviderKind::Null,
-          "wayland+KDE -> Null (not implemented yet)");
+              == FocusProviderKind::Kde,
+          "wayland+KDE -> Kde");
+    check(selectProviderKind(makeInfo("wayland", "plasma", true))
+              == FocusProviderKind::Kde,
+          "wayland+plasma -> Kde");
     check(selectProviderKind(makeInfo("wayland", "Hyprland", true))
               == FocusProviderKind::Hyprland,
           "wayland+Hyprland -> Hyprland");
@@ -91,6 +97,9 @@ int main(int argc, char *argv[]) {
     check(focusProviderKindName(FocusProviderKind::Sway)
               == QStringLiteral("swaymsg"),
           "Sway kind name");
+    check(focusProviderKindName(FocusProviderKind::Kde)
+              == QStringLiteral("kde-dbus"),
+          "Kde kind name");
 
     check(parseHyprctlPid(
               QByteArrayLiteral("{\"address\":\"0x1\",\"pid\":4242,\"class\":\"x\"}"))
@@ -159,6 +168,33 @@ int main(int argc, char *argv[]) {
 
         raw->pid = 7;
         check(cache.focusedPid() == 7, "cache updates on new valid pid");
+    }
+
+    {
+        qint64 fakeNow = 1000;
+        auto clock = [&fakeNow]() { return fakeNow; };
+        KdeFocusProvider provider(5000, clock);
+
+        kdeFocusState().pid.store(-1);
+        kdeFocusState().stampMs.store(0);
+        check(provider.name() == QStringLiteral("kde-dbus"), "kde provider name");
+        check(provider.focusedPid() == -1, "kde provider -1 before any push");
+
+        kdeFocusState().pid.store(123);
+        kdeFocusState().stampMs.store(fakeNow);
+        check(provider.focusedPid() == 123, "kde provider returns pushed pid");
+
+        fakeNow += 6000;
+        check(provider.focusedPid() == -1, "kde provider expires after TTL");
+    }
+
+    {
+        KdeFocusService service;
+        service.setFocusedPid(4242);
+        check(kdeFocusState().pid.load() == 4242, "kde service stores pid");
+        service.setFocusedPid(0);
+        check(kdeFocusState().pid.load() == -1,
+              "kde service clears on non-positive pid");
     }
 
     std::printf("%d failure(s)\n", failures);

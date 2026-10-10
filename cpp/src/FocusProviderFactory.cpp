@@ -3,6 +3,7 @@
 #include "CachingFocusProvider.h"
 #include "GnomePidFileProvider.h"
 #include "HyprctlFocusProvider.h"
+#include "KdeFocusProvider.h"
 #include "NullFocusProvider.h"
 #include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
@@ -17,6 +18,10 @@ FocusProviderKind selectProviderKind(const SessionInfo &info) {
         == 0) {
         if (desktop.contains(QStringLiteral("gnome"))) {
             return FocusProviderKind::Gnome;
+        }
+        if (desktop.contains(QStringLiteral("kde"))
+            || desktop.contains(QStringLiteral("plasma"))) {
+            return FocusProviderKind::Kde;
         }
         if (desktop.contains(QStringLiteral("hyprland"))
             || info.hasHyprlandSignature) {
@@ -39,6 +44,8 @@ QString focusProviderKindName(FocusProviderKind kind) {
     switch (kind) {
     case FocusProviderKind::Gnome:
         return QStringLiteral("gnome-pidfile");
+    case FocusProviderKind::Kde:
+        return QStringLiteral("kde-dbus");
     case FocusProviderKind::Hyprland:
         return QStringLiteral("hyprctl");
     case FocusProviderKind::Sway:
@@ -65,6 +72,8 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider() {
     switch (selectProviderKind(info)) {
     case FocusProviderKind::Gnome:
         return std::make_unique<GnomePidFileProvider>();
+    case FocusProviderKind::Kde:
+        return std::make_unique<KdeFocusProvider>();
     case FocusProviderKind::Hyprland:
         return std::make_unique<CachingFocusProvider>(
             std::make_unique<HyprctlFocusProvider>());

@@ -19,6 +19,8 @@ public:
 
     void setSnapshot(const DisplaySnapshot &snapshot);
 
+    void setDockerStatus(const QString &text);
+
 protected:
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
@@ -33,7 +35,6 @@ private:
 
     void toggleDetails();
     void toggleCompact();
-    void toggleFreeze();
     void updateCompactText();
 
     QLabel *m_appValue = nullptr;
@@ -44,15 +45,14 @@ private:
 
     QWidget *m_metricsWidget = nullptr;
     QLabel *m_compactLabel = nullptr;
+    QLabel *m_dockerValue = nullptr;
     QWidget *m_detailsPanel = nullptr;
     QLabel *m_detailsText = nullptr;
     QPushButton *m_moreButton = nullptr;
     QPushButton *m_showHideButton = nullptr;
-    QPushButton *m_freezeButton = nullptr;
     DisplaySnapshot m_lastSnapshot;
     bool m_detailsExpanded = false;
     bool m_compact = false;
-    bool m_frozen = false;
 
     bool m_dragging = false;
     QPoint m_dragOffset;

@@ -8,6 +8,7 @@ class FocusedWindowProvider;
 
 enum class FocusProviderKind {
     Gnome,
+    Kde,
     Hyprland,
     Sway,
     X11,

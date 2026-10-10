@@ -1,7 +1,9 @@
 #include "HudWindow.h"
 
 #include "FocusProviderFactory.h"
+#include "DockerSource.h"
 #include "GnomePidFileProvider.h"
+#include "KdeFocusService.h"
 #include "SamplerWorker.h"
 
 #include <QApplication>
@@ -79,6 +81,12 @@ int main(int argc, char *argv[]) {
 
     std::unique_ptr<FocusedWindowProvider> provider = createFocusProvider();
 
+    std::unique_ptr<KdeFocusService> kdeService;
+    if (provider->name() == QStringLiteral("kde-dbus")) {
+        kdeService = std::make_unique<KdeFocusService>();
+        kdeService->registerService();
+    }
+
     auto *thread = new QThread;
     auto *worker = new SamplerWorker(provider.get());
     worker->moveToThread(thread);
@@ -96,6 +104,16 @@ int main(int argc, char *argv[]) {
                      });
 
     thread->start();
+
+    auto *dockerThread = new QThread;
+    auto *docker = new DockerSource;
+    docker->moveToThread(dockerThread);
+    QObject::connect(dockerThread, &QThread::started, docker, &DockerSource::start);
+    QObject::connect(dockerThread, &QThread::finished, docker,
+                     &QObject::deleteLater);
+    QObject::connect(docker, &DockerSource::dockerTextReady, &hud,
+                     [&hud](const QString &text) { hud.setDockerStatus(text); });
+    dockerThread->start();
 
     if (provider->name() == QStringLiteral("gnome-pidfile")) {
         const QString pidFilePath = GnomePidFileProvider::defaultPath();
@@ -146,6 +164,10 @@ int main(int argc, char *argv[]) {
     hud.show();
 
     const int rc = app.exec();
+
+    dockerThread->quit();
+    dockerThread->wait();
+    delete dockerThread;
 
     thread->quit();
     thread->wait();

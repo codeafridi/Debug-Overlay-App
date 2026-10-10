@@ -36,8 +36,6 @@ int main(int argc, char *argv[]) {
     auto *moreButton = hud.findChild<QPushButton *>(QStringLiteral("moreButton"));
     auto *showHideButton =
         hud.findChild<QPushButton *>(QStringLiteral("showHideButton"));
-    auto *freezeButton =
-        hud.findChild<QPushButton *>(QStringLiteral("freezeButton"));
     auto *compactLabel = hud.findChild<QLabel *>(QStringLiteral("compact"));
     auto *appLabel = hud.findChild<QLabel *>(QStringLiteral("appValue"));
     auto *pidLabel = hud.findChild<QLabel *>(QStringLiteral("pidValue"));
@@ -47,7 +45,8 @@ int main(int argc, char *argv[]) {
 
     check(moreButton != nullptr, "MORE/LESS button exists");
     check(showHideButton != nullptr, "HIDE/SHOW button exists");
-    check(freezeButton != nullptr, "FRZ/RES button exists");
+    check(hud.findChild<QPushButton *>(QStringLiteral("freezeButton")) == nullptr,
+          "FRZ button removed");
     check(compactLabel != nullptr, "compact summary label exists");
     check(appLabel != nullptr && pidLabel != nullptr && cpuLabel != nullptr
               && memLabel != nullptr && statusLabel != nullptr,
@@ -85,25 +84,6 @@ int main(int argc, char *argv[]) {
               "widget not recreated on snapshot update");
         check(appLabel->text() == QStringLiteral("beta"),
               "snapshot update applied");
-    }
-
-    if (freezeButton && appLabel) {
-        check(freezeButton->text() == QStringLiteral("FRZ"),
-              "FRZ/RES starts as FRZ");
-        freezeButton->click();
-        check(freezeButton->text() == QStringLiteral("RES"),
-              "FRZ click -> RES");
-
-        hud.setSnapshot(makeSnapshot("gamma", "7", "5%", "2 MB", "WARN"));
-        check(appLabel->text() == QStringLiteral("beta"),
-              "frozen: snapshot ignored");
-
-        freezeButton->click();
-        check(freezeButton->text() == QStringLiteral("FRZ"),
-              "RES click -> FRZ");
-        hud.setSnapshot(makeSnapshot("delta", "7", "5%", "2 MB", "WARN"));
-        check(appLabel->text() == QStringLiteral("delta"),
-              "resume: snapshot applied");
     }
 
     if (showHideButton && compactLabel) {

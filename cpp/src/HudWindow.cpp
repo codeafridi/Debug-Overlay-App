@@ -101,6 +101,11 @@ HudWindow::HudWindow(QWidget *parent)
     m_compactLabel->setVisible(false);
     root->addWidget(m_compactLabel);
 
+    m_dockerValue = new QLabel(this);
+    m_dockerValue->setObjectName(QStringLiteral("docker"));
+    m_dockerValue->setVisible(false);
+    root->addWidget(m_dockerValue);
+
     m_detailsPanel = new QFrame(this);
     m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
 
@@ -117,9 +122,7 @@ HudWindow::HudWindow(QWidget *parent)
     m_detailsText->setWordWrap(true);
     m_detailsText->setText(QStringLiteral(
         "No issues detected.\n"
-        "MEM (RSS) is the sum of resident memory (RSS) across the app's "
-        "process group; shared pages may be counted more than once, so it is "
-        "not uniquely owned physical memory."));
+        ));
 
     detailsLayout->addWidget(detailsTitle);
     detailsLayout->addWidget(m_detailsText);
@@ -127,14 +130,8 @@ HudWindow::HudWindow(QWidget *parent)
     root->addWidget(m_detailsPanel);
 
     auto *footer = new QHBoxLayout();
-    footer->setSpacing(1);
+    footer->setSpacing(4);
     footer->addStretch(1);
-
-    m_freezeButton = new QPushButton(QStringLiteral("FRZ"), this);
-    m_freezeButton->setObjectName(QStringLiteral("freezeButton"));
-    m_freezeButton->setFocusPolicy(Qt::NoFocus);
-    m_freezeButton->setCursor(Qt::PointingHandCursor);
-    connect(m_freezeButton, &QPushButton::clicked, this, &HudWindow::toggleFreeze);
 
     m_moreButton = new QPushButton(QStringLiteral("MORE"), this);
     m_moreButton->setObjectName(QStringLiteral("moreButton"));
@@ -148,7 +145,6 @@ HudWindow::HudWindow(QWidget *parent)
     m_showHideButton->setCursor(Qt::PointingHandCursor);
     connect(m_showHideButton, &QPushButton::clicked, this, &HudWindow::toggleCompact);
 
-    footer->addWidget(m_freezeButton);
     footer->addWidget(m_moreButton);
     footer->addWidget(m_showHideButton);
     root->addLayout(footer);
@@ -164,23 +160,25 @@ HudWindow::HudWindow(QWidget *parent)
         "  padding: 3px 8px;"
         "}"
         "#caption { color:rgb(200, 194, 194); }"
+        "#docker  { color:rgb(150, 180, 220); }"
         "#status  { color:rgb(187, 207, 205); }"
         "#detailsPanel {"
         "  background-color:rgb(28, 28, 30);"
         "  border: 1px solid rgb(70, 70, 74);"
         "}"
-        "#freezeButton, #moreButton, #showHideButton {"
+        "#moreButton, #showHideButton {"
         "  color: #f4f8ff;"
         "  background-color:rgb(70, 74, 82);"
         "  border: 1px solid rgb(120, 124, 132);"
+        "  font-size: 10px;"
         "  padding: 2px 8px;"
         "}"
-        "#freezeButton:hover, #moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
+        "#moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
     setSnapshot(DisplaySnapshot{});
 
-    setFixedWidth(440);
+    setFixedWidth(430);
     adjustSize();
 }
 
@@ -206,10 +204,6 @@ QLayout *HudWindow::makeMetricBlock(const QString &caption, QLabel *value) {
 }
 
 void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
-    if (m_frozen) {
-        return;
-    }
-
     m_lastSnapshot = snapshot;
 
     if (m_appValue->text() != snapshot.appName) {
@@ -231,6 +225,20 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
 
     updateCompactText();
+}
+
+void HudWindow::setDockerStatus(const QString &text) {
+    const bool wasVisible = m_dockerValue->isVisibleTo(this);
+
+    if (m_dockerValue->text() != text) {
+        m_dockerValue->setText(text);
+    }
+
+    const bool nowVisible = !text.isEmpty();
+    if (wasVisible != nowVisible) {
+        m_dockerValue->setVisible(nowVisible);
+        adjustSize();
+    }
 }
 
 void HudWindow::updateCompactText() {
@@ -271,12 +279,6 @@ void HudWindow::toggleCompact() {
     }
 
     adjustSize();
-}
-
-void HudWindow::toggleFreeze() {
-    m_frozen = !m_frozen;
-    m_freezeButton->setText(m_frozen ? QStringLiteral("RES")
-                                     : QStringLiteral("FRZ"));
 }
 
 void HudWindow::keyPressEvent(QKeyEvent *event) {
