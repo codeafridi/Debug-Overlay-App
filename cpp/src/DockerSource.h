@@ -1,6 +1,10 @@
 #pragma once
 
+#include "Config.h"
+#include "DockerStatus.h"
+
 #include <QObject>
+#include <QProcess>
 #include <QString>
 
 class QTimer;
@@ -9,17 +13,52 @@ class DockerSource : public QObject {
     Q_OBJECT
 
 public:
-    explicit DockerSource(QObject *parent = nullptr);
+    explicit DockerSource(const DockerConfig &config = DockerConfig{},
+                          QObject *parent = nullptr);
 
 public slots:
     void start();
     void stop();
-    void sampleNow();
 
 signals:
-    void dockerTextReady(const QString &text);
+    void dockerReady(const DockerSnapshot &snapshot);
+
+private slots:
+    void onPollTimeout();
+    void onStdout();
+    void onStderr();
+    void onFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onErrorOccurred(QProcess::ProcessError error);
+    void onDeadlineTimeout();
+    void onKillTimeout();
 
 private:
-    QTimer *m_timer = nullptr;
+    void beginQuery();
+    void scheduleNext(int intervalMs);
+    void emitSnapshot(DockerState state,
+                      const QString &message,
+                      const QList<DockerContainer> &containers,
+                      bool success);
+    int nextIntervalMs(DockerState state, bool hasIssues);
+    void resetBackoff();
+
+    QProcess *m_process = nullptr;
+    QTimer *m_pollTimer = nullptr;
+    QTimer *m_deadlineTimer = nullptr;
+    QTimer *m_killTimer = nullptr;
+
+    DockerConfig m_config;
     QString m_dockerPath;
+    QByteArray m_stdout;
+    QByteArray m_stderr;
+
+    bool m_running = false;
+    bool m_aborting = false;
+    bool m_stopping = false;
+    bool m_refreshPending = false;
+    bool m_haveLast = false;
+    DockerState m_abortState = DockerState::TimedOut;
+    QString m_abortMessage;
+    int m_backoffMs = 15000;
+    DockerSnapshot m_lastGood;
 };

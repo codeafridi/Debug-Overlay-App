@@ -1,7 +1,8 @@
 #include "HudWindow.h"
 
-#include "FocusProviderFactory.h"
+#include "Config.h"
 #include "DockerSource.h"
+#include "FocusProviderFactory.h"
 #include "GnomePidFileProvider.h"
 #include "KdeFocusService.h"
 #include "SamplerWorker.h"
@@ -17,6 +18,7 @@
 #include <QtGlobal>
 
 #include <csignal>
+#include <cstdio>
 #include <memory>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -43,7 +45,15 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Debug Overlay"));
 
+    QString configError;
+    const Config config = loadConfig(defaultConfigPath(), &configError);
+    if (!configError.isEmpty()) {
+        std::fprintf(stderr, "[debug-overlay] config: %s\n",
+                     qUtf8Printable(configError));
+    }
+
     qRegisterMetaType<DisplaySnapshot>("DisplaySnapshot");
+    qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
 
     struct sigaction ignoreAction;
     ignoreAction.sa_handler = SIG_IGN;
@@ -79,7 +89,7 @@ int main(int argc, char *argv[]) {
     HudWindow hud;
     hud.setSnapshot(DisplaySnapshot{});
 
-    std::unique_ptr<FocusedWindowProvider> provider = createFocusProvider();
+    std::unique_ptr<FocusedWindowProvider> provider = createFocusProvider(config);
 
     std::unique_ptr<KdeFocusService> kdeService;
     if (provider->name() == QStringLiteral("kde-dbus")) {
@@ -88,7 +98,7 @@ int main(int argc, char *argv[]) {
     }
 
     auto *thread = new QThread;
-    auto *worker = new SamplerWorker(provider.get());
+    auto *worker = new SamplerWorker(provider.get(), config);
     worker->moveToThread(thread);
     QObject::connect(thread, &QThread::started, worker, &SamplerWorker::start);
     QObject::connect(thread, &QThread::finished, worker, &QObject::deleteLater);
@@ -106,13 +116,15 @@ int main(int argc, char *argv[]) {
     thread->start();
 
     auto *dockerThread = new QThread;
-    auto *docker = new DockerSource;
+    auto *docker = new DockerSource(config.docker);
     docker->moveToThread(dockerThread);
     QObject::connect(dockerThread, &QThread::started, docker, &DockerSource::start);
     QObject::connect(dockerThread, &QThread::finished, docker,
                      &QObject::deleteLater);
-    QObject::connect(docker, &DockerSource::dockerTextReady, &hud,
-                     [&hud](const QString &text) { hud.setDockerStatus(text); });
+    QObject::connect(docker, &DockerSource::dockerReady, &hud,
+                     [&hud](const DockerSnapshot &snapshot) {
+                         hud.setDockerSnapshot(snapshot);
+                     });
     dockerThread->start();
 
     if (provider->name() == QStringLiteral("gnome-pidfile")) {
@@ -165,6 +177,7 @@ int main(int argc, char *argv[]) {
 
     const int rc = app.exec();
 
+    QMetaObject::invokeMethod(docker, "stop", Qt::BlockingQueuedConnection);
     dockerThread->quit();
     dockerThread->wait();
     delete dockerThread;

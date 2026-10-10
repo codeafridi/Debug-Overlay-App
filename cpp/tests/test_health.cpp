@@ -12,7 +12,7 @@ int main() {
     };
 
     constexpr unsigned long long lowRss = 100ULL * 1024;
-    constexpr unsigned long long highRss = HealthEvaluator::kRssWarnKb + 1;
+    constexpr unsigned long long highRss = HealthConfig{}.rssWarnKb + 1;
 
     {
         HealthEvaluator h;
@@ -23,7 +23,7 @@ int main() {
     {
         HealthEvaluator h;
         HealthEvaluator::Level level = HealthEvaluator::Level::Ok;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             level = h.update(true, 80.0, true, lowRss);
         }
         check(level == HealthEvaluator::Level::Warn,
@@ -33,7 +33,7 @@ int main() {
     {
         HealthEvaluator h;
         HealthEvaluator::Level level = HealthEvaluator::Level::Ok;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             level = h.update(true, 95.0, true, lowRss);
         }
         check(level == HealthEvaluator::Level::HighCpu,
@@ -43,7 +43,7 @@ int main() {
     {
         HealthEvaluator h;
         HealthEvaluator::Level level = HealthEvaluator::Level::Ok;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             level = h.update(true, 5.0, true, highRss);
         }
         check(level == HealthEvaluator::Level::Warn,
@@ -59,7 +59,7 @@ int main() {
               "single spike then normal stays OK (not sustained)");
 
         HealthEvaluator::Level level = HealthEvaluator::Level::Ok;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             level = h.update(true, 95.0, true, lowRss);
         }
         check(level == HealthEvaluator::Level::HighCpu,
@@ -68,7 +68,7 @@ int main() {
 
     {
         HealthEvaluator h;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             h.update(true, 95.0, true, lowRss);
         }
         h.reset();
@@ -78,7 +78,7 @@ int main() {
 
     {
         HealthEvaluator h;
-        for (int i = 0; i < HealthEvaluator::kSustainedSamples; ++i) {
+        for (int i = 0; i < HealthConfig{}.sustainedSamples; ++i) {
             h.update(false, 0.0, false, 0);
         }
         check(h.update(false, 0.0, true, lowRss) == HealthEvaluator::Level::Ok,

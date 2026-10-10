@@ -6,16 +6,20 @@
 
 #include <QTimer>
 
-SamplerWorker::SamplerWorker(FocusedWindowProvider *provider, QObject *parent)
+SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
+                             const Config &config,
+                             QObject *parent)
     : QObject(parent)
     , m_provider(provider)
-    , m_sampler(provider) {
+    , m_sampler(provider)
+    , m_health(config.health) {
+    m_intervalMs = config.sampleIntervalMs;
 }
 
 void SamplerWorker::start() {
     if (m_timer == nullptr) {
         m_timer = new QTimer(this);
-        m_timer->setInterval(1000);
+        m_timer->setInterval(m_intervalMs);
         connect(m_timer, &QTimer::timeout, this, &SamplerWorker::sampleNow);
     }
     m_timer->start();

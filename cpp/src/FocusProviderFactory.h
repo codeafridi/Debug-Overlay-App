@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Config.h"
+
 #include <QString>
 
 #include <memory>
@@ -25,6 +27,7 @@ struct SessionInfo {
 
 FocusProviderKind selectProviderKind(const SessionInfo &info);
 
-std::unique_ptr<FocusedWindowProvider> createFocusProvider();
+std::unique_ptr<FocusedWindowProvider> createFocusProvider(
+    const Config &config = Config{});
 
 QString focusProviderKindName(FocusProviderKind kind);

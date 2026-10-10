@@ -1,0 +1,67 @@
+# Debug Overlay — build, install, and desktop integration
+
+This directory contains the C++20 / Qt 6 implementation of Debug Overlay and
+its packaging.
+
+## Build prerequisites
+
+- A C++20 compiler (GCC 11+ or Clang 14+)
+- CMake 3.16+
+- Qt 6 Widgets and Qt 6 DBus development packages
+- Linux `/proc` (standard)
+
+Package names (typical):
+
+| Distribution | Packages |
+| --- | --- |
+| Debian / Ubuntu / Mint | `build-essential cmake qt6-base-dev libqt6dbus6` |
+| Fedora | `gcc-c++ cmake qt6-qtbase-devel qt6-qtbase` (DBus via `qt6-qtbase`) |
+| Arch / CachyOS | `base-devel cmake qt6-base` |
+
+X11 focus detection additionally needs `xdotool` (X11/XWayland sessions only).
+Wayland sessions use compositor integrations (below) instead.
+
+## Build
+
+```bash
+cmake -S cpp -B cpp/build
+cmake --build cpp/build -j"$(nproc)"
+ctest --test-dir cpp/build --output-on-failure
+```
+
+## Install / uninstall
+
+```bash
+bash cpp/install.sh            # systemd user service if available
+bash cpp/install.sh --no-systemd   # XDG autostart only
+bash cpp/install.sh --uninstall
+```
+
+- Installs the binary to `~/.local/bin/debug-overlay` (`XDG_BINDIR` overrides).
+- With systemd: writes `~/.config/systemd/user/debug-overlay.service` and enables it.
+- Without systemd: writes `~/.config/autostart/debug-overlay.desktop`.
+
+## Focus detection per desktop
+
+Debug Overlay is PID-centric; each desktop supplies the focused PID through its
+own channel:
+
+| Session | Mechanism |
+| --- | --- |
+| GNOME (Wayland/X11) | GNOME Shell extension (`gnome_extension/debug-overlay-focus@codeafridi`) |
+| KDE Plasma (Wayland) | KWin script + D-Bus (`cpp/kwin_script`, `cpp/install_kde_focus.sh`) |
+| Hyprland | `hyprctl` |
+| Sway | `swaymsg` |
+| X11 / XWayland (Cinnamon, XFCE, MATE, KDE-X11) | `xdotool` |
+| Other Wayland compositors | not supported (shows `no-focus`) |
+
+There is no generic Wayland way to obtain the focused PID (the foreign-toplevel
+protocols expose only `app_id`/`title`), so compositor-specific adapters are
+required.
+
+## Configuration
+
+Optional INI file at `~/.config/debug-overlay/config.ini`
+(`DEBUG_OVERLAY_CONFIG` overrides the path). See the project README / feature
+report for the full key list. Missing file or invalid values fall back to
+defaults.

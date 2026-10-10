@@ -58,7 +58,7 @@ QString focusProviderKindName(FocusProviderKind kind) {
     }
 }
 
-std::unique_ptr<FocusedWindowProvider> createFocusProvider() {
+std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config) {
     const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 
     SessionInfo info;
@@ -69,6 +69,8 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider() {
         !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty();
     info.hasSwaySocket = !env.value(QStringLiteral("SWAYSOCK")).isEmpty();
 
+    const qint64 ttl = config.focusCacheTtlMs;
+
     switch (selectProviderKind(info)) {
     case FocusProviderKind::Gnome:
         return std::make_unique<GnomePidFileProvider>();
@@ -76,13 +78,13 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider() {
         return std::make_unique<KdeFocusProvider>();
     case FocusProviderKind::Hyprland:
         return std::make_unique<CachingFocusProvider>(
-            std::make_unique<HyprctlFocusProvider>());
+            std::make_unique<HyprctlFocusProvider>(), ttl);
     case FocusProviderKind::Sway:
         return std::make_unique<CachingFocusProvider>(
-            std::make_unique<SwaymsgFocusProvider>());
+            std::make_unique<SwaymsgFocusProvider>(), ttl);
     case FocusProviderKind::X11:
         return std::make_unique<CachingFocusProvider>(
-            std::make_unique<XdotoolFocusProvider>());
+            std::make_unique<XdotoolFocusProvider>(), ttl);
     case FocusProviderKind::Null:
     default:
         return std::make_unique<NullFocusProvider>();

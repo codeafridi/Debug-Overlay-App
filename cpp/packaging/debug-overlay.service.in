@@ -1,0 +1,13 @@
+[Unit]
+Description=Debug Overlay
+Comment=Compact on-screen focused-process monitor
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@BINARY@
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

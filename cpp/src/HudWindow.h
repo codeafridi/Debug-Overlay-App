@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DisplaySnapshot.h"
+#include "DockerStatus.h"
 
 #include <QPoint>
 #include <QWidget>
@@ -19,7 +20,7 @@ public:
 
     void setSnapshot(const DisplaySnapshot &snapshot);
 
-    void setDockerStatus(const QString &text);
+    void setDockerSnapshot(const DockerSnapshot &snapshot);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -35,6 +36,7 @@ private:
 
     void toggleDetails();
     void toggleCompact();
+    void toggleDockerDetails();
     void updateCompactText();
 
     QLabel *m_appValue = nullptr;
@@ -45,7 +47,10 @@ private:
 
     QWidget *m_metricsWidget = nullptr;
     QLabel *m_compactLabel = nullptr;
-    QLabel *m_dockerValue = nullptr;
+    QPushButton *m_dockerButton = nullptr;
+    QLabel *m_dockerDetails = nullptr;
+    QString m_dockerDetailsText;
+    bool m_dockerOpen = false;
     QWidget *m_detailsPanel = nullptr;
     QLabel *m_detailsText = nullptr;
     QPushButton *m_moreButton = nullptr;

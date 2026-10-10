@@ -101,10 +101,22 @@ HudWindow::HudWindow(QWidget *parent)
     m_compactLabel->setVisible(false);
     root->addWidget(m_compactLabel);
 
-    m_dockerValue = new QLabel(this);
-    m_dockerValue->setObjectName(QStringLiteral("docker"));
-    m_dockerValue->setVisible(false);
-    root->addWidget(m_dockerValue);
+    m_dockerButton = new QPushButton(this);
+    m_dockerButton->setObjectName(QStringLiteral("dockerButton"));
+    m_dockerButton->setFont(valueFont());
+    m_dockerButton->setFocusPolicy(Qt::NoFocus);
+    m_dockerButton->setCursor(Qt::PointingHandCursor);
+    m_dockerButton->setVisible(false);
+    connect(m_dockerButton, &QPushButton::clicked, this,
+            &HudWindow::toggleDockerDetails);
+    root->addWidget(m_dockerButton);
+
+    m_dockerDetails = new QLabel(this);
+    m_dockerDetails->setObjectName(QStringLiteral("dockerDetails"));
+    m_dockerDetails->setFont(valueFont());
+    m_dockerDetails->setWordWrap(true);
+    m_dockerDetails->setVisible(false);
+    root->addWidget(m_dockerDetails);
 
     m_detailsPanel = new QFrame(this);
     m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
@@ -160,7 +172,15 @@ HudWindow::HudWindow(QWidget *parent)
         "  padding: 3px 8px;"
         "}"
         "#caption { color:rgb(200, 194, 194); }"
-        "#docker  { color:rgb(150, 180, 220); }"
+        "#dockerButton {"
+        "  color:rgb(150, 180, 220);"
+        "  background: transparent;"
+        "  border: none;"
+        "  padding: 0px;"
+        "  text-align: left;"
+        "}"
+        "#dockerButton:hover { color:rgb(200, 220, 255); }"
+        "#dockerDetails { color:rgb(150, 180, 220); }"
         "#status  { color:rgb(187, 207, 205); }"
         "#detailsPanel {"
         "  background-color:rgb(28, 28, 30);"
@@ -227,18 +247,53 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     updateCompactText();
 }
 
-void HudWindow::setDockerStatus(const QString &text) {
-    const bool wasVisible = m_dockerValue->isVisibleTo(this);
+void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
+    const QString summary = dockerSummaryText(snapshot);
+    const QString details = dockerDetailText(snapshot);
+    m_dockerDetailsText = details;
 
-    if (m_dockerValue->text() != text) {
-        m_dockerValue->setText(text);
+    const bool wasVisible = m_dockerButton->isVisibleTo(this);
+
+    if (m_dockerButton->text() != summary) {
+        m_dockerButton->setText(summary);
     }
 
-    const bool nowVisible = !text.isEmpty();
+    const bool nowVisible = !summary.isEmpty();
     if (wasVisible != nowVisible) {
-        m_dockerValue->setVisible(nowVisible);
+        m_dockerButton->setVisible(nowVisible);
+        if (!nowVisible) {
+            m_dockerOpen = false;
+            m_dockerDetails->setVisible(false);
+        }
         adjustSize();
     }
+
+    if (m_dockerOpen) {
+        if (m_dockerDetailsText.isEmpty()) {
+            m_dockerOpen = false;
+            m_dockerDetails->setVisible(false);
+        } else {
+            m_dockerDetails->setText(m_dockerDetailsText);
+            m_dockerDetails->setVisible(true);
+        }
+    }
+}
+
+void HudWindow::toggleDockerDetails() {
+    if (!m_dockerOpen && m_dockerDetailsText.isEmpty()) {
+        return;
+    }
+
+    m_dockerOpen = !m_dockerOpen;
+
+    if (m_dockerOpen) {
+        m_dockerDetails->setText(m_dockerDetailsText);
+        m_dockerDetails->setVisible(true);
+    } else {
+        m_dockerDetails->setVisible(false);
+    }
+
+    adjustSize();
 }
 
 void HudWindow::updateCompactText() {

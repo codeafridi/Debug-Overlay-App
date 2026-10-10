@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Debug Overlay
+Comment=Compact on-screen focused-process monitor
+Exec=@BINARY@
+Terminal=false
+X-GNOME-Autostart-enabled=true

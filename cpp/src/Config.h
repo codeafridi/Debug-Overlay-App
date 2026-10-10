@@ -1,0 +1,34 @@
+#pragma once
+
+#include <QString>
+#include <QtGlobal>
+
+struct HealthConfig {
+    double cpuWarnPercent = 70.0;
+    double cpuHighPercent = 90.0;
+    qulonglong rssWarnKb = 1024ULL * 1024ULL;
+    int sustainedSamples = 3;
+};
+
+struct DockerConfig {
+    int healthyMs = 20000;
+    int issueMs = 8000;
+    int backoffStartMs = 15000;
+    int backoffCapMs = 240000;
+    int absentMs = 300000;
+    int timeoutMs = 3000;
+    int killGraceMs = 500;
+};
+
+struct Config {
+    HealthConfig health;
+    DockerConfig docker;
+    int focusCacheTtlMs = 1500;
+    int sampleIntervalMs = 1000;
+};
+
+Config defaultConfig();
+
+Config loadConfig(const QString &path, QString *errorMessage);
+
+QString defaultConfigPath();
