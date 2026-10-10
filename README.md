@@ -8,23 +8,19 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)](#build-from-source)
 [![Qt 6](https://img.shields.io/badge/Qt-6-41CD52?style=flat-square&logo=qt&logoColor=white)](#requirements)
 [![CMake](https://img.shields.io/badge/build-CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)](#build-from-source)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f4c430?style=flat-square)](LICENSE)
 
 [Quick start](#quick-start) · [Features](#features) · [Focus detection](#focus-detection) · [Docker & Kubernetes](#docker--kubernetes) · [Configuration](#configuration) · [Architecture](#architecture) · [Testing](#testing)
 
 <sub>Repository: <strong>Syspeek</strong></sub>
 
+<br />
+
+<img src="docs/hud.png" alt="Debug Overlay HUD showing the focused app's name, PID, CPU and RSS plus Docker and Kubernetes badges" width="430" />
+
 </div>
 
 ---
-
-```text
-┌ DEBUG HUD ──────────────────────────────────────────────────── OK ┐
-│ App            PID          CPU          MEM (RSS)               │
-│ cursor         2092707      12%          212 MB                  │
-│ docker: 1 running                                                │
-│ k8s: 4 issues                                    MORE   HIDE     │
-└──────────────────────────────────────────────────────────────────┘
-```
 
 Debug Overlay is a small, always-on-top Linux desktop monitor. Instead of making
 you hunt through every process in `top`, it follows the window you are currently
@@ -282,5 +278,4 @@ interface.
 
 ## License
 
-No license file is included yet. Until one is added, the repository is not offered
-under an open-source license.
+This project is licensed under the [MIT License](LICENSE).
