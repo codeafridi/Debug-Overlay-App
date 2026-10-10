@@ -36,7 +36,7 @@ private:
     void beginQuery();
     void scheduleNext(int intervalMs);
     void emitSnapshot(KubeState state, const QString &message,
-                      const QList<KubePod> &pods, bool success);
+                      const KubeResources &resources, bool success);
     int nextIntervalMs(KubeState state, bool hasIssues);
     void resetBackoff();
 

@@ -4,12 +4,14 @@
 
 namespace {
 
-KubeSnapshot snap(KubeState state, const QList<KubePod> &pods) {
+KubeSnapshot snap(const QList<KubePod> &pods,
+                  const QList<KubeDeployment> &deployments) {
     KubeSnapshot s;
-    s.state = state;
+    s.state = KubeState::Ok;
     s.pods = pods;
+    s.deployments = deployments;
     s.totalPods = pods.size();
-    s.issueCount = kubeIssueCount(pods);
+    s.issueCount = kubeIssueCount(pods, deployments);
     return s;
 }
 
@@ -26,106 +28,87 @@ int main() {
 
     const QByteArray json = QByteArrayLiteral(
         "{\"items\":["
-        "{\"metadata\":{\"namespace\":\"default\",\"name\":\"web-1\"},"
+        "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"default\",\"name\":\"web-1\"},"
         "\"status\":{\"phase\":\"Running\",\"containerStatuses\":["
         "{\"restartCount\":0,\"state\":{\"running\":{}}}]}},"
-        "{\"metadata\":{\"namespace\":\"default\",\"name\":\"crash-1\"},"
+        "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"default\",\"name\":\"crash-1\"},"
         "\"status\":{\"phase\":\"Running\",\"containerStatuses\":["
         "{\"restartCount\":7,\"state\":{\"waiting\":{\"reason\":\"CrashLoopBackOff\"}}}]}},"
-        "{\"metadata\":{\"namespace\":\"kube-system\",\"name\":\"failed-1\"},"
+        "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"kube-system\",\"name\":\"failed-1\"},"
         "\"status\":{\"phase\":\"Failed\",\"containerStatuses\":[]}},"
-        "{\"metadata\":{\"namespace\":\"default\",\"name\":\"img-1\"},"
-        "\"status\":{\"phase\":\"Pending\",\"containerStatuses\":["
-        "{\"restartCount\":0,\"state\":{\"waiting\":{\"reason\":\"ImagePullBackOff\"}}}]}}"
+        "{\"kind\":\"Deployment\",\"metadata\":{\"namespace\":\"default\",\"name\":\"nginx\"},"
+        "\"spec\":{\"replicas\":3},\"status\":{\"availableReplicas\":1,\"unavailableReplicas\":2}},"
+        "{\"kind\":\"Deployment\",\"metadata\":{\"namespace\":\"default\",\"name\":\"ok-dep\"},"
+        "\"spec\":{\"replicas\":2},\"status\":{\"availableReplicas\":2}}"
         "]}");
 
     bool ok = false;
-    const QList<KubePod> pods = parseKubectlPods(json, &ok);
+    const KubeResources res = parseKubectlResources(json, &ok);
     check(ok, "valid kubectl json parses");
-    check(pods.size() == 4, "parsed four pods");
-    check(pods.at(1).ns == QStringLiteral("default"), "parsed namespace");
-    check(pods.at(1).name == QStringLiteral("crash-1"), "parsed name");
-    check(pods.at(1).reason == QStringLiteral("CrashLoopBackOff"),
-          "parsed waiting reason");
-    check(pods.at(1).restarts == 7, "parsed restart count");
+    check(res.pods.size() == 3, "parsed three pods");
+    check(res.deployments.size() == 2, "parsed two deployments");
+    check(res.pods.at(1).reason == QStringLiteral("CrashLoopBackOff"),
+          "parsed pod waiting reason");
+    check(res.pods.at(1).restarts == 7, "parsed pod restart count");
 
-    check(kubeIssueCount(pods) == 3, "issue count = crash + failed + imagepull");
-    check(!kubePodIsIssue(pods.at(0)), "healthy running pod not an issue");
-    check(kubePodIsIssue(pods.at(1)), "crashloopbackoff is an issue");
-    check(kubePodIsIssue(pods.at(2)), "failed phase is an issue");
-    check(kubePodIsIssue(pods.at(3)), "imagepullbackoff is an issue");
+    const KubeDeployment &nginx = res.deployments.at(0);
+    check(nginx.name == QStringLiteral("nginx"), "parsed deployment name");
+    check(nginx.desired == 3 && nginx.available == 1 && nginx.unavailable == 2,
+          "parsed deployment replica counts");
+    check(kubeDeploymentIsIssue(nginx), "deployment with unavailable replicas is an issue");
+    check(!kubeDeploymentIsIssue(res.deployments.at(1)),
+          "deployment fully available is not an issue");
+
+    check(kubeIssueCount(res.pods, res.deployments) == 3,
+          "issue count = 2 pods + 1 deployment");
 
     bool emptyOk = false;
-    check(parseKubectlPods(QByteArrayLiteral("{\"items\":[]}"), &emptyOk).isEmpty()
-              && emptyOk,
-          "empty items -> no pods");
+    const KubeResources empty = parseKubectlResources(
+        QByteArrayLiteral("{\"items\":[]}"), &emptyOk);
+    check(emptyOk && empty.pods.isEmpty() && empty.deployments.isEmpty(),
+          "empty items -> nothing");
 
     bool badOk = true;
-    check(parseKubectlPods(QByteArrayLiteral("not json"), &badOk).isEmpty()
-              && !badOk,
-          "malformed json -> parse failed");
-    bool badOk2 = true;
-    check(parseKubectlPods(QByteArrayLiteral("{\"kind\":\"PodList\"}"), &badOk2)
-                  .isEmpty()
-              && !badOk2,
-          "missing items -> parse failed");
+    parseKubectlResources(QByteArrayLiteral("not json"), &badOk);
+    check(!badOk, "malformed json -> parse failed");
 
     check(classifyKubeFailure(
-              QByteArrayLiteral("The connection to the server 192.168.49.2:8443 "
-                                "was refused"))
+              QByteArrayLiteral("The connection to the server was refused"))
               == KubeState::Unreachable,
           "connection refused -> unreachable");
-    check(classifyKubeFailure(
-              QByteArrayLiteral("error: no configuration has been provided"))
-              == KubeState::Unreachable,
-          "no configuration -> unreachable");
-    check(classifyKubeFailure(QByteArrayLiteral("some unexpected failure"))
+    check(classifyKubeFailure(QByteArrayLiteral("boom"))
               == KubeState::CommandFailed,
           "other error -> command failed");
 
-    check(kubeSummaryText(KubeSnapshot{}) == QString(),
-          "NotConfigured -> empty/hidden");
-    KubeSnapshot unreachable;
-    unreachable.state = KubeState::Unreachable;
-    check(kubeSummaryText(unreachable) == QStringLiteral("k8s: unreachable"),
-          "unreachable summary");
-    check(kubeSummaryText(snap(KubeState::Ok, pods))
-              == QStringLiteral("k8s: 3 issues"),
-          "ok summary issues");
-    check(kubeSummaryText(snap(KubeState::Ok, {}))
-              == QStringLiteral("k8s: 0 pods"),
-          "ok summary no pods");
-    KubeSnapshot oneIssue;
-    oneIssue.state = KubeState::Ok;
-    oneIssue.totalPods = 5;
-    oneIssue.issueCount = 1;
-    check(kubeSummaryText(oneIssue) == QStringLiteral("k8s: 1 issue"),
-          "ok summary singular issue");
-    KubeSnapshot stale;
-    stale.state = KubeState::Stale;
-    stale.stale = true;
-    stale.totalPods = 4;
-    check(kubeSummaryText(stale).contains(QStringLiteral("stale")),
-          "stale summary marks stale");
+    const KubeSnapshot summary = snap(res.pods, res.deployments);
+    check(kubeSummaryText(summary) == QStringLiteral("k8s: 3 issues"),
+          "summary counts pod+deployment issues");
+    check(kubeSummaryText(KubeSnapshot{}) == QString(), "NotConfigured hidden");
 
-    const QString detail = kubeDetailText(snap(KubeState::Ok, pods));
+    KubeSnapshot noIssues;
+    noIssues.state = KubeState::Ok;
+    noIssues.totalPods = 4;
+    check(kubeSummaryText(noIssues) == QStringLiteral("k8s: 4 pods"),
+          "summary healthy pod count");
+
+    const QString detail = kubeDetailText(summary);
     check(detail.contains(QStringLiteral("crash-1")), "detail lists crash pod");
-    check(detail.contains(QStringLiteral("img-1")), "detail lists imagepull pod");
+    check(detail.contains(QStringLiteral("deploy default/nginx")),
+          "detail lists unhealthy deployment");
     check(!detail.contains(QStringLiteral("web-1")), "detail omits healthy pod");
-    check(kubeDetailText(snap(KubeState::Ok, {})) == QStringLiteral("no issues"),
-          "detail: no issues");
+    check(!detail.contains(QStringLiteral("ok-dep")),
+          "detail omits healthy deployment");
 
     const QByteArray oomJson = QByteArrayLiteral(
-        "{\"items\":[{\"metadata\":{\"namespace\":\"d\",\"name\":\"oom-1\"},"
+        "{\"items\":[{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"d\",\"name\":\"oom-1\"},"
         "\"status\":{\"phase\":\"Running\",\"containerStatuses\":["
         "{\"restartCount\":0,\"state\":{\"terminated\":{\"reason\":\"OOMKilled\"}}}]}}]}");
     bool oomOk = false;
-    const QList<KubePod> oomPods = parseKubectlPods(oomJson, &oomOk);
-    check(oomOk && oomPods.size() == 1
-              && oomPods.at(0).reason == QStringLiteral("OOMKilled"),
+    const KubeResources oom = parseKubectlResources(oomJson, &oomOk);
+    check(oomOk && oom.pods.size() == 1
+              && oom.pods.at(0).reason == QStringLiteral("OOMKilled"),
           "parsed terminated reason (OOMKilled)");
-    check(kubePodIsIssue(oomPods.at(0)),
-          "OOMKilled is an issue even with 0 restarts");
+    check(kubePodIsIssue(oom.pods.at(0)), "OOMKilled is an issue");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

@@ -13,6 +13,14 @@ struct KubePod {
     int restarts = 0;
 };
 
+struct KubeDeployment {
+    QString ns;
+    QString name;
+    int desired = 0;
+    int available = 0;
+    int unavailable = 0;
+};
+
 enum class KubeState {
     NotConfigured,
     Unreachable,
@@ -23,9 +31,15 @@ enum class KubeState {
     Stale,
 };
 
+struct KubeResources {
+    QList<KubePod> pods;
+    QList<KubeDeployment> deployments;
+};
+
 struct KubeSnapshot {
     KubeState state = KubeState::NotConfigured;
     QList<KubePod> pods;
+    QList<KubeDeployment> deployments;
     int totalPods = 0;
     int issueCount = 0;
     bool stale = false;
@@ -33,10 +47,12 @@ struct KubeSnapshot {
     qint64 sampledAtMs = 0;
 };
 
-QList<KubePod> parseKubectlPods(const QByteArray &json, bool *ok);
+KubeResources parseKubectlResources(const QByteArray &json, bool *ok);
 
 bool kubePodIsIssue(const KubePod &pod);
-int kubeIssueCount(const QList<KubePod> &pods);
+bool kubeDeploymentIsIssue(const KubeDeployment &deployment);
+int kubeIssueCount(const QList<KubePod> &pods,
+                   const QList<KubeDeployment> &deployments);
 
 KubeState classifyKubeFailure(const QByteArray &stderr);
 
