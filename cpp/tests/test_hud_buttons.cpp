@@ -63,8 +63,8 @@ int main(int argc, char *argv[]) {
     }
     check(hasMemCaption, "metrics caption reads MEM (RSS)");
     check(compactLabel != nullptr
-              && compactLabel->text().contains(QStringLiteral("MEM (RSS)")),
-          "compact line labels memory as MEM (RSS)");
+              && compactLabel->text().contains(QStringLiteral("MEM(RSS)")),
+          "compact line labels memory as MEM(RSS)");
 
     if (appLabel && pidLabel && cpuLabel && memLabel && statusLabel) {
         hud.setSnapshot(makeSnapshot("alpha", "123", "17%", "8 MB", "WARN"));

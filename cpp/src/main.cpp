@@ -1,20 +1,16 @@
 #include "HudWindow.h"
 
-#include "FocusSampler.h"
 #include "GnomePidFileProvider.h"
-
-#include "CpuSampler.h"
-#include "GroupCache.h"
-#include "LinuxProcess.h"
-#include "MemoryFormat.h"
+#include "SamplerWorker.h"
 
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QMetaType>
 #include <QSocketNotifier>
-#include <QTimer>
+#include <QThread>
 #include <QtGlobal>
 
 #include <csignal>
@@ -42,6 +38,8 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Debug Overlay"));
+
+    qRegisterMetaType<DisplaySnapshot>("DisplaySnapshot");
 
     struct sigaction ignoreAction;
     ignoreAction.sa_handler = SIG_IGN;
@@ -75,70 +73,30 @@ int main(int argc, char *argv[]) {
     }
 
     HudWindow hud;
-    DisplaySnapshot snapshot;
-    snapshot.status = QStringLiteral("IDLE");
-    hud.setSnapshot(snapshot);
+    hud.setSnapshot(DisplaySnapshot{});
 
     GnomePidFileProvider provider;
-    FocusSampler sampler(&provider);
-    CpuSampler cpuSampler;
-    GroupCache groupCache;
-    QString lastRaw;
-    QString cpuText = QStringLiteral("--");
-    QString memText = QStringLiteral("--");
-    ProcessIdentity cpuIdentity;
 
-    auto publishFocus = [&](const FocusSample &focus) {
-        DisplaySnapshot snap;
-        if (!focus.available) {
-            snap.status = QStringLiteral("no-focus");
-        } else {
-            snap.appName = focus.appName;
-            snap.pid = QString::number(focus.identity.pid);
-            if (focus.identity == cpuIdentity) {
-                snap.cpu = cpuText;
-                snap.memory = memText;
-            } else {
-                snap.cpu = QStringLiteral("Warming up");
-                snap.memory = QStringLiteral("--");
-            }
-            snap.status = QStringLiteral("IDLE");
-        }
-        hud.setSnapshot(snap);
-    };
+    auto *thread = new QThread;
+    auto *worker = new SamplerWorker(&provider);
+    worker->moveToThread(thread);
+    QObject::connect(thread, &QThread::started, worker, &SamplerWorker::start);
+    QObject::connect(thread, &QThread::finished, worker, &QObject::deleteLater);
 
-    auto publishSample = [&]() {
-        const FocusSample focus = sampler.sample();
-        if (!focus.available) {
-            cpuText = QStringLiteral("--");
-            memText = QStringLiteral("--");
-            cpuIdentity = ProcessIdentity{};
-            publishFocus(focus);
-            return;
-        }
+    quint64 lastSequence = 0;
+    QObject::connect(worker, &SamplerWorker::snapshotReady, &hud,
+                     [&hud, &lastSequence](const DisplaySnapshot &snapshot) {
+                         if (snapshot.sequence <= lastSequence) {
+                             return;
+                         }
+                         lastSequence = snapshot.sequence;
+                         hud.setSnapshot(snapshot);
+                     });
 
-        const ProcessGroup &group = groupCache.pidsFor(focus.identity);
-        const CpuSample cpu = cpuSampler.sample(group.pids, focus.identity);
-
-        if (!cpu.available) {
-            cpuText = QStringLiteral("--");
-        } else if (cpu.warming) {
-            cpuText = QStringLiteral("Warming up");
-        } else {
-            cpuText = QStringLiteral("%1%").arg(qRound(cpu.percent));
-        }
-
-        unsigned long long rss = 0;
-        memText = linuxproc::sumRssKb(group.pids, rss) ? formatMemoryKb(rss)
-                                                       : QStringLiteral("--");
-
-        cpuIdentity = focus.identity;
-        publishFocus(focus);
-    };
-
-    publishSample();
+    thread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
+    QString lastRaw;
     auto *watcher = new QFileSystemWatcher(&app);
     if (!pidFilePath.isEmpty()) {
         const QFileInfo info(pidFilePath);
@@ -151,6 +109,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    auto requestSample = [&worker]() {
+        QMetaObject::invokeMethod(worker, "sampleNow", Qt::QueuedConnection);
+    };
+
     auto refreshIfChanged = [&]() {
         QFile file(pidFilePath);
         QString raw;
@@ -161,7 +123,7 @@ int main(int argc, char *argv[]) {
             return;
         }
         lastRaw = raw;
-        publishFocus(sampler.sample());
+        requestSample();
     };
 
     QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
@@ -184,15 +146,13 @@ int main(int argc, char *argv[]) {
                          }
                      });
 
-    auto *fallbackTimer = new QTimer(&app);
-    fallbackTimer->setInterval(1000);
-    QObject::connect(fallbackTimer, &QTimer::timeout, &app, [&]() {
-        lastRaw.clear();
-        publishSample();
-    });
-    fallbackTimer->start();
-
     hud.show();
 
-    return app.exec();
+    const int rc = app.exec();
+
+    thread->quit();
+    thread->wait();
+    delete thread;
+
+    return rc;
 }

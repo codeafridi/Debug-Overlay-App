@@ -28,6 +28,19 @@ QFont captionFont() {
     return font;
 }
 
+QString statusColor(const QString &status) {
+    if (status == QStringLiteral("HIGH CPU")) {
+        return QStringLiteral("#ff6b6b");
+    }
+    if (status == QStringLiteral("WARN")) {
+        return QStringLiteral("#ffd45d");
+    }
+    if (status == QStringLiteral("OK")) {
+        return QStringLiteral("#79ffb0");
+    }
+    return QStringLiteral("#bbcfcd");
+}
+
 } // namespace
 
 HudWindow::HudWindow(QWidget *parent)
@@ -213,6 +226,8 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
     if (m_statusValue->text() != snapshot.status) {
         m_statusValue->setText(snapshot.status);
+        m_statusValue->setStyleSheet(
+            QStringLiteral("color:%1;").arg(statusColor(snapshot.status)));
     }
 
     updateCompactText();
@@ -223,12 +238,11 @@ void HudWindow::updateCompactText() {
         return;
     }
 
-    m_compactLabel->setText(QStringLiteral("%1  |  PID %2  |  CPU %3  |  MEM (RSS) %4  |  %5")
+    m_compactLabel->setText(QStringLiteral("%1 | PID %2 | CPU %3 | MEM(RSS) %4")
                                 .arg(m_appValue->text(),
                                      m_pidValue->text(),
                                      m_cpuValue->text(),
-                                     m_memoryValue->text(),
-                                     m_statusValue->text()));
+                                     m_memoryValue->text()));
 }
 
 void HudWindow::toggleDetails() {

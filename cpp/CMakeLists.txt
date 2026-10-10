@@ -38,7 +38,11 @@ add_library(debug_overlay_core STATIC
     src/ProcessGrouper.cpp
     src/ProcessGrouper.h
     src/GroupCache.cpp
-    src/GroupCache.h)
+    src/GroupCache.h
+    src/SamplerWorker.cpp
+    src/SamplerWorker.h
+    src/HealthEvaluator.cpp
+    src/HealthEvaluator.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)
@@ -65,11 +69,19 @@ target_link_libraries(debug_overlay_memory_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_group_tests tests/test_group.cpp)
 target_link_libraries(debug_overlay_group_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_sampler_tests tests/test_sampler.cpp)
+target_link_libraries(debug_overlay_sampler_tests PRIVATE debug_overlay_core)
+
+add_executable(debug_overlay_health_tests tests/test_health.cpp)
+target_link_libraries(debug_overlay_health_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
 add_test(NAME memory COMMAND debug_overlay_memory_tests)
 add_test(NAME group COMMAND debug_overlay_group_tests)
+add_test(NAME sampler COMMAND debug_overlay_sampler_tests)
+add_test(NAME health COMMAND debug_overlay_health_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
