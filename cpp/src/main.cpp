@@ -6,11 +6,13 @@
 #include "KubeSource.h"
 #include "GnomePidFileProvider.h"
 #include "KdeFocusService.h"
+#include "LinuxProcess.h"
 #include "SamplerWorker.h"
 
 #include <QApplication>
 #include <QByteArray>
 #include <QDateTime>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -132,6 +134,26 @@ int main(int argc, char *argv[]) {
     if (provider->name() == QStringLiteral("kde-dbus")) {
         kdeService = std::make_unique<KdeFocusService>();
         kdeService->registerService();
+    }
+
+    if (qEnvironmentVariableIsSet("DEBUG_OVERLAY_PROBE")) {
+        int pid = provider->focusedPid();
+        if (pid <= 0 && provider->name() == QStringLiteral("kde-dbus")) {
+            QEventLoop loop;
+            QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+            loop.exec();
+            pid = provider->focusedPid();
+        }
+
+        std::printf("provider=%s\n", qUtf8Printable(provider->name()));
+        if (pid > 0) {
+            std::printf("focused_pid=%d\n", pid);
+            std::printf("focused_comm=%s\n",
+                        qUtf8Printable(linuxproc::comm(pid)));
+        } else {
+            std::printf("focused_pid=none\n");
+        }
+        return 0;
     }
 
     auto *thread = new QThread;

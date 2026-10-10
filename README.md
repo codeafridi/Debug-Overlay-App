@@ -103,13 +103,25 @@ supplies it through its own channel:
 |---|---|---|
 | GNOME (Wayland & X11) | GNOME Shell extension (`gnome_extension/`) | implemented; verified on Ubuntu GNOME Wayland |
 | KDE Plasma (Wayland) | KWin script + D-Bus (`cpp/kwin_script`, `cpp/install_kde_focus.sh`) | implemented; **not yet verified** on KDE |
-| Hyprland | `hyprctl` | implemented; not verified here |
-| Sway | `swaymsg` | implemented; not verified here |
+| Hyprland | `hyprctl` | implemented; **not yet verified** on a real session |
+| Sway | `swaymsg` | implemented; **verified** against a real (headless) Sway compositor |
 | X11 / XWayland (Cinnamon, XFCE, MATE, KDE-X11) | `xdotool` | implemented |
 | Other Wayland compositors | — | not supported; shows `no-focus` |
 
 The provider is auto-selected from `XDG_SESSION_TYPE`/`XDG_CURRENT_DESKTOP`.
 *These are compatibility targets, not universal support claims.*
+
+**Verify focus detection on your desktop in one command** (no GUI needed):
+
+```bash
+DEBUG_OVERLAY_PROBE=1 ./cpp/build/debug_overlay_hud
+# provider=swaymsg
+# focused_pid=1313
+# focused_comm=foot
+```
+
+It prints the selected provider and the focused PID (or `focused_pid=none`).
+For KDE it waits briefly for the KWin script's D-Bus push.
 
 ---
 
