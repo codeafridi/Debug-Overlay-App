@@ -19,7 +19,7 @@ QFont valueFont() {
 
 QFont captionFont() {
     QFont font;
-    font.setPointSize(7);
+    font.setPointSize(10);
     font.setBold(true);
     font.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
     return font;
@@ -32,10 +32,11 @@ HudWindow::HudWindow(QWidget *parent)
     setWindowTitle(QStringLiteral("Debug Overlay"));
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_StyledBackground, true);
+    setAttribute(Qt::WA_ShowWithoutActivating, true);
     setObjectName(QStringLiteral("hudRoot"));
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(14, 10, 14, 12);
+    root->setContentsMargins(14, 10, 14, 16);
     root->setSpacing(10);
 
     auto *header = new QHBoxLayout();
@@ -61,7 +62,7 @@ HudWindow::HudWindow(QWidget *parent)
     m_cpuValue = makeValue();
     m_memoryValue = makeValue();
 
-    metrics->addLayout(makeMetricBlock(QStringLiteral("APP"), m_appValue));
+    metrics->addLayout(makeMetricBlock(QStringLiteral("App"), m_appValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("PID"), m_pidValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("CPU"), m_cpuValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("MEM"), m_memoryValue));
@@ -70,7 +71,7 @@ HudWindow::HudWindow(QWidget *parent)
 
     setStyleSheet(QStringLiteral(
         "#hudRoot {"
-        "  background-color: #20182f;"
+        "  background-color:rgb(19, 19, 20);"
         "  border: 2px solid #4e4a53;"
         "}"
         "#title {"
