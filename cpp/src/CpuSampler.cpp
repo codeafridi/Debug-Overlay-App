@@ -5,24 +5,50 @@
 #include <algorithm>
 #include <thread>
 
-CpuSample CpuSampler::sample(const ProcessIdentity &identity) {
+namespace {
+
+QList<int> normalized(const QList<int> &pids) {
+    QList<int> copy = pids;
+    std::sort(copy.begin(), copy.end());
+    return copy;
+}
+
+} // namespace
+
+CpuSample CpuSampler::sample(const QList<int> &pids, const ProcessIdentity &key) {
     CpuSample result;
 
-    if (!identity.isValid()) {
+    if (!key.isValid() || pids.isEmpty()) {
         reset();
         return result;
     }
 
     unsigned long long total = 0;
-    unsigned long long proc = 0;
-    if (!linuxproc::totalCpuTicks(total) || !linuxproc::cpuTicks(identity.pid, proc)) {
+    if (!linuxproc::totalCpuTicks(total)) {
         reset();
         return result;
     }
 
-    if (!m_hasBaseline || identity != m_identity) {
-        m_identity = identity;
-        m_lastProcTicks = proc;
+    unsigned long long sum = 0;
+    bool any = false;
+    for (int pid : pids) {
+        unsigned long long ticks = 0;
+        if (linuxproc::cpuTicks(pid, ticks)) {
+            sum += ticks;
+            any = true;
+        }
+    }
+
+    if (!any) {
+        reset();
+        return result;
+    }
+
+    const QList<int> current = normalized(pids);
+    if (!m_hasBaseline || key != m_key || current != m_lastPids) {
+        m_key = key;
+        m_lastPids = current;
+        m_lastProcTicks = sum;
         m_lastTotalTicks = total;
         m_hasBaseline = true;
         result.available = true;
@@ -31,11 +57,11 @@ CpuSample CpuSampler::sample(const ProcessIdentity &identity) {
     }
 
     const long long deltaProc =
-        static_cast<long long>(proc) - static_cast<long long>(m_lastProcTicks);
+        static_cast<long long>(sum) - static_cast<long long>(m_lastProcTicks);
     const long long deltaTotal =
         static_cast<long long>(total) - static_cast<long long>(m_lastTotalTicks);
 
-    m_lastProcTicks = proc;
+    m_lastProcTicks = sum;
     m_lastTotalTicks = total;
 
     if (deltaProc < 0 || deltaTotal <= 0) {
@@ -46,18 +72,19 @@ CpuSample CpuSampler::sample(const ProcessIdentity &identity) {
     }
 
     const unsigned int cores = std::max(1u, std::thread::hardware_concurrency());
-    double percent = static_cast<double>(deltaProc)
-                     / static_cast<double>(deltaTotal) * 100.0
-                     * static_cast<double>(cores);
+    const double percent = static_cast<double>(deltaProc)
+                           / static_cast<double>(deltaTotal) * 100.0
+                           * static_cast<double>(cores);
 
     result.available = true;
     result.warming = false;
-    result.percent = std::clamp(percent, 0.0, 999.0);
+    result.percent = std::clamp(percent, 0.0, 999.0 * cores);
     return result;
 }
 
 void CpuSampler::reset() {
-    m_identity = ProcessIdentity{};
+    m_key = ProcessIdentity{};
+    m_lastPids.clear();
     m_lastProcTicks = 0;
     m_lastTotalTicks = 0;
     m_hasBaseline = false;

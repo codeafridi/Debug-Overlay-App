@@ -1,5 +1,6 @@
 #include "LinuxProcess.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
@@ -43,6 +44,37 @@ QString comm(int pid) {
         return QString();
     }
     return QString::fromUtf8(file.readAll()).trimmed();
+}
+
+QString exePath(int pid) {
+    const QString path = procPath(pid, "exe");
+    return QFile::symLinkTarget(path);
+}
+
+int parentPid(int pid) {
+    QStringList fields;
+    if (!readStatTail(pid, fields) || fields.size() <= 1) {
+        return -1;
+    }
+
+    bool ok = false;
+    const int ppid = fields.at(1).toInt(&ok);
+    return ok ? ppid : -1;
+}
+
+QList<int> allPids() {
+    QList<int> pids;
+    const QStringList entries =
+        QDir(QStringLiteral("/proc"))
+            .entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        bool ok = false;
+        const int pid = entry.toInt(&ok);
+        if (ok) {
+            pids.append(pid);
+        }
+    }
+    return pids;
 }
 
 unsigned long long startTime(int pid) {
@@ -145,6 +177,26 @@ bool rssKb(int pid, unsigned long long &out) {
     }
 
     return false;
+}
+
+bool sumRssKb(const QList<int> &pids, unsigned long long &out) {
+    unsigned long long total = 0;
+    bool any = false;
+
+    for (int pid : pids) {
+        unsigned long long kb = 0;
+        if (rssKb(pid, kb)) {
+            total += kb;
+            any = true;
+        }
+    }
+
+    if (!any) {
+        return false;
+    }
+
+    out = total;
+    return true;
 }
 
 } // namespace linuxproc

@@ -4,6 +4,7 @@
 #include "GnomePidFileProvider.h"
 
 #include "CpuSampler.h"
+#include "GroupCache.h"
 #include "LinuxProcess.h"
 #include "MemoryFormat.h"
 
@@ -81,8 +82,10 @@ int main(int argc, char *argv[]) {
     GnomePidFileProvider provider;
     FocusSampler sampler(&provider);
     CpuSampler cpuSampler;
+    GroupCache groupCache;
     QString lastRaw;
     QString cpuText = QStringLiteral("--");
+    QString memText = QStringLiteral("--");
     ProcessIdentity cpuIdentity;
 
     auto publishFocus = [&](const FocusSample &focus) {
@@ -92,14 +95,8 @@ int main(int argc, char *argv[]) {
             snap.pid = QString::number(focus.identity.pid);
             snap.cpu = (focus.identity == cpuIdentity) ? cpuText
                                                        : QStringLiteral("warming");
-
-            unsigned long long rss = 0;
-            if (linuxproc::rssKb(focus.identity.pid, rss)) {
-                snap.memory = formatMemoryKb(rss);
-            } else {
-                snap.memory = QStringLiteral("--");
-            }
-
+            snap.memory = (focus.identity == cpuIdentity) ? memText
+                                                          : QStringLiteral("--");
             snap.status = QStringLiteral("IDLE");
         } else {
             snap.status = QStringLiteral("no-focus");
@@ -110,15 +107,26 @@ int main(int argc, char *argv[]) {
     auto publishSample = [&]() {
         const FocusSample focus = sampler.sample();
         if (focus.available) {
-            const CpuSample cpu = cpuSampler.sample(focus.identity);
+            const ProcessGroup &group = groupCache.pidsFor(focus.identity);
+
+            const CpuSample cpu = cpuSampler.sample(group.pids, focus.identity);
             if (cpu.available && !cpu.warming) {
                 cpuText = QStringLiteral("%1%").arg(qRound(cpu.percent));
             } else {
                 cpuText = QStringLiteral("warming");
             }
+
+            unsigned long long rss = 0;
+            if (linuxproc::sumRssKb(group.pids, rss)) {
+                memText = formatMemoryKb(rss);
+            } else {
+                memText = QStringLiteral("--");
+            }
+
             cpuIdentity = focus.identity;
         } else {
             cpuText = QStringLiteral("--");
+            memText = QStringLiteral("--");
             cpuIdentity = ProcessIdentity{};
         }
         publishFocus(focus);

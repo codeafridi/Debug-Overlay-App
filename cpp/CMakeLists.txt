@@ -34,7 +34,11 @@ add_library(debug_overlay_core STATIC
     src/CpuSampler.cpp
     src/CpuSampler.h
     src/MemoryFormat.cpp
-    src/MemoryFormat.h)
+    src/MemoryFormat.h
+    src/ProcessGrouper.cpp
+    src/ProcessGrouper.h
+    src/GroupCache.cpp
+    src/GroupCache.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)
@@ -58,10 +62,14 @@ target_link_libraries(debug_overlay_cpu_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_memory_tests tests/test_memory.cpp)
 target_link_libraries(debug_overlay_memory_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_group_tests tests/test_group.cpp)
+target_link_libraries(debug_overlay_group_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
 add_test(NAME memory COMMAND debug_overlay_memory_tests)
+add_test(NAME group COMMAND debug_overlay_group_tests)
 
-set_tests_properties(hud_buttons focus cpu memory PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

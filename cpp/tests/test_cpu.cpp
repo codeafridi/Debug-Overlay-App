@@ -30,13 +30,14 @@ int main(int argc, char *argv[]) {
 
     CpuSampler sampler;
 
-    const CpuSample invalid = sampler.sample(ProcessIdentity{});
+    const CpuSample invalid = sampler.sample({}, ProcessIdentity{});
     check(!invalid.available, "invalid identity -> unavailable");
 
     const ProcessIdentity id = linuxproc::identity(self);
     check(id.isValid(), "identity(self) valid");
 
-    const CpuSample first = sampler.sample(id);
+    const QList<int> pids{self};
+    const CpuSample first = sampler.sample(pids, id);
     check(first.available, "first sample available");
     check(first.warming, "first sample warming (baseline)");
 
@@ -47,14 +48,14 @@ int main(int argc, char *argv[]) {
     ::usleep(60000);
     (void)sink;
 
-    const CpuSample second = sampler.sample(id);
+    const CpuSample second = sampler.sample(pids, id);
     check(second.available, "second sample available");
     check(!second.warming, "second sample not warming after interval");
     check(second.percent >= 0.0 && second.percent <= 999.0,
           "percent within range");
 
     const ProcessIdentity reused(self, id.startTime + 1);
-    const CpuSample changed = sampler.sample(reused);
+    const CpuSample changed = sampler.sample(pids, reused);
     check(changed.available && changed.warming,
           "identity change resets baseline (warming)");
 
