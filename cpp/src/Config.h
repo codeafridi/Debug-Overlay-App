@@ -20,9 +20,20 @@ struct DockerConfig {
     int killGraceMs = 500;
 };
 
+struct KubeConfig {
+    int healthyMs = 30000;
+    int issueMs = 10000;
+    int backoffStartMs = 15000;
+    int backoffCapMs = 240000;
+    int absentMs = 300000;
+    int timeoutMs = 5000;
+    int killGraceMs = 500;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
+    KubeConfig kube;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

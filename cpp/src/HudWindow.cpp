@@ -1,5 +1,6 @@
 #include "HudWindow.h"
 
+#include <QApplication>
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -7,7 +8,9 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QStringList>
 #include <QVBoxLayout>
+#include <QWindow>
 
 namespace {
 
@@ -118,6 +121,23 @@ HudWindow::HudWindow(QWidget *parent)
     m_dockerDetails->setVisible(false);
     root->addWidget(m_dockerDetails);
 
+    m_kubeButton = new QPushButton(this);
+    m_kubeButton->setObjectName(QStringLiteral("kubeButton"));
+    m_kubeButton->setFont(valueFont());
+    m_kubeButton->setFocusPolicy(Qt::NoFocus);
+    m_kubeButton->setCursor(Qt::PointingHandCursor);
+    m_kubeButton->setVisible(false);
+    connect(m_kubeButton, &QPushButton::clicked, this,
+            &HudWindow::toggleKubeDetails);
+    root->addWidget(m_kubeButton);
+
+    m_kubeDetails = new QLabel(this);
+    m_kubeDetails->setObjectName(QStringLiteral("kubeDetails"));
+    m_kubeDetails->setFont(valueFont());
+    m_kubeDetails->setWordWrap(true);
+    m_kubeDetails->setVisible(false);
+    root->addWidget(m_kubeDetails);
+
     m_detailsPanel = new QFrame(this);
     m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
 
@@ -132,9 +152,6 @@ HudWindow::HudWindow(QWidget *parent)
     m_detailsText = new QLabel(m_detailsPanel);
     m_detailsText->setObjectName(QStringLiteral("details"));
     m_detailsText->setWordWrap(true);
-    m_detailsText->setText(QStringLiteral(
-        "No issues detected.\n"
-        ));
 
     detailsLayout->addWidget(detailsTitle);
     detailsLayout->addWidget(m_detailsText);
@@ -161,6 +178,11 @@ HudWindow::HudWindow(QWidget *parent)
     footer->addWidget(m_showHideButton);
     root->addLayout(footer);
 
+    for (QPushButton *button : {m_dockerButton, m_kubeButton, m_moreButton,
+                                m_showHideButton}) {
+        button->installEventFilter(this);
+    }
+
     setStyleSheet(QStringLiteral(
         "#hudRoot {"
         "  background-color:rgb(19, 19, 20);"
@@ -181,6 +203,15 @@ HudWindow::HudWindow(QWidget *parent)
         "}"
         "#dockerButton:hover { color:rgb(200, 220, 255); }"
         "#dockerDetails { color:rgb(150, 180, 220); }"
+        "#kubeButton {"
+        "  color:rgb(190, 170, 230);"
+        "  background: transparent;"
+        "  border: none;"
+        "  padding: 0px;"
+        "  text-align: left;"
+        "}"
+        "#kubeButton:hover { color:rgb(220, 205, 255); }"
+        "#kubeDetails { color:rgb(190, 170, 230); }"
         "#status  { color:rgb(187, 207, 205); }"
         "#detailsPanel {"
         "  background-color:rgb(28, 28, 30);"
@@ -197,6 +228,7 @@ HudWindow::HudWindow(QWidget *parent)
         "QLabel   { color:rgb(198, 205, 195); }"));
 
     setSnapshot(DisplaySnapshot{});
+    updateDiagnosis();
 
     setFixedWidth(430);
     adjustSize();
@@ -250,6 +282,7 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
 void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
     const QString summary = dockerSummaryText(snapshot);
     const QString details = dockerDetailText(snapshot);
+    m_dockerSummaryText = summary;
     m_dockerDetailsText = details;
 
     const bool wasVisible = m_dockerButton->isVisibleTo(this);
@@ -277,6 +310,8 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
             m_dockerDetails->setVisible(true);
         }
     }
+
+    updateDiagnosis();
 }
 
 void HudWindow::toggleDockerDetails() {
@@ -294,6 +329,89 @@ void HudWindow::toggleDockerDetails() {
     }
 
     adjustSize();
+}
+
+void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
+    const QString summary = kubeSummaryText(snapshot);
+    const QString details = kubeDetailText(snapshot);
+    m_kubeSummaryText = summary;
+    m_kubeDetailsText = details;
+
+    const bool wasVisible = m_kubeButton->isVisibleTo(this);
+
+    if (m_kubeButton->text() != summary) {
+        m_kubeButton->setText(summary);
+    }
+
+    const bool nowVisible = !summary.isEmpty();
+    if (wasVisible != nowVisible) {
+        m_kubeButton->setVisible(nowVisible);
+        if (!nowVisible) {
+            m_kubeOpen = false;
+            m_kubeDetails->setVisible(false);
+        }
+        adjustSize();
+    }
+
+    if (m_kubeOpen) {
+        if (m_kubeDetailsText.isEmpty()) {
+            m_kubeOpen = false;
+            m_kubeDetails->setVisible(false);
+        } else {
+            m_kubeDetails->setText(m_kubeDetailsText);
+            m_kubeDetails->setVisible(true);
+        }
+    }
+
+    updateDiagnosis();
+}
+
+void HudWindow::toggleKubeDetails() {
+    if (!m_kubeOpen && m_kubeDetailsText.isEmpty()) {
+        return;
+    }
+
+    m_kubeOpen = !m_kubeOpen;
+
+    if (m_kubeOpen) {
+        m_kubeDetails->setText(m_kubeDetailsText);
+        m_kubeDetails->setVisible(true);
+    } else {
+        m_kubeDetails->setVisible(false);
+    }
+
+    adjustSize();
+}
+
+void HudWindow::updateDiagnosis() {
+    if (m_detailsText == nullptr) {
+        return;
+    }
+
+    QStringList lines;
+    lines.append(QStringLiteral(
+        "MEM (RSS): resident memory summed across the app's process group; "
+        "shared pages may be counted more than once."));
+
+    if (!m_dockerSummaryText.isEmpty()) {
+        lines.append(QString());
+        lines.append(m_dockerSummaryText);
+        if (!m_dockerDetailsText.isEmpty()
+            && m_dockerDetailsText != QStringLiteral("no issues")) {
+            lines.append(m_dockerDetailsText);
+        }
+    }
+
+    if (!m_kubeSummaryText.isEmpty()) {
+        lines.append(QString());
+        lines.append(m_kubeSummaryText);
+        if (!m_kubeDetailsText.isEmpty()
+            && m_kubeDetailsText != QStringLiteral("no issues")) {
+            lines.append(m_kubeDetailsText);
+        }
+    }
+
+    m_detailsText->setText(lines.join(QLatin1Char('\n')));
 }
 
 void HudWindow::updateCompactText() {
@@ -351,6 +469,11 @@ void HudWindow::keyPressEvent(QKeyEvent *event) {
 
 void HudWindow::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
+        if (windowHandle() != nullptr && windowHandle()->startSystemMove()) {
+            event->accept();
+            return;
+        }
+
         m_dragging = true;
         m_dragOffset =
             event->globalPosition().toPoint() - frameGeometry().topLeft();
@@ -379,4 +502,62 @@ void HudWindow::mouseReleaseEvent(QMouseEvent *event) {
     }
 
     QWidget::mouseReleaseEvent(event);
+}
+
+bool HudWindow::eventFilter(QObject *watched, QEvent *event) {
+    if (qobject_cast<QPushButton *>(watched) == nullptr) {
+        return QWidget::eventFilter(watched, event);
+    }
+
+    switch (event->type()) {
+    case QEvent::MouseButtonPress: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            m_buttonPressGlobal = mouseEvent->globalPosition().toPoint();
+            m_buttonDragPending = true;
+            m_buttonDragActive = false;
+            m_buttonManualMove = false;
+        }
+        break;
+    }
+    case QEvent::MouseMove: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (m_buttonDragPending && !m_buttonDragActive
+            && mouseEvent->buttons().testFlag(Qt::LeftButton)) {
+            const int distance =
+                (mouseEvent->globalPosition().toPoint() - m_buttonPressGlobal)
+                    .manhattanLength();
+            if (distance >= QApplication::startDragDistance()) {
+                m_buttonDragActive = true;
+                m_buttonManualMove = true;
+                m_dragOffset = m_buttonPressGlobal - frameGeometry().topLeft();
+                if (windowHandle() != nullptr
+                    && windowHandle()->startSystemMove()) {
+                    m_buttonManualMove = false;
+                }
+            }
+        }
+        if (m_buttonDragActive) {
+            if (m_buttonManualMove) {
+                move(mouseEvent->globalPosition().toPoint() - m_dragOffset);
+            }
+            return true;
+        }
+        break;
+    }
+    case QEvent::MouseButtonRelease: {
+        const bool wasActive = m_buttonDragActive;
+        m_buttonDragPending = false;
+        m_buttonDragActive = false;
+        m_buttonManualMove = false;
+        if (wasActive) {
+            return true;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return QWidget::eventFilter(watched, event);
 }

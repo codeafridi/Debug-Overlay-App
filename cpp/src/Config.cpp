@@ -46,6 +46,19 @@ void validate(Config &config) {
 
     config.focusCacheTtlMs = clampInt(config.focusCacheTtlMs, 0, 600000);
     config.sampleIntervalMs = clampInt(config.sampleIntervalMs, 100, 600000);
+
+    config.kube.healthyMs = clampInt(config.kube.healthyMs, 1000, 3600000);
+    config.kube.issueMs = clampInt(config.kube.issueMs, 1000, 3600000);
+    config.kube.backoffStartMs =
+        clampInt(config.kube.backoffStartMs, 1000, 3600000);
+    config.kube.backoffCapMs =
+        clampInt(config.kube.backoffCapMs, 1000, 3600000);
+    if (config.kube.backoffCapMs < config.kube.backoffStartMs) {
+        config.kube.backoffCapMs = config.kube.backoffStartMs;
+    }
+    config.kube.absentMs = clampInt(config.kube.absentMs, 1000, 3600000);
+    config.kube.timeoutMs = clampInt(config.kube.timeoutMs, 100, 600000);
+    config.kube.killGraceMs = clampInt(config.kube.killGraceMs, 50, 60000);
 }
 
 } // namespace
@@ -127,6 +140,36 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int timeout = settings.value(QStringLiteral("timeout_ms")).toInt();
         if (timeout > 0) {
             config.docker.timeoutMs = timeout;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("kubernetes"));
+    {
+        const int healthy = settings.value(QStringLiteral("healthy_ms")).toInt();
+        if (healthy > 0) {
+            config.kube.healthyMs = healthy;
+        }
+        const int issue = settings.value(QStringLiteral("issue_ms")).toInt();
+        if (issue > 0) {
+            config.kube.issueMs = issue;
+        }
+        const int backoff =
+            settings.value(QStringLiteral("backoff_start_ms")).toInt();
+        if (backoff > 0) {
+            config.kube.backoffStartMs = backoff;
+        }
+        const int cap = settings.value(QStringLiteral("backoff_cap_ms")).toInt();
+        if (cap > 0) {
+            config.kube.backoffCapMs = cap;
+        }
+        const int absent = settings.value(QStringLiteral("absent_ms")).toInt();
+        if (absent > 0) {
+            config.kube.absentMs = absent;
+        }
+        const int timeout = settings.value(QStringLiteral("timeout_ms")).toInt();
+        if (timeout > 0) {
+            config.kube.timeoutMs = timeout;
         }
     }
     settings.endGroup();

@@ -106,6 +106,24 @@ int main(int argc, char *argv[]) {
         moreButton->click();
     }
 
+    auto *detailsLabel = hud.findChild<QLabel *>(QStringLiteral("details"));
+    DockerSnapshot dockerSnap;
+    dockerSnap.state = DockerState::Ok;
+    dockerSnap.runningCount = 1;
+    dockerSnap.issueCount = 1;
+    hud.setDockerSnapshot(dockerSnap);
+    KubeSnapshot kubeSnap;
+    kubeSnap.state = KubeState::Ok;
+    kubeSnap.totalPods = 3;
+    kubeSnap.issueCount = 2;
+    hud.setKubeSnapshot(kubeSnap);
+    check(detailsLabel != nullptr
+              && detailsLabel->text().contains(QStringLiteral("docker:")),
+          "diagnosis panel lists docker");
+    check(detailsLabel != nullptr
+              && detailsLabel->text().contains(QStringLiteral("k8s:")),
+          "diagnosis panel lists kubernetes");
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

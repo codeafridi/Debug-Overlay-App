@@ -3,16 +3,19 @@
 #include "Config.h"
 #include "DockerSource.h"
 #include "FocusProviderFactory.h"
+#include "KubeSource.h"
 #include "GnomePidFileProvider.h"
 #include "KdeFocusService.h"
 #include "SamplerWorker.h"
 
 #include <QApplication>
 #include <QByteArray>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QMetaType>
+#include <QProcessEnvironment>
 #include <QSocketNotifier>
 #include <QThread>
 #include <QtGlobal>
@@ -33,6 +36,23 @@ void writeSignalByte(int) {
     static_cast<void>(written);
 }
 
+void logLine(const QString &message) {
+    const QString path =
+        QProcessEnvironment::systemEnvironment().value(
+            QStringLiteral("DEBUG_OVERLAY_LOG"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QFile file(path);
+    if (file.open(QIODevice::Append | QIODevice::Text)) {
+        file.write(QDateTime::currentDateTime().toString(Qt::ISODate).toUtf8());
+        file.write(" ");
+        file.write(message.toUtf8());
+        file.write("\n");
+    }
+}
+
 } // namespace
 
 int main(int argc, char *argv[]) {
@@ -51,9 +71,12 @@ int main(int argc, char *argv[]) {
         std::fprintf(stderr, "[debug-overlay] config: %s\n",
                      qUtf8Printable(configError));
     }
+    logLine(QStringLiteral("config path=%1 error=%2")
+                .arg(defaultConfigPath(), configError));
 
     qRegisterMetaType<DisplaySnapshot>("DisplaySnapshot");
     qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
+    qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
 
     struct sigaction ignoreAction;
     ignoreAction.sa_handler = SIG_IGN;
@@ -90,6 +113,7 @@ int main(int argc, char *argv[]) {
     hud.setSnapshot(DisplaySnapshot{});
 
     std::unique_ptr<FocusedWindowProvider> provider = createFocusProvider(config);
+    logLine(QStringLiteral("focus provider=%1").arg(provider->name()));
 
     std::unique_ptr<KdeFocusService> kdeService;
     if (provider->name() == QStringLiteral("kde-dbus")) {
@@ -123,9 +147,23 @@ int main(int argc, char *argv[]) {
                      &QObject::deleteLater);
     QObject::connect(docker, &DockerSource::dockerReady, &hud,
                      [&hud](const DockerSnapshot &snapshot) {
+                         logLine(dockerSummaryText(snapshot));
                          hud.setDockerSnapshot(snapshot);
                      });
     dockerThread->start();
+
+    auto *kubeThread = new QThread;
+    auto *kube = new KubeSource(config.kube);
+    kube->moveToThread(kubeThread);
+    QObject::connect(kubeThread, &QThread::started, kube, &KubeSource::start);
+    QObject::connect(kubeThread, &QThread::finished, kube,
+                     &QObject::deleteLater);
+    QObject::connect(kube, &KubeSource::kubeReady, &hud,
+                     [&hud](const KubeSnapshot &snapshot) {
+                         logLine(kubeSummaryText(snapshot));
+                         hud.setKubeSnapshot(snapshot);
+                     });
+    kubeThread->start();
 
     if (provider->name() == QStringLiteral("gnome-pidfile")) {
         const QString pidFilePath = GnomePidFileProvider::defaultPath();
@@ -182,9 +220,16 @@ int main(int argc, char *argv[]) {
     dockerThread->wait();
     delete dockerThread;
 
+    QMetaObject::invokeMethod(kube, "stop", Qt::BlockingQueuedConnection);
+    kubeThread->quit();
+    kubeThread->wait();
+    delete kubeThread;
+
     thread->quit();
     thread->wait();
     delete thread;
+
+    logLine(QStringLiteral("stopped"));
 
     return rc;
 }

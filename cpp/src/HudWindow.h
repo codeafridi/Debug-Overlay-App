@@ -2,6 +2,7 @@
 
 #include "DisplaySnapshot.h"
 #include "DockerStatus.h"
+#include "KubeStatus.h"
 
 #include <QPoint>
 #include <QWidget>
@@ -22,11 +23,14 @@ public:
 
     void setDockerSnapshot(const DockerSnapshot &snapshot);
 
+    void setKubeSnapshot(const KubeSnapshot &snapshot);
+
 protected:
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     QLabel *makeCaption(const QString &text);
@@ -37,7 +41,9 @@ private:
     void toggleDetails();
     void toggleCompact();
     void toggleDockerDetails();
+    void toggleKubeDetails();
     void updateCompactText();
+    void updateDiagnosis();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -51,6 +57,12 @@ private:
     QLabel *m_dockerDetails = nullptr;
     QString m_dockerDetailsText;
     bool m_dockerOpen = false;
+    QString m_dockerSummaryText;
+    QPushButton *m_kubeButton = nullptr;
+    QLabel *m_kubeDetails = nullptr;
+    QString m_kubeDetailsText;
+    bool m_kubeOpen = false;
+    QString m_kubeSummaryText;
     QWidget *m_detailsPanel = nullptr;
     QLabel *m_detailsText = nullptr;
     QPushButton *m_moreButton = nullptr;
@@ -61,4 +73,9 @@ private:
 
     bool m_dragging = false;
     QPoint m_dragOffset;
+
+    QPoint m_buttonPressGlobal;
+    bool m_buttonDragPending = false;
+    bool m_buttonDragActive = false;
+    bool m_buttonManualMove = false;
 };

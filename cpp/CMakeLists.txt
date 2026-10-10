@@ -66,7 +66,11 @@ add_library(debug_overlay_core STATIC
     src/DockerSource.cpp
     src/DockerSource.h
     src/Config.cpp
-    src/Config.h)
+    src/Config.h
+    src/KubeStatus.cpp
+    src/KubeStatus.h
+    src/KubeSource.cpp
+    src/KubeSource.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets Qt6::DBus)
@@ -108,6 +112,9 @@ target_link_libraries(debug_overlay_docker_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_config_tests tests/test_config.cpp)
 target_link_libraries(debug_overlay_config_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_kube_tests tests/test_kube.cpp)
+target_link_libraries(debug_overlay_kube_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
@@ -118,6 +125,7 @@ add_test(NAME health COMMAND debug_overlay_health_tests)
 add_test(NAME providers COMMAND debug_overlay_provider_tests)
 add_test(NAME docker COMMAND debug_overlay_docker_tests)
 add_test(NAME config COMMAND debug_overlay_config_tests)
+add_test(NAME kube COMMAND debug_overlay_kube_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
