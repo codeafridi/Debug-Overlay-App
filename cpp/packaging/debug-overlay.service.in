@@ -1,6 +1,5 @@
 [Unit]
 Description=Debug Overlay
-Comment=Compact on-screen focused-process monitor
 After=graphical-session.target
 
 [Service]

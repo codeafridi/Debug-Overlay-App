@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_SRC="$ROOT_DIR/cpp/build/debug_overlay_hud"
+BIN_SRC="$ROOT_DIR/build/debug_overlay_hud"
 BINDIR="${XDG_BINDIR:-$HOME/.local/bin}"
 BIN_DST="$BINDIR/debug-overlay"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -38,11 +38,11 @@ have_systemd() {
 }
 
 do_uninstall() {
-  if command -v systemctl >/dev/null 2>&1; then
+  if [ "$use_systemd" -eq 1 ] && command -v systemctl >/dev/null 2>&1; then
     systemctl --user disable --now debug-overlay.service 2>/dev/null || true
   fi
   rm -f "$UNIT_FILE" "$AUTOSTART_FILE" "$BIN_DST"
-  if command -v systemctl >/dev/null 2>&1; then
+  if [ "$use_systemd" -eq 1 ] && command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload 2>/dev/null || true
   fi
   echo "Debug Overlay uninstalled (binary, service, autostart)."
@@ -65,7 +65,7 @@ install -m 0755 "$BIN_SRC" "$BIN_DST"
 if have_systemd; then
   mkdir -p "$UNIT_DIR"
   sed "s|@BINARY@|$BIN_DST|g" \
-    "$ROOT_DIR/cpp/packaging/debug-overlay.service.in" > "$UNIT_FILE"
+    "$ROOT_DIR/packaging/debug-overlay.service.in" > "$UNIT_FILE"
   systemctl --user daemon-reload
   systemctl --user import-environment DISPLAY WAYLAND_DISPLAY \
     XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_RUNTIME_DIR 2>/dev/null || true
@@ -76,7 +76,7 @@ if have_systemd; then
 else
   mkdir -p "$AUTOSTART_DIR"
   sed "s|@BINARY@|$BIN_DST|g" \
-    "$ROOT_DIR/cpp/packaging/debug-overlay.desktop.in" > "$AUTOSTART_FILE"
+    "$ROOT_DIR/packaging/debug-overlay.desktop.in" > "$AUTOSTART_FILE"
   echo "systemd user service not used; installed XDG autostart entry:"
   echo "  $AUTOSTART_FILE"
 fi
