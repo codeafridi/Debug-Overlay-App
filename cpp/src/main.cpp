@@ -3,6 +3,10 @@
 #include "FocusSampler.h"
 #include "GnomePidFileProvider.h"
 
+#include "CpuSampler.h"
+#include "LinuxProcess.h"
+#include "MemoryFormat.h"
+
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
@@ -76,15 +80,26 @@ int main(int argc, char *argv[]) {
 
     GnomePidFileProvider provider;
     FocusSampler sampler(&provider);
+    CpuSampler cpuSampler;
     QString lastRaw;
+    QString cpuText = QStringLiteral("--");
+    ProcessIdentity cpuIdentity;
 
-    auto publish = [&hud, &sampler]() {
-        const FocusSample focus = sampler.sample();
-
+    auto publishFocus = [&](const FocusSample &focus) {
         DisplaySnapshot snap;
         if (focus.available) {
             snap.appName = focus.appName;
             snap.pid = QString::number(focus.identity.pid);
+            snap.cpu = (focus.identity == cpuIdentity) ? cpuText
+                                                       : QStringLiteral("warming");
+
+            unsigned long long rss = 0;
+            if (linuxproc::rssKb(focus.identity.pid, rss)) {
+                snap.memory = formatMemoryKb(rss);
+            } else {
+                snap.memory = QStringLiteral("--");
+            }
+
             snap.status = QStringLiteral("IDLE");
         } else {
             snap.status = QStringLiteral("no-focus");
@@ -92,7 +107,24 @@ int main(int argc, char *argv[]) {
         hud.setSnapshot(snap);
     };
 
-    publish();
+    auto publishSample = [&]() {
+        const FocusSample focus = sampler.sample();
+        if (focus.available) {
+            const CpuSample cpu = cpuSampler.sample(focus.identity);
+            if (cpu.available && !cpu.warming) {
+                cpuText = QStringLiteral("%1%").arg(qRound(cpu.percent));
+            } else {
+                cpuText = QStringLiteral("warming");
+            }
+            cpuIdentity = focus.identity;
+        } else {
+            cpuText = QStringLiteral("--");
+            cpuIdentity = ProcessIdentity{};
+        }
+        publishFocus(focus);
+    };
+
+    publishSample();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     auto *watcher = new QFileSystemWatcher(&app);
@@ -117,7 +149,7 @@ int main(int argc, char *argv[]) {
             return;
         }
         lastRaw = raw;
-        publish();
+        publishFocus(sampler.sample());
     };
 
     QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
@@ -144,7 +176,7 @@ int main(int argc, char *argv[]) {
     fallbackTimer->setInterval(1000);
     QObject::connect(fallbackTimer, &QTimer::timeout, &app, [&]() {
         lastRaw.clear();
-        publish();
+        publishSample();
     });
     fallbackTimer->start();
 

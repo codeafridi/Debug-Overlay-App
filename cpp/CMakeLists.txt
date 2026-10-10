@@ -30,7 +30,11 @@ add_library(debug_overlay_core STATIC
     src/GnomePidFileProvider.cpp
     src/GnomePidFileProvider.h
     src/FocusSampler.cpp
-    src/FocusSampler.h)
+    src/FocusSampler.h
+    src/CpuSampler.cpp
+    src/CpuSampler.h
+    src/MemoryFormat.cpp
+    src/MemoryFormat.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)
@@ -48,8 +52,16 @@ target_link_libraries(debug_overlay_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_focus_tests tests/test_focus.cpp)
 target_link_libraries(debug_overlay_focus_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_cpu_tests tests/test_cpu.cpp)
+target_link_libraries(debug_overlay_cpu_tests PRIVATE debug_overlay_core)
+
+add_executable(debug_overlay_memory_tests tests/test_memory.cpp)
+target_link_libraries(debug_overlay_memory_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
+add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
+add_test(NAME memory COMMAND debug_overlay_memory_tests)
 
-set_tests_properties(hud_buttons focus PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

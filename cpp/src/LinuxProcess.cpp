@@ -11,6 +11,23 @@ QString procPath(int pid, const char *leaf) {
     return QStringLiteral("/proc/%1/%2").arg(pid).arg(QLatin1String(leaf));
 }
 
+bool readStatTail(int pid, QStringList &fields) {
+    QFile file(procPath(pid, "stat"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    const QString text = QString::fromUtf8(file.readAll());
+    const int close = text.lastIndexOf(QLatin1Char(')'));
+    if (close < 0 || close + 2 > text.size()) {
+        return false;
+    }
+
+    fields = text.mid(close + 2).trimmed().split(QLatin1Char(' '),
+                                                 Qt::SkipEmptyParts);
+    return true;
+}
+
 } // namespace
 
 bool exists(int pid) {
@@ -29,26 +46,13 @@ QString comm(int pid) {
 }
 
 unsigned long long startTime(int pid) {
-    QFile file(procPath(pid, "stat"));
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return 0;
-    }
-
-    const QString text = QString::fromUtf8(file.readAll());
-    const int close = text.lastIndexOf(QLatin1Char(')'));
-    if (close < 0) {
-        return 0;
-    }
-
-    const QString tail = text.mid(close + 2).trimmed();
-    const QStringList fields = tail.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    constexpr int startTimeIndex = 19;
-    if (fields.size() <= startTimeIndex) {
+    QStringList fields;
+    if (!readStatTail(pid, fields) || fields.size() <= 19) {
         return 0;
     }
 
     bool ok = false;
-    const unsigned long long value = fields.at(startTimeIndex).toULongLong(&ok);
+    const unsigned long long value = fields.at(19).toULongLong(&ok);
     return ok ? value : 0;
 }
 
@@ -64,6 +68,83 @@ ProcessIdentity identity(int pid) {
         id.pid = -1;
     }
     return id;
+}
+
+bool cpuTicks(int pid, unsigned long long &out) {
+    QStringList fields;
+    if (!readStatTail(pid, fields) || fields.size() <= 12) {
+        return false;
+    }
+
+    bool okU = false;
+    bool okS = false;
+    const unsigned long long utime = fields.at(11).toULongLong(&okU);
+    const unsigned long long stime = fields.at(12).toULongLong(&okS);
+    if (!okU || !okS) {
+        return false;
+    }
+
+    out = utime + stime;
+    return true;
+}
+
+bool totalCpuTicks(unsigned long long &out) {
+    QFile file(QStringLiteral("/proc/stat"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    const QByteArray line = file.readLine().simplified();
+    const QList<QByteArray> parts = line.split(' ');
+    if (parts.isEmpty() || parts.first() != QByteArrayLiteral("cpu")) {
+        return false;
+    }
+
+    constexpr int countedFields = 8;
+    unsigned long long sum = 0;
+    int counted = 0;
+    for (int i = 1; i < parts.size() && counted < countedFields; ++i, ++counted) {
+        bool ok = false;
+        const unsigned long long value = parts.at(i).toULongLong(&ok);
+        if (!ok) {
+            break;
+        }
+        sum += value;
+    }
+
+    out = sum;
+    return true;
+}
+
+bool rssKb(int pid, unsigned long long &out) {
+    QFile file(procPath(pid, "status"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    const QByteArray data = file.readAll();
+    const QList<QByteArray> lines = data.split('\n');
+    for (const QByteArray &line : lines) {
+        if (!line.startsWith("VmRSS:")) {
+            continue;
+        }
+
+        const QList<QByteArray> parts = line.simplified().split(' ');
+        if (parts.size() < 2) {
+            return false;
+        }
+
+        bool ok = false;
+        const unsigned long long kb = parts.at(1).toULongLong(&ok);
+        if (!ok) {
+            return false;
+        }
+
+        out = kb;
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace linuxproc
