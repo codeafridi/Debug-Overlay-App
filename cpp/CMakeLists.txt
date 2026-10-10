@@ -42,7 +42,15 @@ add_library(debug_overlay_core STATIC
     src/SamplerWorker.cpp
     src/SamplerWorker.h
     src/HealthEvaluator.cpp
-    src/HealthEvaluator.h)
+    src/HealthEvaluator.h
+    src/NullFocusProvider.cpp
+    src/NullFocusProvider.h
+    src/XdotoolFocusProvider.cpp
+    src/XdotoolFocusProvider.h
+    src/HyprctlFocusProvider.cpp
+    src/HyprctlFocusProvider.h
+    src/FocusProviderFactory.cpp
+    src/FocusProviderFactory.h)
 
 target_include_directories(debug_overlay_core PUBLIC src)
 target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)
@@ -75,6 +83,9 @@ target_link_libraries(debug_overlay_sampler_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_health_tests tests/test_health.cpp)
 target_link_libraries(debug_overlay_health_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_provider_tests tests/test_providers.cpp)
+target_link_libraries(debug_overlay_provider_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
@@ -82,6 +93,7 @@ add_test(NAME memory COMMAND debug_overlay_memory_tests)
 add_test(NAME group COMMAND debug_overlay_group_tests)
 add_test(NAME sampler COMMAND debug_overlay_sampler_tests)
 add_test(NAME health COMMAND debug_overlay_health_tests)
+add_test(NAME providers COMMAND debug_overlay_provider_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

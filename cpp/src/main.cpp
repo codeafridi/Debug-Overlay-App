@@ -1,5 +1,6 @@
 #include "HudWindow.h"
 
+#include "FocusProviderFactory.h"
 #include "GnomePidFileProvider.h"
 #include "SamplerWorker.h"
 
@@ -14,6 +15,7 @@
 #include <QtGlobal>
 
 #include <csignal>
+#include <memory>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -75,10 +77,10 @@ int main(int argc, char *argv[]) {
     HudWindow hud;
     hud.setSnapshot(DisplaySnapshot{});
 
-    GnomePidFileProvider provider;
+    std::unique_ptr<FocusedWindowProvider> provider = createFocusProvider();
 
     auto *thread = new QThread;
-    auto *worker = new SamplerWorker(&provider);
+    auto *worker = new SamplerWorker(provider.get());
     worker->moveToThread(thread);
     QObject::connect(thread, &QThread::started, worker, &SamplerWorker::start);
     QObject::connect(thread, &QThread::finished, worker, &QObject::deleteLater);
@@ -95,56 +97,51 @@ int main(int argc, char *argv[]) {
 
     thread->start();
 
-    const QString pidFilePath = GnomePidFileProvider::defaultPath();
-    QString lastRaw;
-    auto *watcher = new QFileSystemWatcher(&app);
-    if (!pidFilePath.isEmpty()) {
-        const QFileInfo info(pidFilePath);
-        const QString dirPath = info.absolutePath();
-        if (QFileInfo::exists(dirPath)) {
-            watcher->addPath(dirPath);
+    if (provider->name() == QStringLiteral("gnome-pidfile")) {
+        const QString pidFilePath = GnomePidFileProvider::defaultPath();
+        QString lastRaw;
+        auto *watcher = new QFileSystemWatcher(&app);
+        if (!pidFilePath.isEmpty()) {
+            const QFileInfo info(pidFilePath);
+            const QString dirPath = info.absolutePath();
+            if (QFileInfo::exists(dirPath)) {
+                watcher->addPath(dirPath);
+            }
+            if (QFileInfo::exists(pidFilePath)) {
+                watcher->addPath(pidFilePath);
+            }
         }
-        if (QFileInfo::exists(pidFilePath)) {
-            watcher->addPath(pidFilePath);
-        }
+
+        auto requestSample = [&worker]() {
+            QMetaObject::invokeMethod(worker, "sampleNow", Qt::QueuedConnection);
+        };
+
+        auto refreshIfChanged = [&]() {
+            QFile file(pidFilePath);
+            QString raw;
+            if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                raw = QString::fromUtf8(file.readAll()).trimmed();
+            }
+            if (raw == lastRaw) {
+                return;
+            }
+            lastRaw = raw;
+            requestSample();
+        };
+
+        auto onChange = [&]() {
+            refreshIfChanged();
+            if (!pidFilePath.isEmpty() && QFileInfo::exists(pidFilePath)
+                && !watcher->files().contains(pidFilePath)) {
+                watcher->addPath(pidFilePath);
+            }
+        };
+
+        QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
+                         [&](const QString &) { onChange(); });
+        QObject::connect(watcher, &QFileSystemWatcher::fileChanged, &app,
+                         [&](const QString &) { onChange(); });
     }
-
-    auto requestSample = [&worker]() {
-        QMetaObject::invokeMethod(worker, "sampleNow", Qt::QueuedConnection);
-    };
-
-    auto refreshIfChanged = [&]() {
-        QFile file(pidFilePath);
-        QString raw;
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            raw = QString::fromUtf8(file.readAll()).trimmed();
-        }
-        if (raw == lastRaw) {
-            return;
-        }
-        lastRaw = raw;
-        requestSample();
-    };
-
-    QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
-                     [&](const QString &) {
-                         refreshIfChanged();
-                         if (!pidFilePath.isEmpty()
-                             && QFileInfo::exists(pidFilePath)
-                             && !watcher->files().contains(pidFilePath)) {
-                             watcher->addPath(pidFilePath);
-                         }
-                     });
-
-    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, &app,
-                     [&](const QString &) {
-                         refreshIfChanged();
-                         if (!pidFilePath.isEmpty()
-                             && QFileInfo::exists(pidFilePath)
-                             && !watcher->files().contains(pidFilePath)) {
-                             watcher->addPath(pidFilePath);
-                         }
-                     });
 
     hud.show();
 
