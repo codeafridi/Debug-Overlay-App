@@ -140,6 +140,20 @@ Run it:
 ./cpp/build/debug_overlay_hud
 ```
 
+**Verified builds** (configure + compile + all tests pass, in clean containers):
+
+| Distribution | Qt 6 | Result |
+| --- | --- | --- |
+| Ubuntu 26.04 (dev machine) | 6.10.2 | ✅ build + 12/12 tests |
+| Debian 13 | 6.8.2 | ✅ build + 12/12 tests |
+| Fedora 44 | 6.11.2 | ✅ build + 12/12 tests |
+| Arch Linux | 6.12.0 | ✅ build + 12/12 tests |
+| openSUSE Tumbleweed | 6.11.2 | ✅ build + 12/12 tests |
+
+(Linux Mint and CachyOS share the Ubuntu/Arch bases respectively.) This validates
+the build and dependency assumptions across Qt 6.8–6.12; it does not, by itself,
+validate on-desktop focus integration on each distro.
+
 ---
 
 ## Install (autostart at login)
