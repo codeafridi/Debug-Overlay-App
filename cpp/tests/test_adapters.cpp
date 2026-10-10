@@ -1,4 +1,5 @@
 #include "HyprctlFocusProvider.h"
+#include "NiriFocusProvider.h"
 #include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
 
@@ -76,6 +77,17 @@ int main(int argc, char *argv[]) {
     SwaymsgFocusProvider swayProvider(swaymsg);
     check(swayProvider.focusedPid() == me,
           "swaymsg adapter returns pid from tree JSON");
+
+    const QString niri = writeScript(
+        dir, QStringLiteral("niri"),
+        QStringLiteral("[ \"$1\" = \"msg\" ] && [ \"$2\" = \"--json\" ] && "
+                       "[ \"$3\" = \"focused-window\" ] || exit 2\necho "
+                       "'{\"pid\":%1,\"app_id\":\"foot\"}'\n")
+            .arg(pid));
+    NiriFocusProvider niriProvider(niri);
+    check(niriProvider.name() == QStringLiteral("niri"), "niri adapter name");
+    check(niriProvider.focusedPid() == me,
+          "niri adapter returns pid from focused-window JSON");
 
     XdotoolFocusProvider nonzero(
         writeScript(dir, QStringLiteral("badexit"), QStringLiteral("exit 3\n")));

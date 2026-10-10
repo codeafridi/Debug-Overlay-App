@@ -74,6 +74,9 @@ int main(int argc, char *argv[]) {
     check(selectProviderKind(makeInfo("wayland", "", false, false, true))
               == FocusProviderKind::Sway,
           "wayland + SWAYSOCK -> Sway");
+    check(selectProviderKind(makeInfo("wayland", "niri", true))
+              == FocusProviderKind::Niri,
+          "wayland+niri -> Niri");
     check(selectProviderKind(makeInfo("wayland", "", false))
               == FocusProviderKind::Null,
           "wayland+unknown -> Null");
@@ -97,6 +100,9 @@ int main(int argc, char *argv[]) {
     check(focusProviderKindName(FocusProviderKind::Sway)
               == QStringLiteral("swaymsg"),
           "Sway kind name");
+    check(focusProviderKindName(FocusProviderKind::Niri)
+              == QStringLiteral("niri"),
+          "Niri kind name");
     check(focusProviderKindName(FocusProviderKind::Kde)
               == QStringLiteral("kde-dbus"),
           "Kde kind name");

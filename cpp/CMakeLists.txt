@@ -51,6 +51,8 @@ add_library(debug_overlay_core STATIC
     src/HyprctlFocusProvider.h
     src/SwaymsgFocusProvider.cpp
     src/SwaymsgFocusProvider.h
+    src/NiriFocusProvider.cpp
+    src/NiriFocusProvider.h
     src/FocusProviderFactory.cpp
     src/FocusProviderFactory.h
     src/CachingFocusProvider.cpp

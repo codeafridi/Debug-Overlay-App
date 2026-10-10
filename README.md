@@ -105,6 +105,7 @@ supplies it through its own channel:
 | KDE Plasma (Wayland) | KWin script + D-Bus (`cpp/kwin_script`, `cpp/install_kde_focus.sh`) | implemented; **not yet verified** on KDE |
 | Hyprland | `hyprctl` | implemented; **not yet verified** on a real session |
 | Sway | `swaymsg` | implemented; **verified** against a real (headless) Sway compositor |
+| niri | `niri msg` | implemented; **verified** against a real (nested) niri compositor |
 | X11 / XWayland (Cinnamon, XFCE, MATE, KDE-X11) | `xdotool` | implemented; **verified** against a real (headless Xvfb) X server |
 | Other Wayland compositors | — | not supported; shows `no-focus` |
 
