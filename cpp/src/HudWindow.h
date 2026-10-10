@@ -1,0 +1,81 @@
+#pragma once
+
+#include "DisplaySnapshot.h"
+#include "DockerStatus.h"
+#include "KubeStatus.h"
+
+#include <QPoint>
+#include <QWidget>
+
+class QLabel;
+class QKeyEvent;
+class QLayout;
+class QMouseEvent;
+class QPushButton;
+
+class HudWindow : public QWidget {
+    Q_OBJECT
+
+public:
+    explicit HudWindow(QWidget *parent = nullptr);
+
+    void setSnapshot(const DisplaySnapshot &snapshot);
+
+    void setDockerSnapshot(const DockerSnapshot &snapshot);
+
+    void setKubeSnapshot(const KubeSnapshot &snapshot);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
+private:
+    QLabel *makeCaption(const QString &text);
+    QLabel *makeValue();
+
+    QLayout *makeMetricBlock(const QString &caption, QLabel *value);
+
+    void toggleDetails();
+    void toggleCompact();
+    void toggleDockerDetails();
+    void toggleKubeDetails();
+    void updateCompactText();
+    void updateDiagnosis();
+
+    QLabel *m_appValue = nullptr;
+    QLabel *m_pidValue = nullptr;
+    QLabel *m_cpuValue = nullptr;
+    QLabel *m_memoryValue = nullptr;
+    QLabel *m_statusValue = nullptr;
+
+    QWidget *m_metricsWidget = nullptr;
+    QLabel *m_compactLabel = nullptr;
+    QPushButton *m_dockerButton = nullptr;
+    QLabel *m_dockerDetails = nullptr;
+    QString m_dockerDetailsText;
+    bool m_dockerOpen = false;
+    QString m_dockerSummaryText;
+    QPushButton *m_kubeButton = nullptr;
+    QLabel *m_kubeDetails = nullptr;
+    QString m_kubeDetailsText;
+    bool m_kubeOpen = false;
+    QString m_kubeSummaryText;
+    QWidget *m_detailsPanel = nullptr;
+    QLabel *m_detailsText = nullptr;
+    QPushButton *m_moreButton = nullptr;
+    QPushButton *m_showHideButton = nullptr;
+    DisplaySnapshot m_lastSnapshot;
+    bool m_detailsExpanded = false;
+    bool m_compact = false;
+
+    bool m_dragging = false;
+    QPoint m_dragOffset;
+
+    QPoint m_buttonPressGlobal;
+    bool m_buttonDragPending = false;
+    bool m_buttonDragActive = false;
+    bool m_buttonManualMove = false;
+};

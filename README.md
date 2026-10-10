@@ -1,216 +1,268 @@
 # Debug Overlay
 
-Debug Overlay is a small Linux window that sits on your screen and watches the
-app you are using. It shows the app name, PID, CPU use, memory use, and simple
-warnings when something looks wrong.
+**A lightweight, always-on-top HUD for live process and infrastructure status on Linux desktops.**
 
-It is made for people who want a quick answer while working: "is this app using
-too much CPU or memory?" You do not need to keep `top` open all the time.
+Debug Overlay watches the application you are actually using and shows, at a glance,
+the focused app, its PID, CPU, and memory — plus optional Docker and Kubernetes
+health — without leaving your workflow or opening a terminal.
 
-<img width="1245" height="814" alt="image" src="https://github.com/user-attachments/assets/c89e2016-b378-4567-be0d-a9a73b4ca5c8" />
+> Rewritten in C++20 / Qt 6 for low CPU, low memory, and a responsive GUI.
+> Designed to monitor *apps with helper processes* (browsers, Electron IDEs, games)
+> as a single unit, not one PID.
 
+```
+ Debug Overlay                                OK
+ App            PID        CPU       MEM (RSS)
+ cursor         2092707    Warming up  212 MB
+ docker: 1 running
+ k8s: 4 issues
+                              MORE   HIDE
+```
+
+---
+
+## Highlights
+
+- **Focused-app aware** — shows the app you are using, resolved to a stable
+  **process identity** (PID + start time) so PID reuse can't fool it.
+- **Whole-app metrics** — groups the app with its helper processes and reports
+  **aggregate CPU and RSS**, so browser/Electron numbers are meaningful.
+- **Compact health state** — `OK` / `WARN` / `HIGH CPU` from sustained CPU/RSS
+  thresholds (no noisy one-sample alerts).
+- **Optional Docker & Kubernetes** — container and pod health as small, clickable
+  badges; details only on demand.
+- **Non-invasive UI** — a frameless, always-on-top overlay that never steals focus
+  and never queues stale samples.
+- **Graceful by design** — missing tools, unreachable daemons, and unsupported
+  desktops degrade to a clear status instead of breaking.
+- **Broad Linux support** — X11 and major Wayland compositors via per-desktop
+  adapters; the monitoring core is distribution-independent.
+
+---
 
 ## What it shows
 
-- the app you are currently using
-- the app PID
-- CPU usage
-- RAM usage (RSS)
-- Docker container status
-- unhealthy Docker containers
-- warnings for high CPU, memory growth, disk pressure, network activity, and
-  recent system errors
+| Field | Meaning |
+|---|---|
+| **App** | Focused application name (from `/proc`) |
+| **PID** | Focused process ID |
+| **CPU** | CPU use of the *app group*, in % of one logical core (multithreaded apps can exceed 100%) |
+| **MEM (RSS)** | Resident memory **summed** across the app group (shared pages may be counted more than once) |
+| **Status** | `OK`, `WARN`, or `HIGH CPU` from sustained thresholds |
+| **docker** | Optional: `N running`, `N running \| M issue(s)`, or a clear error state |
+| **k8s** | Optional: `N pods`, `N issues`, or a clear error state |
 
-## Docker monitoring
+Click a **docker**/**k8s** badge for details; press **MORE** for a combined
+diagnosis panel; press **HIDE** to collapse to a single line. Drag it anywhere.
 
-If Docker is installed and accessible to your user, Debug Overlay automatically
-checks Docker containers in the background.
+---
 
-The compact overlay shows a short Docker status such as:
+## Architecture
 
-```text
-docker: 2 running | healthy
+A deliberately small, testable design — every unit has one job.
+
+```
+                 ┌───────────────────────────────────────────┐
+                 │              GUI THREAD (Qt)              │
+                 │   HudWindow — render-only, no monitoring  │
+                 └───────────────▲───────────────┬───────────┘
+                                 │ queued        │ file-watch
+                                 │ snapshots     │ (GNOME focus)
+        ┌────────────────────────┴───────┐       │
+        │   SamplerWorker (QThread)      │       │
+        │   focus → identity → group     │       │
+        │   CPU + RSS snapshots          │       │
+        └───────────────┬────────────────┘       │
+                        │ FocusedWindowProvider   │
+                        │ adapters (GNOME/KDE/…)  │
+        ┌───────────────┴──────┐   ┌──────────────┴───────┐
+        │ DockerSource (thread)│   │  KubeSource (thread) │
+        │ bounded async poll   │   │  bounded async poll  │
+        └──────────────────────┘   └──────────────────────┘
 ```
 
-Apps such as Cursor, VS Code, Chrome, and Firefox use helper processes. The
-overlay groups related child processes, so its CPU and RAM numbers are more
-useful than looking at only one helper process.
+- **Render-only GUI.** The GUI thread never scans `/proc`, runs subprocesses, or
+  waits on workers. It renders the newest completed `DisplaySnapshot`.
+- **Bounded workers.** One long-lived thread per source; at most one query in
+  flight, no queued history, deadlines + exponential backoff, safe shutdown.
+- **Value snapshots.** Results cross threads as typed values via queued signals;
+  stale/out-of-order snapshots are rejected.
+- **Isolated slow sources.** Docker and Kubernetes run on separate threads with
+  timeouts, output caps, and last-known-good/stale marking, so they can never
+  delay the critical focus/CPU/RSS path.
 
-## Will it work on my Linux system?
+---
 
-The overlay needs a graphical Linux desktop, Python 3, Tkinter, and the Linux
-`/proc` filesystem. It works on Ubuntu, Debian, Linux Mint, Fedora, Red Hat,
-Arch, and similar distributions.
+## Supported desktops (focus detection)
 
-How it finds the app you are currently using depends on your desktop session:
+Debug Overlay is PID-centric. Wayland has no generic way to obtain the focused
+PID (the foreign-toplevel protocols expose only `app_id`/`title`), so each desktop
+supplies it through its own channel:
 
-| Your session | How app detection works |
-| --- | --- |
-| X11 / Xorg | Automatic, using `xdotool` |
-| Ubuntu / GNOME Wayland | Automatic, using the included GNOME integration |
-| Hyprland Wayland | Automatic, using `hyprctl` |
-| Sway Wayland | Automatic, using `swaymsg` |
-| Other Wayland desktops | Need their own compositor integration |
+| Session | Mechanism | Status |
+|---|---|---|
+| GNOME (Wayland & X11) | GNOME Shell extension (`gnome_extension/`) | implemented; verified on Ubuntu GNOME Wayland |
+| KDE Plasma (Wayland) | KWin script + D-Bus (`cpp/kwin_script`, `cpp/install_kde_focus.sh`) | implemented; **not yet verified** on KDE |
+| Hyprland | `hyprctl` | implemented; not verified here |
+| Sway | `swaymsg` | implemented; not verified here |
+| X11 / XWayland (Cinnamon, XFCE, MATE, KDE-X11) | `xdotool` | implemented |
+| Other Wayland compositors | — | not supported; shows `no-focus` |
 
-This is not about the Linux distribution alone. Wayland desktop environments do
-not share one standard way to reveal the focused app to another program.
+The provider is auto-selected from `XDG_SESSION_TYPE`/`XDG_CURRENT_DESKTOP`.
+*These are compatibility targets, not universal support claims.*
 
-## Ubuntu 26.04 / GNOME Wayland setup
+---
 
-This is the setup most Ubuntu users need. Run these commands from the project
-folder:
+## Build
+
+**Prerequisites**
+
+| Distribution | Packages |
+|---|---|
+| Debian / Ubuntu / Mint | `build-essential cmake qt6-base-dev libqt6dbus6` |
+| Fedora | `gcc-c++ cmake qt6-qtbase-devel qt6-qtbase` |
+| Arch / CachyOS | `base-devel cmake qt6-base` |
+
+Plus `xdotool` for X11 sessions, and a GNOME/KDE focus script on those desktops
+(see above).
+
+**Compile and test**
 
 ```bash
-sudo apt update
-sudo apt install python3 python3-tk
-bash ./install_gnome_extension.sh
+cmake -S cpp -B cpp/build
+cmake --build cpp/build -j"$(nproc)"
+ctest --test-dir cpp/build --output-on-failure
 ```
 
-Now log out of Ubuntu and log back in once. This is **not** a device restart.
-GNOME only loads a newly installed extension when a new desktop session starts.
-After that one-time step, the overlay tracks your active app live every time it
-runs.
-
-Then start it:
+Run it:
 
 ```bash
-bash ./start_overlay.sh
+./cpp/build/debug_overlay_hud
 ```
 
-Do not use `sudo` with either project script.
+---
 
-## X11 / Xorg setup
-
-If your desktop session is X11/Xorg, install `xdotool` too.
-
-Ubuntu, Debian, or Mint:
+## Install (autostart at login)
 
 ```bash
-sudo apt update
-sudo apt install python3 python3-tk xdotool
+bash cpp/install.sh                 # systemd user service if available
+bash cpp/install.sh --no-systemd    # XDG autostart only
+bash cpp/install.sh --uninstall
 ```
 
-Fedora or Red Hat:
+Installs the binary to `~/.local/bin/debug-overlay` (`XDG_BINDIR` overrides),
+uses a **systemd user service** where present, and falls back to an
+**XDG autostart** entry otherwise.
+
+GNOME users also need the focus bridge once:
 
 ```bash
-sudo dnf install python3 python3-tkinter xdotool
+bash install_gnome_extension.sh     # then log out and back in
 ```
 
-Arch:
+---
 
-```bash
-sudo pacman -S python tk xdotool
+## Configuration
+
+Optional INI file at `~/.config/debug-overlay/config.ini`
+(override with `DEBUG_OVERLAY_CONFIG`). Missing file or invalid values fall back
+to safe defaults.
+
+```ini
+[health]
+cpu_warn_percent = 70
+cpu_high_percent = 90
+rss_warn_kb      = 1048576
+sustained_samples = 3
+
+[docker]
+healthy_ms      = 20000
+issue_ms        = 8000
+backoff_start_ms = 15000
+backoff_cap_ms  = 240000
+timeout_ms      = 3000
+
+[kubernetes]
+healthy_ms      = 30000
+issue_ms        = 10000
+timeout_ms      = 5000
+
+[overlay]
+sample_interval_ms = 1000
+focus_cache_ttl_ms = 1500
 ```
 
-Start the overlay:
+Set `DEBUG_OVERLAY_LOG=<path>` to append structured status/lifecycle logging to a
+file.
 
-```bash
-bash ./start_overlay.sh
+---
+
+## Docker & Kubernetes
+
+- **Docker:** one bounded `docker ps --all --format …` call (no per-container
+  inspect). Distinguishes *not installed*, *daemon unreachable*,
+  *permission denied*, and *M running / N unhealthy/restarting*. Compact badge +
+  on-demand details.
+- **Kubernetes:** one bounded `kubectl get pods -A -o json` call. Flags
+  `CrashLoopBackOff`, `ImagePullBackOff`/`ErrImagePull`, `OOMKilled`/`Error`,
+  failed/unknown phases, and high restart counts. Compact badge + on-demand
+  details. Unreachable clusters show `k8s: unreachable`.
+- Both poll on a backoff schedule and keep the last good result marked **stale**
+  when a later poll fails.
+
+---
+
+## Performance
+
+Measured on the reference machine (Ubuntu 26.04, GNOME Wayland, 12 logical cores),
+idle, focused app = Cursor:
+
+| Metric | Python (Tkinter) | C++ / Qt 6 |
+|---|---|---|
+| CPU (% of one core) | 26.2 % | **0.75–0.9 %** |
+| Voluntary wakeups/s | ~4,600 | **~2** |
+| RSS | ~62 MB | ~60 MB |
+| PSS | ~51 MB | **~36 MB** |
+
+10-minute soak: **0.74 % CPU**, memory flat (RSS +0.3 MB, PSS +0.1 MB).
+
+The design targets: no blocking monitoring on the GUI thread, no unbounded
+queues, no fast idle polling, and correct stale/unavailable states.
+
+---
+
+## Testing
+
+`ctest` covers parsing and logic without a GUI:
+focus/identity, CPU sampling, RSS formatting, process grouping, snapshots,
+health thresholds, provider selection/caching, Docker parsing/states, Kubernetes
+parsing/states, and configuration loading/validation.
+
+---
+
+## Project layout
+
+```
+cpp/
+├── CMakeLists.txt
+├── src/                 core library + app (sampler, sources, GUI, config)
+├── tests/               unit tests (ctest)
+├── tools/bench.sh       process benchmark harness
+├── packaging/           systemd unit, autostart entry, docs
+├── install.sh           install / uninstall
+├── install_kde_focus.sh KDE focus bridge installer
+└── kwin_script/         KWin focus bridge
+gnome_extension/         GNOME Shell focus bridge
+overlay_design.py        original Python/Tk reference implementation
 ```
 
-## Start it automatically
+The original Python application is kept as the **reference implementation and
+benchmark baseline**.
 
-You do not need a server.
+---
 
-If you want the overlay to keep running even after you close Terminal, Cursor,
-or VS Code, install the included user service:
+## Compatibility
 
-```bash
-bash ./install_autostart.sh
-```
-
-After this, the overlay starts automatically whenever you log in. If it closes
-or crashes, systemd starts it again after a few seconds. You do **not** need to
-start it manually every day.
-
-It cannot show before you log in, because it is a graphical window and your
-desktop does not exist until you log in.
-
-Useful commands:
-
-```bash
-# See whether it is running
-systemctl --user status debug-overlay.service
-
-# Restart it after changing overlay_design.py
-systemctl --user restart debug-overlay.service
-
-# Stop it and stop automatic startup
-systemctl --user disable --now debug-overlay.service
-```
-
-## Using the overlay
-
-- Drag it anywhere on the screen.
-- `HIDE` keeps warnings small: one line with app name, PID, CPU, RSS, and
-  `WARN` or `CRITICAL`.
-- `SHOW` brings back the full diagnosis panel when a warning appears.
-- `MORE` opens the full diagnosis panel whenever you want it.
-- `LESS` closes that panel.
-- `FRZ` freezes the current numbers so you can read them.
-
-The normal compact overlay is intentionally small. Use `HIDE` if you want
-warnings to stay small too, then press `SHOW` or `MORE` when you are actually
-debugging something.
-
-## What RSS means
-
-RSS means the RAM currently used by the app. For multi-process apps, the
-overlay adds RAM used by related helper processes. That is why its memory number
-can be larger than the number for one process shown in `top`.
-
-The numbers may not exactly match `top` because CPU changes every second and
-the overlay can group several related processes together. That is normal.
-
-## If something does not work
-
-### The overlay says GNOME focus integration is not enabled
-
-Run this once, without `sudo`:
-
-```bash
-bash ./install_gnome_extension.sh
-```
-
-Then log out and back in. If it still does not work, check that the bridge is
-reporting a PID:
-
-```bash
-cat "$XDG_RUNTIME_DIR/debug-overlay-active-pid"
-```
-
-Switch to another app and run the command again. The number should change.
-
-### `xdotool` is missing
-
-This matters only for X11/Xorg. Install it with your distribution package
-manager; the X11 setup commands above include it.
-
-### Tkinter is missing
-
-Ubuntu/Debian/Mint:
-
-```bash
-sudo apt install python3-tk
-```
-
-Fedora/RHEL:
-
-```bash
-sudo dnf install python3-tkinter
-```
-
-Arch:
-
-```bash
-sudo pacman -S tk
-```
-
-## Project files
-
-- `overlay_design.py` — the main overlay
-- `start_overlay.sh` — starts the overlay
-- `install_autostart.sh` — makes it start automatically at login
-- `install_gnome_extension.sh` — enables automatic app detection for GNOME
-  Wayland
-- `process_time.py` — older terminal-only experiment
+Targets mainstream desktop Linux (Ubuntu, Linux Mint, Debian, Fedora, Arch,
+CachyOS, openSUSE). The monitoring core uses only `/proc` and standard kernel
+interfaces; only focus detection and autostart are desktop-specific.
