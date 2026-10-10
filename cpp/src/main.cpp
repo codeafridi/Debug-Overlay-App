@@ -1,8 +1,15 @@
 #include "HudWindow.h"
 
+#include "FocusSampler.h"
+#include "GnomePidFileProvider.h"
+
 #include <QApplication>
 #include <QByteArray>
+#include <QFile>
+#include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QSocketNotifier>
+#include <QTimer>
 #include <QtGlobal>
 
 #include <csignal>
@@ -63,11 +70,84 @@ int main(int argc, char *argv[]) {
     }
 
     HudWindow hud;
-    hud.applyPlaceholderValues(QStringLiteral("example-app"),
-                               QStringLiteral("--"),
-                               QStringLiteral("--"),
-                               QStringLiteral("--"),
-                               QStringLiteral("IDLE"));
+    DisplaySnapshot snapshot;
+    snapshot.status = QStringLiteral("IDLE");
+    hud.setSnapshot(snapshot);
+
+    GnomePidFileProvider provider;
+    FocusSampler sampler(&provider);
+    QString lastRaw;
+
+    auto publish = [&hud, &sampler]() {
+        const FocusSample focus = sampler.sample();
+
+        DisplaySnapshot snap;
+        if (focus.available) {
+            snap.appName = focus.appName;
+            snap.pid = QString::number(focus.identity.pid);
+            snap.status = QStringLiteral("IDLE");
+        } else {
+            snap.status = QStringLiteral("no-focus");
+        }
+        hud.setSnapshot(snap);
+    };
+
+    publish();
+
+    const QString pidFilePath = GnomePidFileProvider::defaultPath();
+    auto *watcher = new QFileSystemWatcher(&app);
+    if (!pidFilePath.isEmpty()) {
+        const QFileInfo info(pidFilePath);
+        const QString dirPath = info.absolutePath();
+        if (QFileInfo::exists(dirPath)) {
+            watcher->addPath(dirPath);
+        }
+        if (QFileInfo::exists(pidFilePath)) {
+            watcher->addPath(pidFilePath);
+        }
+    }
+
+    auto refreshIfChanged = [&]() {
+        QFile file(pidFilePath);
+        QString raw;
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            raw = QString::fromUtf8(file.readAll()).trimmed();
+        }
+        if (raw == lastRaw) {
+            return;
+        }
+        lastRaw = raw;
+        publish();
+    };
+
+    QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, &app,
+                     [&](const QString &) {
+                         refreshIfChanged();
+                         if (!pidFilePath.isEmpty()
+                             && QFileInfo::exists(pidFilePath)
+                             && !watcher->files().contains(pidFilePath)) {
+                             watcher->addPath(pidFilePath);
+                         }
+                     });
+
+    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, &app,
+                     [&](const QString &) {
+                         refreshIfChanged();
+                         if (!pidFilePath.isEmpty()
+                             && QFileInfo::exists(pidFilePath)
+                             && !watcher->files().contains(pidFilePath)) {
+                             watcher->addPath(pidFilePath);
+                         }
+                     });
+
+    auto *fallbackTimer = new QTimer(&app);
+    fallbackTimer->setInterval(1000);
+    QObject::connect(fallbackTimer, &QTimer::timeout, &app, [&]() {
+        lastRaw.clear();
+        publish();
+    });
+    fallbackTimer->start();
+
     hud.show();
 
     return app.exec();

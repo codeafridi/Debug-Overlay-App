@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(debug_overlay_hud
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Debug Overlay HUD (Qt 6 Widgets)"
     LANGUAGES CXX)
 
@@ -19,14 +19,37 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-add_executable(debug_overlay_hud
-    src/main.cpp
+add_library(debug_overlay_core STATIC
     src/HudWindow.cpp
-    src/HudWindow.h)
+    src/HudWindow.h
+    src/DisplaySnapshot.h
+    src/ProcessIdentity.h
+    src/LinuxProcess.cpp
+    src/LinuxProcess.h
+    src/FocusedWindowProvider.h
+    src/GnomePidFileProvider.cpp
+    src/GnomePidFileProvider.h
+    src/FocusSampler.cpp
+    src/FocusSampler.h)
 
-target_include_directories(debug_overlay_hud PRIVATE src)
-
-target_link_libraries(debug_overlay_hud PRIVATE Qt6::Widgets)
-
-target_compile_options(debug_overlay_hud PRIVATE
+target_include_directories(debug_overlay_core PUBLIC src)
+target_link_libraries(debug_overlay_core PUBLIC Qt6::Widgets)
+target_compile_options(debug_overlay_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra>)
+
+add_executable(debug_overlay_hud src/main.cpp)
+target_link_libraries(debug_overlay_hud PRIVATE debug_overlay_core)
+
+enable_testing()
+
+add_executable(debug_overlay_tests tests/test_hud_buttons.cpp)
+target_link_libraries(debug_overlay_tests PRIVATE debug_overlay_core)
+
+add_executable(debug_overlay_focus_tests tests/test_focus.cpp)
+target_link_libraries(debug_overlay_focus_tests PRIVATE debug_overlay_core)
+
+add_test(NAME hud_buttons COMMAND debug_overlay_tests)
+add_test(NAME focus COMMAND debug_overlay_focus_tests)
+
+set_tests_properties(hud_buttons focus PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

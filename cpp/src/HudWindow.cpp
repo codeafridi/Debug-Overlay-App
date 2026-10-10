@@ -33,9 +33,11 @@ QFont captionFont() {
 HudWindow::HudWindow(QWidget *parent)
     : QWidget(parent) {
     setWindowTitle(QStringLiteral("Debug Overlay"));
-    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool
+                   | Qt::WindowDoesNotAcceptFocus);
     setAttribute(Qt::WA_StyledBackground, true);
     setAttribute(Qt::WA_ShowWithoutActivating, true);
+    setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
     setObjectName(QStringLiteral("hudRoot"));
 
     auto *root = new QVBoxLayout(this);
@@ -61,23 +63,37 @@ HudWindow::HudWindow(QWidget *parent)
     metrics->setSpacing(18);
 
     m_appValue = makeValue();
+    m_appValue->setObjectName(QStringLiteral("appValue"));
     m_pidValue = makeValue();
+    m_pidValue->setObjectName(QStringLiteral("pidValue"));
     m_cpuValue = makeValue();
+    m_cpuValue->setObjectName(QStringLiteral("cpuValue"));
     m_memoryValue = makeValue();
+    m_memoryValue->setObjectName(QStringLiteral("memoryValue"));
 
     metrics->addLayout(makeMetricBlock(QStringLiteral("App"), m_appValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("PID"), m_pidValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("CPU"), m_cpuValue));
     metrics->addLayout(makeMetricBlock(QStringLiteral("MEM"), m_memoryValue));
     metrics->addStretch(1);
-    root->addLayout(metrics);
+
+    m_metricsWidget = new QWidget(this);
+    m_metricsWidget->setObjectName(QStringLiteral("metrics"));
+    m_metricsWidget->setLayout(metrics);
+    root->addWidget(m_metricsWidget);
+
+    m_compactLabel = new QLabel(this);
+    m_compactLabel->setObjectName(QStringLiteral("compact"));
+    m_compactLabel->setFont(valueFont());
+    m_compactLabel->setVisible(false);
+    root->addWidget(m_compactLabel);
 
     m_detailsPanel = new QFrame(this);
     m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
 
     auto *detailsLayout = new QVBoxLayout(m_detailsPanel);
     detailsLayout->setContentsMargins(10, 8, 10, 10);
-    detailsLayout->setSpacing(4);
+    detailsLayout->setSpacing(1);
 
     auto *detailsTitle = new QLabel(QStringLiteral("DIAGNOSIS"), m_detailsPanel);
     detailsTitle->setObjectName(QStringLiteral("caption"));
@@ -96,14 +112,30 @@ HudWindow::HudWindow(QWidget *parent)
     root->addWidget(m_detailsPanel);
 
     auto *footer = new QHBoxLayout();
-    footer->setSpacing(6);
+    footer->setSpacing(1);
+    footer->addStretch(1);
+
+    m_freezeButton = new QPushButton(QStringLiteral("FRZ"), this);
+    m_freezeButton->setObjectName(QStringLiteral("freezeButton"));
+    m_freezeButton->setFocusPolicy(Qt::NoFocus);
+    m_freezeButton->setCursor(Qt::PointingHandCursor);
+    connect(m_freezeButton, &QPushButton::clicked, this, &HudWindow::toggleFreeze);
+
     m_moreButton = new QPushButton(QStringLiteral("MORE"), this);
     m_moreButton->setObjectName(QStringLiteral("moreButton"));
     m_moreButton->setFocusPolicy(Qt::NoFocus);
     m_moreButton->setCursor(Qt::PointingHandCursor);
     connect(m_moreButton, &QPushButton::clicked, this, &HudWindow::toggleDetails);
-    footer->addStretch(1);
+
+    m_showHideButton = new QPushButton(QStringLiteral("HIDE"), this);
+    m_showHideButton->setObjectName(QStringLiteral("showHideButton"));
+    m_showHideButton->setFocusPolicy(Qt::NoFocus);
+    m_showHideButton->setCursor(Qt::PointingHandCursor);
+    connect(m_showHideButton, &QPushButton::clicked, this, &HudWindow::toggleCompact);
+
+    footer->addWidget(m_freezeButton);
     footer->addWidget(m_moreButton);
+    footer->addWidget(m_showHideButton);
     root->addLayout(footer);
 
     setStyleSheet(QStringLiteral(
@@ -116,28 +148,24 @@ HudWindow::HudWindow(QWidget *parent)
         "  background-color:rgb(124, 128, 134);"
         "  padding: 3px 8px;"
         "}"
-        "#caption { color:rgb(209, 187, 187); }"
+        "#caption { color:rgb(200, 194, 194); }"
         "#status  { color:rgb(187, 207, 205); }"
         "#detailsPanel {"
         "  background-color:rgb(28, 28, 30);"
         "  border: 1px solid rgb(70, 70, 74);"
         "}"
-        "#moreButton {"
+        "#freezeButton, #moreButton, #showHideButton {"
         "  color: #f4f8ff;"
         "  background-color:rgb(70, 74, 82);"
         "  border: 1px solid rgb(120, 124, 132);"
-        "  padding: 2px 10px;"
+        "  padding: 2px 8px;"
         "}"
-        "#moreButton:hover { background-color:rgb(96, 100, 110); }"
+        "#freezeButton:hover, #moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
-    applyPlaceholderValues(QStringLiteral("--"),
-                           QStringLiteral("--"),
-                           QStringLiteral("--"),
-                           QStringLiteral("--"),
-                           QStringLiteral("IDLE"));
+    setSnapshot(DisplaySnapshot{});
 
-    setFixedWidth(460);
+    setFixedWidth(440);
     adjustSize();
 }
 
@@ -162,16 +190,77 @@ QLayout *HudWindow::makeMetricBlock(const QString &caption, QLabel *value) {
     return box;
 }
 
-void HudWindow::applyPlaceholderValues(const QString &appName,
-                                       const QString &pid,
-                                       const QString &cpu,
-                                       const QString &memory,
-                                       const QString &status) {
-    m_appValue->setText(appName);
-    m_pidValue->setText(pid);
-    m_cpuValue->setText(cpu);
-    m_memoryValue->setText(memory);
-    m_statusValue->setText(status);
+void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
+    if (m_frozen) {
+        return;
+    }
+
+    m_lastSnapshot = snapshot;
+
+    if (m_appValue->text() != snapshot.appName) {
+        m_appValue->setText(snapshot.appName);
+    }
+    if (m_pidValue->text() != snapshot.pid) {
+        m_pidValue->setText(snapshot.pid);
+    }
+    if (m_cpuValue->text() != snapshot.cpu) {
+        m_cpuValue->setText(snapshot.cpu);
+    }
+    if (m_memoryValue->text() != snapshot.memory) {
+        m_memoryValue->setText(snapshot.memory);
+    }
+    if (m_statusValue->text() != snapshot.status) {
+        m_statusValue->setText(snapshot.status);
+    }
+
+    updateCompactText();
+}
+
+void HudWindow::updateCompactText() {
+    if (m_compactLabel == nullptr) {
+        return;
+    }
+
+    m_compactLabel->setText(QStringLiteral("%1  |  PID %2  |  CPU %3  |  MEM %4  |  %5")
+                                .arg(m_appValue->text(),
+                                     m_pidValue->text(),
+                                     m_cpuValue->text(),
+                                     m_memoryValue->text(),
+                                     m_statusValue->text()));
+}
+
+void HudWindow::toggleDetails() {
+    m_detailsExpanded = !m_detailsExpanded;
+    m_detailsPanel->setVisible(m_detailsExpanded);
+    m_moreButton->setText(m_detailsExpanded ? QStringLiteral("LESS")
+                                            : QStringLiteral("MORE"));
+    adjustSize();
+}
+
+void HudWindow::toggleCompact() {
+    m_compact = !m_compact;
+
+    m_metricsWidget->setVisible(!m_compact);
+    m_compactLabel->setVisible(m_compact);
+    m_showHideButton->setText(m_compact ? QStringLiteral("SHOW")
+                                        : QStringLiteral("HIDE"));
+
+    if (m_compact) {
+        m_detailsExpanded = false;
+        m_detailsPanel->setVisible(false);
+        m_moreButton->setText(QStringLiteral("MORE"));
+        m_moreButton->setVisible(false);
+    } else {
+        m_moreButton->setVisible(true);
+    }
+
+    adjustSize();
+}
+
+void HudWindow::toggleFreeze() {
+    m_frozen = !m_frozen;
+    m_freezeButton->setText(m_frozen ? QStringLiteral("RES")
+                                     : QStringLiteral("FRZ"));
 }
 
 void HudWindow::keyPressEvent(QKeyEvent *event) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DisplaySnapshot.h"
+
 #include <QPoint>
 #include <QWidget>
 
@@ -15,11 +17,7 @@ class HudWindow : public QWidget {
 public:
     explicit HudWindow(QWidget *parent = nullptr);
 
-    void applyPlaceholderValues(const QString &appName,
-                                const QString &pid,
-                                const QString &cpu,
-                                const QString &memory,
-                                const QString &status);
+    void setSnapshot(const DisplaySnapshot &snapshot);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -34,6 +32,9 @@ private:
     QLayout *makeMetricBlock(const QString &caption, QLabel *value);
 
     void toggleDetails();
+    void toggleCompact();
+    void toggleFreeze();
+    void updateCompactText();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -41,10 +42,17 @@ private:
     QLabel *m_memoryValue = nullptr;
     QLabel *m_statusValue = nullptr;
 
+    QWidget *m_metricsWidget = nullptr;
+    QLabel *m_compactLabel = nullptr;
     QWidget *m_detailsPanel = nullptr;
     QLabel *m_detailsText = nullptr;
     QPushButton *m_moreButton = nullptr;
+    QPushButton *m_showHideButton = nullptr;
+    QPushButton *m_freezeButton = nullptr;
+    DisplaySnapshot m_lastSnapshot;
     bool m_detailsExpanded = false;
+    bool m_compact = false;
+    bool m_frozen = false;
 
     bool m_dragging = false;
     QPoint m_dragOffset;
