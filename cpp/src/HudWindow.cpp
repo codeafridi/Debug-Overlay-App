@@ -1,10 +1,12 @@
 #include "HudWindow.h"
 
 #include <QFont>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QPushButton>
 #include <QVBoxLayout>
 
 namespace {
@@ -70,6 +72,40 @@ HudWindow::HudWindow(QWidget *parent)
     metrics->addStretch(1);
     root->addLayout(metrics);
 
+    m_detailsPanel = new QFrame(this);
+    m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
+
+    auto *detailsLayout = new QVBoxLayout(m_detailsPanel);
+    detailsLayout->setContentsMargins(10, 8, 10, 10);
+    detailsLayout->setSpacing(4);
+
+    auto *detailsTitle = new QLabel(QStringLiteral("DIAGNOSIS"), m_detailsPanel);
+    detailsTitle->setObjectName(QStringLiteral("caption"));
+    detailsTitle->setFont(captionFont());
+
+    m_detailsText = new QLabel(m_detailsPanel);
+    m_detailsText->setObjectName(QStringLiteral("details"));
+    m_detailsText->setWordWrap(true);
+    m_detailsText->setText(QStringLiteral(
+        "No issues detected.\n"
+        "Metrics are placeholders (Feature 1)."));
+
+    detailsLayout->addWidget(detailsTitle);
+    detailsLayout->addWidget(m_detailsText);
+    m_detailsPanel->setVisible(false);
+    root->addWidget(m_detailsPanel);
+
+    auto *footer = new QHBoxLayout();
+    footer->setSpacing(6);
+    m_moreButton = new QPushButton(QStringLiteral("MORE"), this);
+    m_moreButton->setObjectName(QStringLiteral("moreButton"));
+    m_moreButton->setFocusPolicy(Qt::NoFocus);
+    m_moreButton->setCursor(Qt::PointingHandCursor);
+    connect(m_moreButton, &QPushButton::clicked, this, &HudWindow::toggleDetails);
+    footer->addStretch(1);
+    footer->addWidget(m_moreButton);
+    root->addLayout(footer);
+
     setStyleSheet(QStringLiteral(
         "#hudRoot {"
         "  background-color:rgb(19, 19, 20);"
@@ -82,6 +118,17 @@ HudWindow::HudWindow(QWidget *parent)
         "}"
         "#caption { color:rgb(209, 187, 187); }"
         "#status  { color:rgb(187, 207, 205); }"
+        "#detailsPanel {"
+        "  background-color:rgb(28, 28, 30);"
+        "  border: 1px solid rgb(70, 70, 74);"
+        "}"
+        "#moreButton {"
+        "  color: #f4f8ff;"
+        "  background-color:rgb(70, 74, 82);"
+        "  border: 1px solid rgb(120, 124, 132);"
+        "  padding: 2px 10px;"
+        "}"
+        "#moreButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
     applyPlaceholderValues(QStringLiteral("--"),
@@ -90,7 +137,8 @@ HudWindow::HudWindow(QWidget *parent)
                            QStringLiteral("--"),
                            QStringLiteral("IDLE"));
 
-    resize(460, 96);
+    setFixedWidth(460);
+    adjustSize();
 }
 
 QLabel *HudWindow::makeCaption(const QString &text) {
