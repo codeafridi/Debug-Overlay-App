@@ -4,6 +4,7 @@
 #include "GnomePidFileProvider.h"
 #include "HyprctlFocusProvider.h"
 #include "KdeFocusProvider.h"
+#include "NiriFocusProvider.h"
 #include "NullFocusProvider.h"
 #include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
@@ -23,12 +24,23 @@ FocusProviderKind selectProviderKind(const SessionInfo &info) {
             || desktop.contains(QStringLiteral("plasma"))) {
             return FocusProviderKind::Kde;
         }
-        if (desktop.contains(QStringLiteral("hyprland"))
-            || info.hasHyprlandSignature) {
+        if (desktop.contains(QStringLiteral("hyprland"))) {
             return FocusProviderKind::Hyprland;
         }
-        if (desktop.contains(QStringLiteral("sway")) || info.hasSwaySocket) {
+        if (desktop.contains(QStringLiteral("sway"))) {
             return FocusProviderKind::Sway;
+        }
+        if (desktop.contains(QStringLiteral("niri"))) {
+            return FocusProviderKind::Niri;
+        }
+        if (info.hasHyprlandSignature) {
+            return FocusProviderKind::Hyprland;
+        }
+        if (info.hasSwaySocket) {
+            return FocusProviderKind::Sway;
+        }
+        if (info.hasNiriSocket) {
+            return FocusProviderKind::Niri;
         }
         return FocusProviderKind::Null;
     }
@@ -50,6 +62,8 @@ QString focusProviderKindName(FocusProviderKind kind) {
         return QStringLiteral("hyprctl");
     case FocusProviderKind::Sway:
         return QStringLiteral("swaymsg");
+    case FocusProviderKind::Niri:
+        return QStringLiteral("niri");
     case FocusProviderKind::X11:
         return QStringLiteral("xdotool");
     case FocusProviderKind::Null:
@@ -68,6 +82,7 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config)
     info.hasHyprlandSignature =
         !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty();
     info.hasSwaySocket = !env.value(QStringLiteral("SWAYSOCK")).isEmpty();
+    info.hasNiriSocket = !env.value(QStringLiteral("NIRI_SOCKET")).isEmpty();
 
     const qint64 ttl = config.focusCacheTtlMs;
 
@@ -82,6 +97,9 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config)
     case FocusProviderKind::Sway:
         return std::make_unique<CachingFocusProvider>(
             std::make_unique<SwaymsgFocusProvider>(), ttl);
+    case FocusProviderKind::Niri:
+        return std::make_unique<CachingFocusProvider>(
+            std::make_unique<NiriFocusProvider>(), ttl);
     case FocusProviderKind::X11:
         return std::make_unique<CachingFocusProvider>(
             std::make_unique<XdotoolFocusProvider>(), ttl);

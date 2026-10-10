@@ -13,6 +13,7 @@ enum class FocusProviderKind {
     Kde,
     Hyprland,
     Sway,
+    Niri,
     X11,
     Null,
 };
@@ -23,6 +24,7 @@ struct SessionInfo {
     bool hasDisplay = false;
     bool hasHyprlandSignature = false;
     bool hasSwaySocket = false;
+    bool hasNiriSocket = false;
 };
 
 FocusProviderKind selectProviderKind(const SessionInfo &info);

@@ -51,6 +51,8 @@ add_library(debug_overlay_core STATIC
     src/HyprctlFocusProvider.h
     src/SwaymsgFocusProvider.cpp
     src/SwaymsgFocusProvider.h
+    src/NiriFocusProvider.cpp
+    src/NiriFocusProvider.h
     src/FocusProviderFactory.cpp
     src/FocusProviderFactory.h
     src/CachingFocusProvider.cpp
@@ -115,6 +117,9 @@ target_link_libraries(debug_overlay_config_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_kube_tests tests/test_kube.cpp)
 target_link_libraries(debug_overlay_kube_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_adapter_tests tests/test_adapters.cpp)
+target_link_libraries(debug_overlay_adapter_tests PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
@@ -126,6 +131,7 @@ add_test(NAME providers COMMAND debug_overlay_provider_tests)
 add_test(NAME docker COMMAND debug_overlay_docker_tests)
 add_test(NAME config COMMAND debug_overlay_config_tests)
 add_test(NAME kube COMMAND debug_overlay_kube_tests)
+add_test(NAME adapters COMMAND debug_overlay_adapter_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
