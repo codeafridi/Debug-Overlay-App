@@ -228,7 +228,8 @@ Both back off on failure and keep the last good result marked **stale**.
 ## Performance
 
 Reference machine: Ubuntu 26.04, GNOME Wayland, 12 cores. Idle, focused = Cursor
-(median of 5 × 30 s). Python = the original Tkinter reference implementation.
+(median of 5 × 30 s). Reference: the original Python/Tk implementation that this
+project replaced (measured before it was retired; it remains in git history).
 
 | Metric | Python (Tk) | C++ / Qt 6 |
 |---|---|---|
@@ -296,7 +297,6 @@ cpp/
 ├── install_kde_focus.sh KDE focus bridge installer
 └── kwin_script/         KWin focus bridge
 gnome_extension/         GNOME Shell focus bridge
-overlay_design.py        original Python/Tk reference implementation
 ```
 
 ## Status / roadmap
