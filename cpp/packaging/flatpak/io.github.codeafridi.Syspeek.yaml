@@ -54,4 +54,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/codeafridi/Syspeek.git
-        commit: PLACEHOLDER_COMMIT
+        commit: d25d01a69ef54beb49c714f8170e0700d9634185
