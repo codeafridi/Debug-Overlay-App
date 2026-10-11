@@ -5,12 +5,14 @@
 #   curl -fsSL https://raw.githubusercontent.com/codeafridi/Syspeek/main/install.sh | sh
 #
 # Downloads a self-contained build (Qt 6 bundled — no Qt or compiler needed),
-# installs it to ~/.local/opt/syspeek, adds a `syspeek` command, and
-# starts it at login (systemd user service, or XDG autostart).
+# installs it to ~/.local/opt/syspeek, adds a `syspeek` command, starts it at
+# login, and installs the desktop focus bridge (GNOME extension / KWin script)
+# when one is needed.
 #
 # Options:
 #   --no-autostart   install but do not enable start-at-login
-#   --uninstall      remove the app, command, service and autostart entry
+#   --no-bridge      skip installing the desktop focus bridge
+#   --uninstall      remove the app, command, service, autostart and bridge
 #   -h, --help       show this help
 #
 # Environment overrides:
@@ -33,19 +35,20 @@ AUTOSTART_DIR="$CONFIG_HOME/autostart"
 AUTOSTART_FILE="$AUTOSTART_DIR/syspeek.desktop"
 WRAPPER="$BIN_DIR/syspeek"
 
+GNOME_UUID="syspeek-focus@codeafridi"
+KDE_ID="syspeek-focus"
+
 autostart=1
+bridge=1
 mode=install
 
 for arg in "$@"; do
   case "$arg" in
-    --uninstall)   mode=uninstall ;;
+    --uninstall)    mode=uninstall ;;
     --no-autostart) autostart=0 ;;
-    -h|--help)
-      sed -n '2,18p' "$0" 2>/dev/null || true
-      exit 0 ;;
-    *)
-      echo "unknown option: $arg" >&2
-      exit 2 ;;
+    --no-bridge)    bridge=0 ;;
+    -h|--help)      sed -n '2,22p' "$0" 2>/dev/null || true; exit 0 ;;
+    *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
 
@@ -64,6 +67,10 @@ fetch() { # <url> <dest>
 
 have_systemd() {
   command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1
+}
+
+desktop_id() {
+  printf '%s' "${XDG_CURRENT_DESKTOP:-}${XDG_SESSION_DESKTOP:-}" | tr '[:upper:]' '[:lower:]'
 }
 
 write_wrapper() {
@@ -132,10 +139,96 @@ EOF
   fi
 }
 
+enable_gnome_extension() { # <uuid>
+  command -v gsettings >/dev/null 2>&1 || return 0
+  cur="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || echo '[]')"
+  case "$cur" in
+    *"'$1'"*) return 0 ;;
+  esac
+  case "$cur" in
+    ''|'[]'|'@as []') nv="['$1']" ;;
+    *) nv="${cur%]}, '$1']" ;;
+  esac
+  gsettings set org.gnome.shell enabled-extensions "$nv" 2>/dev/null || true
+}
+
+disable_gnome_extension() { # <uuid>
+  command -v gsettings >/dev/null 2>&1 || return 0
+  cur="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || echo '[]')"
+  nv="$(printf '%s' "$cur" | sed "s/, *'$1'//; s/'$1', *//; s/'$1'//")"
+  case "$nv" in
+    *'['*']'*) gsettings set org.gnome.shell enabled-extensions "$nv" 2>/dev/null || true ;;
+  esac
+}
+
+bridge_gnome() {
+  src="$APP_DIR/bridge/gnome/$GNOME_UUID"
+  dst="$HOME_DIR/.local/share/gnome-shell/extensions/$GNOME_UUID"
+  if [ ! -f "$src/metadata.json" ]; then
+    log "note: GNOME focus bridge not bundled; focus will show '--' until installed."
+    return 0
+  fi
+  mkdir -p "$dst"
+  cp -f "$src/metadata.json" "$src/extension.js" "$dst/" 2>/dev/null || true
+  enable_gnome_extension "$GNOME_UUID"
+  log "Installed GNOME focus bridge -> $dst"
+  log "  GNOME loads new extensions only at login: log out and back in to activate it."
+}
+
+bridge_kde() {
+  src="$APP_DIR/bridge/kwin/$KDE_ID"
+  dst="$HOME_DIR/.local/share/kwin/scripts/$KDE_ID"
+  if [ ! -f "$src/metadata.json" ]; then
+    log "note: KWin focus bridge not bundled."
+    return 0
+  fi
+  rm -rf "$dst"
+  mkdir -p "$dst"
+  cp -r "$src/." "$dst/" 2>/dev/null || true
+  if command -v kpackagetool6 >/dev/null 2>&1; then
+    kpackagetool6 --type=KWin/Script -i "$dst" >/dev/null 2>&1 || true
+  elif command -v kpackagetool5 >/dev/null 2>&1; then
+    kpackagetool5 --type=KWin/Script -i "$dst" >/dev/null 2>&1 || true
+  fi
+  if command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file kwinrc --group Plugins --key "${KDE_ID}Enabled" true
+  elif command -v kwriteconfig5 >/dev/null 2>&1; then
+    kwriteconfig5 --file kwinrc --group Plugins --key "${KDE_ID}Enabled" true
+  fi
+  if command -v qdbus6 >/dev/null 2>&1; then
+    qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+  elif command -v qdbus >/dev/null 2>&1; then
+    qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+  fi
+  log "Installed KDE focus bridge."
+}
+
+install_focus_bridge() {
+  [ "$bridge" -eq 1 ] || return 0
+  case "$(desktop_id)" in
+    *gnome*) bridge_gnome ;;
+    *kde*|*plasma*) bridge_kde ;;
+    *sway*)   log "note: focus detection needs 'swaymsg'; install it if you don't have it." ;;
+    *niri*)   log "note: focus detection needs 'niri msg'; install it if you don't have it." ;;
+    *hyprland*) log "note: focus detection needs 'hyprctl'; install it if you don't have it." ;;
+    *xfce*|*x11*|*mate*|*cinnamon*) log "note: on X11, focus detection needs 'xdotool'." ;;
+    *) log "note: focus detection on X11 needs 'xdotool'; GNOME/KDE need the desktop bridge." ;;
+  esac
+}
+
+remove_focus_bridge() {
+  if [ -d "$HOME_DIR/.local/share/gnome-shell/extensions/$GNOME_UUID" ]; then
+    disable_gnome_extension "$GNOME_UUID"
+    rm -rf "$HOME_DIR/.local/share/gnome-shell/extensions/$GNOME_UUID"
+  fi
+  rm -rf "$HOME_DIR/.local/share/kwin/scripts/$KDE_ID"
+}
+
 do_uninstall() {
   if command -v systemctl >/dev/null 2>&1; then
     systemctl --user disable --now syspeek.service 2>/dev/null || true
   fi
+  remove_focus_bridge
   rm -f "$UNIT_FILE" "$AUTOSTART_FILE" "$WRAPPER"
   [ -n "${APP_DIR:-}" ] && [ -d "$APP_DIR" ] && rm -rf "$APP_DIR"
   if command -v systemctl >/dev/null 2>&1; then
@@ -168,6 +261,7 @@ chmod +x "$APP_DIR/run.sh" "$APP_DIR/syspeek" 2>/dev/null || true
 
 write_wrapper
 install_autostart
+install_focus_bridge
 
 log ""
 log "Installed to $APP_DIR"
