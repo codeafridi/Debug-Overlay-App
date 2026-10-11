@@ -1,5 +1,6 @@
 #include "HyprctlFocusProvider.h"
 
+#include "HostCommand.h"
 #include "LinuxProcess.h"
 
 #include <QJsonDocument>
@@ -37,8 +38,9 @@ QString HyprctlFocusProvider::name() const {
 
 int HyprctlFocusProvider::focusedPid() const {
     QProcess process;
-    process.start(m_command,
-                  {QStringLiteral("activewindow"), QStringLiteral("-j")});
+    const HostCommand command =
+        hostcmd::wrap(m_command, {QStringLiteral("activewindow"), QStringLiteral("-j")});
+    process.start(command.program, command.arguments);
 
     if (!process.waitForStarted(kStartTimeoutMs)) {
         return -1;

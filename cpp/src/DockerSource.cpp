@@ -1,7 +1,8 @@
 #include "DockerSource.h"
 
+#include "HostCommand.h"
+
 #include <QDateTime>
-#include <QStandardPaths>
 #include <QTimer>
 
 #include <algorithm>
@@ -17,7 +18,7 @@ DockerSource::DockerSource(const DockerConfig &config, QObject *parent)
 }
 
 void DockerSource::start() {
-    m_dockerPath = QStandardPaths::findExecutable(QStringLiteral("docker"));
+    m_dockerPath = hostcmd::resolveHostProgram(QStringLiteral("docker"));
 
     if (m_process == nullptr) {
         m_process = new QProcess(this);
@@ -101,10 +102,12 @@ void DockerSource::beginQuery() {
     m_running = true;
     m_aborting = false;
 
-    m_process->start(m_dockerPath,
-                     {QStringLiteral("ps"), QStringLiteral("--all"),
-                      QStringLiteral("--format"),
-                      QStringLiteral("{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Status}}")});
+    const HostCommand command =
+        hostcmd::wrap(m_dockerPath,
+                      {QStringLiteral("ps"), QStringLiteral("--all"),
+                       QStringLiteral("--format"),
+                       QStringLiteral("{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Status}}")});
+    m_process->start(command.program, command.arguments);
     m_deadlineTimer->start(m_config.timeoutMs);
 }
 

@@ -1,5 +1,6 @@
 #include "SwaymsgFocusProvider.h"
 
+#include "HostCommand.h"
 #include "LinuxProcess.h"
 
 #include <QJsonArray>
@@ -64,9 +65,10 @@ QString SwaymsgFocusProvider::name() const {
 
 int SwaymsgFocusProvider::focusedPid() const {
     QProcess process;
-    process.start(m_command,
-                  {QStringLiteral("-t"), QStringLiteral("get_tree"),
-                   QStringLiteral("-r")});
+    const HostCommand command =
+        hostcmd::wrap(m_command, {QStringLiteral("-t"), QStringLiteral("get_tree"),
+                                  QStringLiteral("-r")});
+    process.start(command.program, command.arguments);
 
     if (!process.waitForStarted(kStartTimeoutMs)) {
         return -1;
