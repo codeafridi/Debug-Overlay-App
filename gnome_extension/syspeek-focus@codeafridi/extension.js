@@ -2,7 +2,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-export default class DebugOverlayFocusExtension extends Extension {
+export default class SyspeekFocusExtension extends Extension {
     enable() {
         this._pidFile = Gio.File.new_for_path(
             GLib.build_filenamev([GLib.get_user_runtime_dir(), 'syspeek-active-pid'])

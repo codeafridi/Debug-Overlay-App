@@ -73,6 +73,11 @@ set -euo pipefail
   chmod +x /outapp/run.sh
   cp /src/README.md /outapp/README.md 2>/dev/null || true
 
+  # Desktop focus bridges so install.sh can set them up automatically.
+  mkdir -p /outapp/bridge/gnome /outapp/bridge/kwin
+  cp -r /src/gnome_extension/syspeek-focus@codeafridi /outapp/bridge/gnome/ 2>/dev/null || true
+  cp -r /src/cpp/kwin_script/syspeek-focus /outapp/bridge/kwin/ 2>/dev/null || true
+
   echo ">> package ready ($(du -sh /outapp | cut -f1))"
 } >&2
 
