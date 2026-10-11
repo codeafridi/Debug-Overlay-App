@@ -15,12 +15,12 @@ bool KdeFocusService::registerService() {
         return false;
     }
 
-    if (!bus.registerService(QStringLiteral("org.debugoverlay.Focus"))) {
+    if (!bus.registerService(QStringLiteral("org.syspeek.Focus"))) {
         return false;
     }
 
     return bus.registerObject(QStringLiteral("/Focus"),
-                              QStringLiteral("org.debugoverlay.Focus"),
+                              QStringLiteral("org.syspeek.Focus"),
                               this, QDBusConnection::ExportAllSlots);
 }
 

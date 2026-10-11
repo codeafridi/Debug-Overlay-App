@@ -48,7 +48,7 @@ QString statusColor(const QString &status) {
 
 HudWindow::HudWindow(QWidget *parent)
     : QWidget(parent) {
-    setWindowTitle(QStringLiteral("Debug Overlay"));
+    setWindowTitle(QStringLiteral("Syspeek"));
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool
                    | Qt::WindowDoesNotAcceptFocus);
     setAttribute(Qt::WA_StyledBackground, true);
@@ -63,7 +63,7 @@ HudWindow::HudWindow(QWidget *parent)
     auto *header = new QHBoxLayout();
     header->setSpacing(6);
 
-    auto *title = new QLabel(QStringLiteral("DEBUG HUD"), this);
+    auto *title = new QLabel(QStringLiteral("SYSPEEK"), this);
     title->setObjectName(QStringLiteral("title"));
     title->setFont(captionFont());
 

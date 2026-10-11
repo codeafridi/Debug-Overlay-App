@@ -1,6 +1,6 @@
-# Debug Overlay — build, install, and desktop integration
+# Syspeek — build, install, and desktop integration
 
-This directory contains the C++20 / Qt 6 implementation of Debug Overlay and
+This directory contains the C++20 / Qt 6 implementation of Syspeek and
 its packaging.
 
 ## Build prerequisites
@@ -37,18 +37,18 @@ bash cpp/install.sh --no-systemd   # XDG autostart only
 bash cpp/install.sh --uninstall
 ```
 
-- Installs the binary to `~/.local/bin/debug-overlay` (`XDG_BINDIR` overrides).
-- With systemd: writes `~/.config/systemd/user/debug-overlay.service` and enables it.
-- Without systemd: writes `~/.config/autostart/debug-overlay.desktop`.
+- Installs the binary to `~/.local/bin/syspeek` (`XDG_BINDIR` overrides).
+- With systemd: writes `~/.config/systemd/user/syspeek.service` and enables it.
+- Without systemd: writes `~/.config/autostart/syspeek.desktop`.
 
 ## Focus detection per desktop
 
-Debug Overlay is PID-centric; each desktop supplies the focused PID through its
+Syspeek is PID-centric; each desktop supplies the focused PID through its
 own channel:
 
 | Session | Mechanism |
 | --- | --- |
-| GNOME (Wayland/X11) | GNOME Shell extension (`gnome_extension/debug-overlay-focus@codeafridi`) |
+| GNOME (Wayland/X11) | GNOME Shell extension (`gnome_extension/syspeek-focus@codeafridi`) |
 | KDE Plasma (Wayland) | KWin script + D-Bus (`cpp/kwin_script`, `cpp/install_kde_focus.sh`) |
 | Hyprland | `hyprctl` |
 | Sway | `swaymsg` |
@@ -61,8 +61,8 @@ required.
 
 ## Configuration
 
-Optional INI file at `~/.config/debug-overlay/config.ini`
-(`DEBUG_OVERLAY_CONFIG` overrides the path). See the project README / feature
+Optional INI file at `~/.config/syspeek/config.ini`
+(`SYSPEEK_CONFIG` overrides the path). See the project README / feature
 report for the full key list. Missing file or invalid values fall back to
 defaults.
 
@@ -74,16 +74,16 @@ environment.
 | Format | Artifact | Build command |
 | --- | --- | --- |
 | Debian/Ubuntu (`.deb`) | `cpp/packaging/build_deb.sh` | `bash cpp/packaging/build_deb.sh` |
-| Fedora/RHEL (`.rpm`) | `cpp/packaging/rpm/debug-overlay.spec` | `rpmbuild -ba cpp/packaging/rpm/debug-overlay.spec` |
+| Fedora/RHEL (`.rpm`) | `cpp/packaging/rpm/syspeek.spec` | `rpmbuild -ba cpp/packaging/rpm/syspeek.spec` |
 | Arch (PKGBUILD) | `cpp/packaging/arch/PKGBUILD` | `makepkg -si` |
 
-The `.deb` installs the binary to `/usr/bin/debug-overlay`, a system-wide user
-unit to `/usr/lib/systemd/user/debug-overlay.service`, a launcher `.desktop`, and
+The `.deb` installs the binary to `/usr/bin/syspeek`, a system-wide user
+unit to `/usr/lib/systemd/user/syspeek.service`, a launcher `.desktop`, and
 docs. Per-user autostart is then a normal user action:
 
 ```bash
-systemctl --user enable --now debug-overlay.service   # systemd
-# or add ~/.config/autostart/debug-overlay.desktop     (non-systemd / desktop)
+systemctl --user enable --now syspeek.service   # systemd
+# or add ~/.config/autostart/syspeek.desktop     (non-systemd / desktop)
 ```
 
 Other distributions are **not yet packaged** (Arch packages must be built on

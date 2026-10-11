@@ -1,6 +1,6 @@
 function publish(pid) {
-    callDBus("org.debugoverlay.Focus", "/Focus",
-             "org.debugoverlay.Focus", "setFocusedPid",
+    callDBus("org.syspeek.Focus", "/Focus",
+             "org.syspeek.Focus", "setFocusedPid",
              (pid > 0 ? pid : 0));
 }
 

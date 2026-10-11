@@ -1,10 +1,10 @@
-# Maintainer: Debug Overlay <noreply@example.com>
-pkgname=debug-overlay
+# Maintainer: Syspeek <noreply@example.com>
+pkgname=syspeek
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Compact always-on-top HUD for focused-process and infra status"
 arch=('x86_64')
-url="https://github.com/codeafridi/Debug-Overlay-App"
+url="https://github.com/codeafridi/Syspeek"
 license=('MIT')
 depends=('qt6-base' 'xdotool')
 makedepends=('cmake' 'gcc')
@@ -17,13 +17,13 @@ build() {
 }
 
 package() {
-    install -Dm0755 cpp/build/debug_overlay_hud \
-        "$pkgdir/usr/bin/debug-overlay"
-    sed 's|@BINARY@|/usr/bin/debug-overlay|g' \
-        cpp/packaging/debug-overlay.service.in \
-        > debug-overlay.service
-    install -Dm0644 debug-overlay.service \
-        "$pkgdir/usr/lib/systemd/user/debug-overlay.service"
-    install -Dm0644 cpp/packaging/debug-overlay.desktop.in \
-        "$pkgdir/usr/share/applications/debug-overlay.desktop"
+    install -Dm0755 cpp/build/syspeek \
+        "$pkgdir/usr/bin/syspeek"
+    sed 's|@BINARY@|/usr/bin/syspeek|g' \
+        cpp/packaging/syspeek.service.in \
+        > syspeek.service
+    install -Dm0644 syspeek.service \
+        "$pkgdir/usr/lib/systemd/user/syspeek.service"
+    install -Dm0644 cpp/packaging/syspeek.desktop.in \
+        "$pkgdir/usr/share/applications/syspeek.desktop"
 }

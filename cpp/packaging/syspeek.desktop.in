@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Debug Overlay
+Name=Syspeek
 Comment=Compact on-screen focused-process monitor
 Exec=@BINARY@
 Terminal=false

@@ -2,7 +2,7 @@
 #
 # build_portable.sh — build a self-contained (bundled-Qt) portable tarball.
 #
-# Produces dist/debug-overlay-portable.tar.gz, which runs on any glibc-based
+# Produces dist/syspeek-portable.tar.gz, which runs on any glibc-based
 # Linux with glibc >= 2.34 WITHOUT Qt installed (Qt 6, ICU and the needed
 # system libraries are bundled). Verification matrix is in the README.
 #
@@ -18,7 +18,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$here/../.." && pwd)"
 out_dir="${1:-$repo_root/dist}"
 mkdir -p "$out_dir"
-tarball="$out_dir/debug-overlay-portable.tar.gz"
+tarball="$out_dir/syspeek-portable.tar.gz"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker is required to build the portable bundle" >&2
@@ -47,8 +47,8 @@ set -euo pipefail
 
   echo ">> bundling Qt and dependencies"
   rm -rf /outapp && mkdir -p /outapp/lib /outapp/plugins/platforms
-  cp /w/debug_overlay_hud /outapp/
-  QTL="$(dirname "$(ldd /w/debug_overlay_hud | awk "/libQt6Core/{print \$3}")")"
+  cp /w/syspeek /outapp/
+  QTL="$(dirname "$(ldd /w/syspeek | awk "/libQt6Core/{print \$3}")")"
   cp -aL "$QTL"/libQt6*.so* /outapp/lib/
   for p in "$(dirname "$QTL")"/../plugins/platforms /usr/lib64/qt6/plugins/platforms; do
     [ -d "$p" ] && cp -a "$p"/libqoffscreen.so "$p"/libqxcb.so /outapp/plugins/platforms/ 2>/dev/null || true
@@ -57,7 +57,7 @@ set -euo pipefail
   # Bundle every non-core shared library (dereferencing symlinks) until closure.
   core="libc\.so|libm\.so|libpthread|libdl\.so|librt\.so|libgcc_s|libstdc\+\+|ld-linux|libresolv|libnsl"
   for _ in 1 2 3 4 5; do
-    for t in /outapp/debug_overlay_hud /outapp/lib/*.so* /outapp/plugins/platforms/*.so; do
+    for t in /outapp/syspeek /outapp/lib/*.so* /outapp/plugins/platforms/*.so; do
       ldd "$t" 2>/dev/null | awk "{print \$3}"
     done | grep "^/" | sort -u | grep -vE "$core" | while read -r l; do
       b="$(basename "$l")"; [ -e "/outapp/lib/$b" ] || cp -L "$l" "/outapp/lib/$b" 2>/dev/null || true
@@ -69,7 +69,7 @@ set -euo pipefail
     "HERE=\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")\" && pwd -P)" \
     "export LD_LIBRARY_PATH=\"\$HERE/lib:\$LD_LIBRARY_PATH\"" \
     "export QT_PLUGIN_PATH=\"\$HERE/plugins\"" \
-    "exec \"\$HERE/debug_overlay_hud\" \"\$@\"" > /outapp/run.sh
+    "exec \"\$HERE/syspeek\" \"\$@\"" > /outapp/run.sh
   chmod +x /outapp/run.sh
   cp /src/README.md /outapp/README.md 2>/dev/null || true
 
@@ -80,4 +80,4 @@ tar czf - -C /outapp .
 ' > "$tarball"
 
 echo ">> done: $(du -h "$tarball" | cut -f1) -> $tarball" >&2
-echo ">> install:  mkdir -p ~/.local/opt/debug-overlay && tar xzf $tarball -C ~/.local/opt/debug-overlay && ~/.local/opt/debug-overlay/run.sh" >&2
+echo ">> install:  mkdir -p ~/.local/opt/syspeek && tar xzf $tarball -C ~/.local/opt/syspeek && ~/.local/opt/syspeek/run.sh" >&2

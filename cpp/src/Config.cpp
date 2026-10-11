@@ -196,7 +196,7 @@ Config loadConfig(const QString &path, QString *errorMessage) {
 QString defaultConfigPath() {
     const QString override =
         QProcessEnvironment::systemEnvironment().value(
-            QStringLiteral("DEBUG_OVERLAY_CONFIG"));
+            QStringLiteral("SYSPEEK_CONFIG"));
     if (!override.isEmpty()) {
         return override;
     }
@@ -206,5 +206,5 @@ QString defaultConfigPath() {
             QStringLiteral("XDG_CONFIG_HOME"),
             QProcessEnvironment::systemEnvironment().value(
                 QStringLiteral("HOME")) + QStringLiteral("/.config"));
-    return configHome + QStringLiteral("/debug-overlay/config.ini");
+    return configHome + QStringLiteral("/syspeek/config.ini");
 }

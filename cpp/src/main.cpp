@@ -52,7 +52,7 @@ void writeSignalByte(int) {
 void logLine(const QString &message) {
     const QString path =
         QProcessEnvironment::systemEnvironment().value(
-            QStringLiteral("DEBUG_OVERLAY_LOG"));
+            QStringLiteral("SYSPEEK_LOG"));
     if (path.isEmpty()) {
         return;
     }
@@ -76,12 +76,12 @@ int main(int argc, char *argv[]) {
     }
 
     QApplication app(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("Debug Overlay"));
+    QApplication::setApplicationName(QStringLiteral("Syspeek"));
 
     QString configError;
     const Config config = loadConfig(defaultConfigPath(), &configError);
     if (!configError.isEmpty()) {
-        std::fprintf(stderr, "[debug-overlay] config: %s\n",
+        std::fprintf(stderr, "[syspeek] config: %s\n",
                      qUtf8Printable(configError));
     }
     logLine(QStringLiteral("config path=%1 error=%2")
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
     qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
 
-    g_latencyProbe = qEnvironmentVariableIsSet("DEBUG_OVERLAY_LATENCY");
+    g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
     struct sigaction ignoreAction;
     ignoreAction.sa_handler = SIG_IGN;
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
         kdeService->registerService();
     }
 
-    if (qEnvironmentVariableIsSet("DEBUG_OVERLAY_PROBE")) {
+    if (qEnvironmentVariableIsSet("SYSPEEK_PROBE")) {
         int pid = provider->focusedPid();
         if (pid <= 0 && provider->name() == QStringLiteral("kde-dbus")) {
             QEventLoop loop;

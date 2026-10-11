@@ -101,8 +101,8 @@ int main(int argc, char *argv[]) {
               "non-numeric value -> default kept");
     }
 
-    check(defaultConfigPath().endsWith(QStringLiteral("debug-overlay/config.ini"))
-              || qEnvironmentVariableIsSet("DEBUG_OVERLAY_CONFIG"),
+    check(defaultConfigPath().endsWith(QStringLiteral("syspeek/config.ini"))
+              || qEnvironmentVariableIsSet("SYSPEEK_CONFIG"),
           "default config path shape");
 
     std::printf("%d failure(s)\n", failures);
