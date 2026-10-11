@@ -2,7 +2,7 @@
 
 # Debug Overlay
 
-### A tiny, always-on-top Qt 6 HUD for the focused Linux application — and your Docker/Kubernetes infra.
+### A tiny, always on top Qt 6 HUD for the focused Linux application and your Docker/Kubernetes infra.
 
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational?style=flat-square&logo=linux&logoColor=white)](#requirements)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)](#build-from-source)
