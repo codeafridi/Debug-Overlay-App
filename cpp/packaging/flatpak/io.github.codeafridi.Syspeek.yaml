@@ -9,11 +9,10 @@
 # Runtime branch: match whatever org.kde.Platform branch Flathub currently
 # ships (6.9 at the time of writing; 6.10/6.11 exist as they roll forward).
 #
-# NOTE: Syspeek shells out to host tools (docker, kubectl, xdotool, swaymsg,
-# hyprctl, niri) and reads the desktop focus bridge. Inside the Flatpak
-# sandbox those host binaries are not present. See flatpak/README.md for the
-# small code change needed to route them through flatpak-spawn before this
-# manifest produces a fully featured build.
+# Syspeek shells out to host tools (docker, kubectl and the compositor focus
+# tools) and reads host /proc. Inside the sandbox it does all of that on the
+# host through flatpak-spawn (see the --talk-name below). Tested in a real
+# sandbox: build, focus detection, CPU/RAM and Docker status all work.
 app-id: io.github.codeafridi.Syspeek
 runtime: org.kde.Platform
 runtime-version: "6.9"
