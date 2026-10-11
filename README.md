@@ -22,8 +22,8 @@
 ---
 
 No more digging through `top`. Debug Overlay follows the window you're using and
-shows that app's CPU and RAM, plus optional Docker/Kubernetes health, in a small
-panel that stays on top and out of your way.
+shows that app's CPU and RSS memory use, plus optional Docker/Kubernetes health,
+in a small panel that stays on top and out of your way.
 
 ## Install
 
@@ -43,6 +43,7 @@ git clone https://github.com/codeafridi/Syspeek.git
 cd Syspeek
 cmake -S cpp -B cpp/build
 cmake --build cpp/build -j"$(nproc)"
+ctest --test-dir cpp/build --output-on-failure
 ```
 
 **3. Install it so it starts at login:**
@@ -71,9 +72,9 @@ log in.
 
 ## GNOME / KDE setup
 
-Focus detection works on GNOME, KDE, Sway, niri, and X11 out of the box. On
-**GNOME** and **KDE** the focused app is shared through a small bridge you install
-once:
+Focus adapters are included for GNOME, KDE, Sway, niri, Hyprland, and X11.
+**GNOME** and **KDE** require the following one-time bridge installation to
+share the focused application's PID:
 
 **GNOME** (then log out and back in):
 
@@ -93,8 +94,8 @@ fine but show `no-focus`.
 
 ## Docker & Kubernetes
 
-Both are optional. If the tool isn't installed or reachable, the overlay shows a
-status instead of failing.
+Both are optional. If Docker, `kubectl`, or their daemon/context is unavailable,
+focused-app CPU/RSS monitoring continues normally.
 
 - **Docker** — shows running count and flags unhealthy, restarting, and recently
   exited containers.
@@ -109,8 +110,8 @@ Thresholds and polling intervals are configurable in
 
 Handy environment variables:
 
-- `DEBUG_OVERLAY_PROBE=1 ./debug-overlay` — print the detected focus provider and
-  focused PID, then exit.
+- `DEBUG_OVERLAY_PROBE=1 ./cpp/build/debug_overlay_hud` — print the detected
+  focus provider and focused PID, then exit. Use `debug-overlay` after installing.
 - `DEBUG_OVERLAY_LOG=/tmp/overlay.log` — log status to a file.
 
 ## Troubleshooting
