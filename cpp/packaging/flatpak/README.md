@@ -41,15 +41,33 @@ binary directly, so normal installs are unchanged.
 | KDE focus bridge | owns `org.syspeek.Focus` | works (`--own-name=org.syspeek.Focus`) |
 | Docker socket | `/var/run/docker.sock` | add `--filesystem=/run/docker.sock` if the CLI needs it directly |
 
+## Verified on a real sandboxed run
+
+- **Build and install:** works. `flatpak-builder` builds the app and AppStream
+  compose succeeds.
+- **Focus bridge:** works. The sandbox reads
+  `/run/user/$UID/syspeek-active-pid` and gets the real host PID.
+- **Metrics: BLOCKED.** Flatpak gives the app a private PID namespace (the
+  sandbox sees only its own handful of processes; the host has hundreds), so
+  `/proc/<pid>` for the focused app does not exist inside the sandbox. Focus
+  detection finds a PID, then `linuxproc::exists()` fails and the HUD shows
+  `--` for CPU and RAM. This is the remaining work before Flathub.
+
+### Fix path (not yet implemented)
+
+`flatpak-spawn --host` can read host `/proc` (verified: `--host cat /proc/stat`
+and `/proc/1/comm` both work). The sampling layer needs to read host `/proc`
+through it when `FLATPAK_ID` is set, ideally one batched host call per sample
+(`/proc/stat` plus each process's `stat`/`status` fields) parsed locally. The
+`HostCommand` helper already exists; this extends it to the `/proc` reads in
+`LinuxProcess` / `ProcessGrouper`.
+
 ## Still to verify
 
-- **PID namespace.** Syspeek samples `/proc/<pid>` for the focused app. Confirm
-  the sandbox can see host PIDs on your Flatpak version; if not, the metrics
-  columns will show `--` even though focus detection works.
 - **Focus sockets.** The Wayland/X11 focus tools need the compositor socket
   reachable from the sandbox. Add the specific socket via `finish-args` for the
   desktops you claim to support.
-- Test the GNOME and KDE bridges from a real sandboxed run before publishing.
+- Test the KDE bridge from a real sandboxed run.
 
 ## Why Flatpak is a bigger job than it looks
 
