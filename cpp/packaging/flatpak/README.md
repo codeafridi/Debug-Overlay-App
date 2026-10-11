@@ -49,10 +49,15 @@ binary directly, so normal installs are unchanged.
   `/run/user/$UID/syspeek-active-pid` and gets the real host PID.
 - **Metrics:** fixed. Flatpak gives the app a private PID namespace, so the app
   cannot read `/proc/<pid>` directly. When `FLATPAK_ID` is set, `LinuxProcess`
-  now takes one batched host snapshot per sample through `flatpak-spawn --host`
-  (the aggregate `/proc/stat` line plus every process's `stat`, `status`,
-  `comm` and `exe`) and parses it locally. Outside Flatpak the same functions
-  read `/proc` directly, unchanged.
+  takes one batched host snapshot per sample through `flatpak-spawn --host`
+  (the aggregate `/proc/stat` line plus every process's ppid, CPU ticks, RSS and
+  comm) and parses it locally. `exe` is resolved on demand. Outside Flatpak the
+  same functions read `/proc` directly, unchanged.
+
+The host dump uses POSIX `sh` builtins only (no per-process forks), because the
+host `/bin/sh` is usually `dash` and the round-trip must stay well inside the
+sample interval. Verified inside a real sandbox: 460 processes parsed and the
+focused PID and name populate.
 
 The snapshot is refreshed once per sampling pass (`linuxproc::beginSample()`),
 so CPU deltas within a pass are consistent and consecutive samples never reuse
