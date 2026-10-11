@@ -139,7 +139,7 @@
     <section class="section getstarted" id="install-methods">
       <div class="wrap">
         <p class="section-kicker">Get started</p>
-        <h2>Two ways to install.</h2>
+        <h2>Three ways to install.</h2>
         <div class="methods">
           <article class="card method">
             <h3>Portable <span class="tag">recommended</span></h3>
@@ -157,8 +157,24 @@
           </article>
 
           <article class="card method">
+            <h3>.deb <span class="tag">Debian / Ubuntu</span></h3>
+            <p>Native package. Installs <code>/usr/bin/syspeek</code>, a user unit, and a launcher.</p>
+            <div class="terminal">
+              <div class="terminal-bar">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="terminal-title">deb</span>
+              </div>
+              <div class="terminal-body">
+                <code id="cmd-deb"><span class="prompt">$</span> sudo apt install ./syspeek_0.3.2_amd64.deb</code>
+                <button class="copy" type="button" data-copy="#cmd-deb" aria-label="Copy deb install command">Copy</button>
+              </div>
+            </div>
+            <p class="muted small">Grab the <code>.deb</code> + <code>SHA256SUMS</code> from the <a href="https://github.com/codeafridi/Syspeek/releases/latest" rel="noopener">latest release</a>, verify with <code>sha256sum -c SHA256SUMS --ignore-missing</code>.</p>
+          </article>
+
+          <article class="card method">
             <h3>AppImage</h3>
-            <p>One file, no install step. Download it, make it executable, run it.</p>
+            <p>One file, no install step. Download it, make it executable, run it. Self-updates via delta (<code>.zsync</code> on the release page, use AppImageUpdate).</p>
             <div class="terminal">
               <div class="terminal-bar">
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>

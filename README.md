@@ -95,7 +95,9 @@ tar xzf dist/syspeek-portable.tar.gz -C ~/.local/opt/syspeek
 <details>
 <summary><strong>Install as an AppImage</strong></summary>
 
-One file, no install step. Runs on any glibc ≥ 2.34 x86-64 distro, Qt bundled:
+One file, no install step. Runs on any glibc ≥ 2.34 x86-64 distro, Qt bundled.
+It self-updates via delta (a `.zsync` file ships alongside on the release page —
+use [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate)):
 
 ```bash
 curl -fLO https://github.com/codeafridi/Syspeek/releases/latest/download/Syspeek-0.3.2-x86_64.AppImage
@@ -105,6 +107,26 @@ chmod +x Syspeek-0.3.2-x86_64.AppImage
 
 The AppImage has no `syspeek` command and no start-at-login; it just runs. Use
 the one-liner above if you want those.
+
+</details>
+
+<details>
+<summary><strong>Install the .deb (Debian / Ubuntu / Mint / Kali)</strong></summary>
+
+Native package, verified install/remove on Ubuntu 26.04. Grab the `.deb` plus
+`SHA256SUMS` from the
+[latest release](https://github.com/codeafridi/Syspeek/releases/latest),
+verify, then install (`apt` resolves the Qt dependencies automatically):
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+sudo apt install ./syspeek_0.3.2_amd64.deb
+```
+
+This installs `/usr/bin/syspeek`, a user unit
+(`/usr/lib/systemd/user/syspeek.service`), a launcher, and docs.
+Enable start-at-login with `systemctl --user enable --now syspeek.service`.
+Remove with `sudo apt remove syspeek`.
 
 </details>
 
