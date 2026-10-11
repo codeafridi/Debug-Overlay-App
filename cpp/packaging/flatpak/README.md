@@ -47,20 +47,20 @@ binary directly, so normal installs are unchanged.
   compose succeeds.
 - **Focus bridge:** works. The sandbox reads
   `/run/user/$UID/syspeek-active-pid` and gets the real host PID.
-- **Metrics: BLOCKED.** Flatpak gives the app a private PID namespace (the
-  sandbox sees only its own handful of processes; the host has hundreds), so
-  `/proc/<pid>` for the focused app does not exist inside the sandbox. Focus
-  detection finds a PID, then `linuxproc::exists()` fails and the HUD shows
-  `--` for CPU and RAM. This is the remaining work before Flathub.
+- **Metrics:** fixed. Flatpak gives the app a private PID namespace, so the app
+  cannot read `/proc/<pid>` directly. When `FLATPAK_ID` is set, `LinuxProcess`
+  now takes one batched host snapshot per sample through `flatpak-spawn --host`
+  (the aggregate `/proc/stat` line plus every process's `stat`, `status`,
+  `comm` and `exe`) and parses it locally. Outside Flatpak the same functions
+  read `/proc` directly, unchanged.
 
-### Fix path (not yet implemented)
+The snapshot is refreshed once per sampling pass (`linuxproc::beginSample()`),
+so CPU deltas within a pass are consistent and consecutive samples never reuse
+stale data. If the host command fails, reads degrade gracefully (the HUD shows
+`--`) and retries are rate-limited to avoid spawning storms.
 
-`flatpak-spawn --host` can read host `/proc` (verified: `--host cat /proc/stat`
-and `/proc/1/comm` both work). The sampling layer needs to read host `/proc`
-through it when `FLATPAK_ID` is set, ideally one batched host call per sample
-(`/proc/stat` plus each process's `stat`/`status` fields) parsed locally. The
-`HostCommand` helper already exists; this extends it to the `/proc` reads in
-`LinuxProcess` / `ProcessGrouper`.
+`SYSPEEK_HOST_SPAWN` overrides the spawn program (default `flatpak-spawn`),
+which is how the test suite exercises the parser without a sandbox.
 
 ## Still to verify
 

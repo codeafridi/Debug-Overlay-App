@@ -125,6 +125,9 @@ target_link_libraries(syspeek_adapter_tests PRIVATE syspeek_core)
 add_executable(syspeek_hostcommand_tests tests/test_hostcommand.cpp)
 target_link_libraries(syspeek_hostcommand_tests PRIVATE syspeek_core)
 
+add_executable(syspeek_flatpakproc_tests tests/test_flatpakproc.cpp)
+target_link_libraries(syspeek_flatpakproc_tests PRIVATE syspeek_core)
+
 add_executable(syspeek_screenshot EXCLUDE_FROM_ALL tools/screenshot.cpp)
 target_link_libraries(syspeek_screenshot PRIVATE syspeek_core)
 
@@ -141,6 +144,7 @@ add_test(NAME config COMMAND syspeek_config_tests)
 add_test(NAME kube COMMAND syspeek_kube_tests)
 add_test(NAME adapters COMMAND syspeek_adapter_tests)
 add_test(NAME hostcommand COMMAND syspeek_hostcommand_tests)
+add_test(NAME flatpakproc COMMAND syspeek_flatpakproc_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters hostcommand PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters hostcommand flatpakproc PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

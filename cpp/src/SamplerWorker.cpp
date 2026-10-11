@@ -33,6 +33,7 @@ void SamplerWorker::stop() {
 }
 
 void SamplerWorker::sampleNow() {
+    linuxproc::beginSample();
     const FocusSample focus = m_sampler.sample();
     DisplaySnapshot snapshot = buildSnapshot(focus);
     snapshot.sequence = ++m_sequence;
