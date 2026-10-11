@@ -5,7 +5,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 export default class DebugOverlayFocusExtension extends Extension {
     enable() {
         this._pidFile = Gio.File.new_for_path(
-            GLib.build_filenamev([GLib.get_user_runtime_dir(), 'debug-overlay-active-pid'])
+            GLib.build_filenamev([GLib.get_user_runtime_dir(), 'syspeek-active-pid'])
         );
         this._focusChangedId = global.display.connect(
             'notify::focus-window',
@@ -45,7 +45,7 @@ export default class DebugOverlayFocusExtension extends Extension {
                 this._pidFile.delete(null);
             }
         } catch (error) {
-            logError(error, 'Debug Overlay Focus Bridge could not update the focused PID');
+            logError(error, 'Syspeek Focus Bridge could not update the focused PID');
         }
     }
 }

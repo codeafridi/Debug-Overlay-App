@@ -42,5 +42,5 @@ QString GnomePidFileProvider::defaultPath() {
     if (runtime.isEmpty()) {
         return QString();
     }
-    return runtime + QStringLiteral("/debug-overlay-active-pid");
+    return runtime + QStringLiteral("/syspeek-active-pid");
 }

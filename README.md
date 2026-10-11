@@ -1,6 +1,6 @@
 <div align="center">
 
-# Debug Overlay
+# Syspeek
 
 ### A tiny, always-on-top HUD for the app you're focused on — CPU, RAM, and Docker/Kubernetes status at a glance.
 
@@ -15,13 +15,13 @@
 
 <br />
 
-<img src="docs/hud.png" alt="Debug Overlay HUD showing the focused app's name, PID, CPU and RSS plus Docker and Kubernetes badges" width="430" />
+<img src="docs/hud.png" alt="Syspeek HUD showing the focused app's name, PID, CPU and RSS plus Docker and Kubernetes badges" width="430" />
 
 </div>
 
 ---
 
-No more digging through `top`. Debug Overlay follows the window you're using and
+No more digging through `top`. Syspeek follows the window you're using and
 shows that app's CPU and RAM, plus optional Docker/Kubernetes health, in a small
 panel that stays on top and out of your way.
 
@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/codeafridi/Syspeek/main/install.sh 
 ```
 
 One line. It downloads a self-contained build (Qt 6 bundled — nothing else to
-install), puts it in `~/.local/opt/debug-overlay`, adds a `debug-overlay` command,
+install), puts it in `~/.local/opt/syspeek`, adds a `syspeek` command,
 and starts it at login. Requires **x86-64** and **glibc ≥ 2.34** (see
 [Compatibility](#compatibility)).
 
@@ -40,13 +40,13 @@ Control it:
 
 | Command | What it does |
 | --- | --- |
-| `debug-overlay run` | run in the foreground |
-| `debug-overlay stop` | stop it now |
-| `debug-overlay disable` | stop it and don't start at login |
-| `debug-overlay enable` | start it and start at login |
-| `debug-overlay status` | is it running? |
-| `debug-overlay update` | upgrade to the latest version |
-| `debug-overlay uninstall` | remove everything |
+| `syspeek run` | run in the foreground |
+| `syspeek stop` | stop it now |
+| `syspeek disable` | stop it and don't start at login |
+| `syspeek enable` | start it and start at login |
+| `syspeek status` | is it running? |
+| `syspeek update` | upgrade to the latest version |
+| `syspeek uninstall` | remove everything |
 
 <details>
 <summary><strong>Build from source instead</strong></summary>
@@ -84,10 +84,10 @@ build:
 ```bash
 git clone https://github.com/codeafridi/Syspeek.git
 cd Syspeek
-bash cpp/packaging/build_portable.sh          # writes dist/debug-overlay-portable.tar.gz
-mkdir -p ~/.local/opt/debug-overlay
-tar xzf dist/debug-overlay-portable.tar.gz -C ~/.local/opt/debug-overlay
-~/.local/opt/debug-overlay/run.sh             # run it
+bash cpp/packaging/build_portable.sh          # writes dist/syspeek-portable.tar.gz
+mkdir -p ~/.local/opt/syspeek
+tar xzf dist/syspeek-portable.tar.gz -C ~/.local/opt/syspeek
+~/.local/opt/syspeek/run.sh             # run it
 ```
 
 </details>
@@ -164,13 +164,13 @@ status instead of failing.
 ## Advanced (optional)
 
 Thresholds and polling intervals are configurable in
-`~/.config/debug-overlay/config.ini`; sensible defaults are used if it's absent.
+`~/.config/syspeek/config.ini`; sensible defaults are used if it's absent.
 
 Handy environment variables:
 
-- `DEBUG_OVERLAY_PROBE=1 ./debug-overlay` — print the detected focus provider and
+- `SYSPEEK_PROBE=1 ./syspeek` — print the detected focus provider and
   focused PID, then exit.
-- `DEBUG_OVERLAY_LOG=/tmp/overlay.log` — log status to a file.
+- `SYSPEEK_LOG=/tmp/overlay.log` — log status to a file.
 
 ## Troubleshooting
 
@@ -179,7 +179,7 @@ Handy environment variables:
 1. Run the probe to see which provider was chosen:
 
    ```bash
-   DEBUG_OVERLAY_PROBE=1 ./cpp/build/debug_overlay_hud
+   SYSPEEK_PROBE=1 ./cpp/build/syspeek
    ```
 
 2. Set up the bridge for your desktop (see
@@ -188,7 +188,7 @@ Handy environment variables:
 **It builds but won't start.** Check the platform plugin:
 
 ```bash
-QT_DEBUG_PLUGINS=1 ./cpp/build/debug_overlay_hud 2>&1 | tail
+QT_DEBUG_PLUGINS=1 ./cpp/build/syspeek 2>&1 | tail
 ```
 
 ## License

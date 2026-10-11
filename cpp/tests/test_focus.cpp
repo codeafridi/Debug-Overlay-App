@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     check(fileProvider.focusedPid() == self, "pid-file provider resolves live pid");
 
     GnomePidFileProvider missingProvider(
-        QStringLiteral("/nonexistent/debug-overlay-active-pid"));
+        QStringLiteral("/nonexistent/syspeek-active-pid"));
     check(missingProvider.focusedPid() == -1, "missing pid file -> -1");
 
     GnomePidFileProvider emptyPathProvider{QString()};
