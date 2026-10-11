@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Syspeek — a tiny focused-process HUD for Linux</title>
+  <meta name="description" content="Syspeek is a small, always-on-top HUD for Linux that follows the app you're focused on and shows its CPU and memory — plus optional Docker and Kubernetes health." />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0e11'/%3E%3Crect x='8' y='8' width='16' height='16' rx='3' fill='%23d9a441'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Syspeek</span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#compatibility">Compatibility</a>
+        <a href="https://github.com/codeafridi/Syspeek" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Linux · C++20 · Qt 6</p>
+        <h1>A tiny, always-on-top HUD for the app you're focused on.</h1>
+        <p class="lede">
+          No more hunting through <code>top</code>. Syspeek follows the window you're
+          using and shows that application's CPU and memory — plus optional Docker
+          and Kubernetes health — in a compact panel that stays out of your way.
+        </p>
+
+        <div class="install-box" id="install">
+          <div class="command" role="group" aria-label="Install command">
+            <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/codeafridi/Syspeek/main/install.sh | sh</code>
+            <button class="copy" type="button" data-copy="#install-cmd" aria-label="Copy install command">Copy</button>
+          </div>
+          <p class="install-note">
+            Installs a self-contained build (Qt bundled — no compiler needed) and starts
+            at login. Needs x86-64 and glibc ≥ 2.34.
+          </p>
+        </div>
+
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/codeafridi/Syspeek" rel="noopener">View on GitHub</a>
+          <a class="btn" href="https://github.com/codeafridi/Syspeek/releases" rel="noopener">Releases</a>
+        </div>
+
+        <figure class="shot">
+          <img src="hud.png" width="430" height="196"
+               alt="Syspeek HUD showing the focused app's name, PID, CPU and RSS, with Docker and Kubernetes badges and MORE / HIDE buttons." />
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <h2>What it shows</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Focused application</h3>
+            <p>The window you're using right now — its PID, CPU percentage, and resident memory — updated live.</p>
+          </article>
+          <article class="card">
+            <h3>Docker</h3>
+            <p>Running container count, and flags for unhealthy, restarting, and recently exited containers.</p>
+          </article>
+          <article class="card">
+            <h3>Kubernetes</h3>
+            <p>Problem pods (<code>CrashLoopBackOff</code>, image-pull failures, <code>OOMKilled</code>) and deployments with too few ready replicas, from your current <code>kubectl</code> context.</p>
+          </article>
+          <article class="card">
+            <h3>Works where you are</h3>
+            <p>GNOME, KDE, Sway, niri, and X11 out of the box; other Wayland compositors run fine and simply show <code>no-focus</code>.</p>
+          </article>
+        </div>
+        <p class="muted small">
+          Both integrations are optional and run off the UI thread, so a missing tool
+          never blocks the overlay.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="compatibility">
+      <div class="wrap">
+        <h2>Compatibility</h2>
+        <p class="muted">
+          Built and tested on Ubuntu, Debian, Fedora, RHEL 9 clones, openSUSE, Arch,
+          and Alpine. The installer ships Qt 6 with the app, so it also runs on
+          distros that don't package Qt 6 (openSUSE Leap, Amazon Linux 2023).
+        </p>
+        <ul class="plain">
+          <li><strong>Portable install</strong> — Linux, x86-64, glibc ≥ 2.34.</li>
+          <li><strong>From source</strong> — any distro with Qt 6 packages (RHEL family uses EPEL; Alpine uses musl).</li>
+          <li><strong>Controls</strong> — <code>syspeek stop</code>, <code>syspeek disable</code>, <code>syspeek update</code>, <code>syspeek uninstall</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section getstarted">
+      <div class="wrap narrow">
+        <h2>Get started</h2>
+        <div class="command">
+          <code id="install-cmd-2">curl -fsSL https://raw.githubusercontent.com/codeafridi/Syspeek/main/install.sh | sh</code>
+          <button class="copy" type="button" data-copy="#install-cmd-2" aria-label="Copy install command">Copy</button>
+        </div>
+        <p class="muted small">
+          Full documentation, build notes, and source are in the
+          <a href="https://github.com/codeafridi/Syspeek" rel="noopener">GitHub repository</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span>Syspeek — MIT licensed.</span>
+      <span class="footer-links">
+        <a href="https://github.com/codeafridi/Syspeek" rel="noopener">GitHub</a>
+        <a href="https://github.com/codeafridi/Syspeek/releases" rel="noopener">Releases</a>
+        <a href="https://github.com/codeafridi/Syspeek/blob/main/LICENSE" rel="noopener">License</a>
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    for (const btn of document.querySelectorAll('.copy')) {
+      btn.addEventListener('click', async () => {
+        const el = document.querySelector(btn.dataset.copy);
+        if (!el) return;
+        try {
+          await navigator.clipboard.writeText(el.textContent.trim());
+          const old = btn.textContent;
+          btn.textContent = 'Copied';
+          btn.classList.add('done');
+          setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1400);
+        } catch (_) { /* clipboard unavailable; ignore */ }
+      });
+    }
+  </script>
+</body>
+</html>
