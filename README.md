@@ -27,11 +27,31 @@ panel that stays on top and out of your way.
 
 ## Install
 
-Pick **one** of the two ways below. Most people want the first.
+```bash
+curl -fsSL https://raw.githubusercontent.com/codeafridi/Syspeek/main/install.sh | sh
+```
 
-### Option 1 — Build from your distro's Qt 6 (recommended)
+One line. It downloads a self-contained build (Qt 6 bundled — nothing else to
+install), puts it in `~/.local/opt/debug-overlay`, adds a `debug-overlay` command,
+and starts it at login. Requires **x86-64** and **glibc ≥ 2.34** (see
+[Compatibility](#compatibility)).
 
-Install the build tools, then build and install:
+Control it:
+
+| Command | What it does |
+| --- | --- |
+| `debug-overlay run` | run in the foreground |
+| `debug-overlay stop` | stop it now |
+| `debug-overlay disable` | stop it and don't start at login |
+| `debug-overlay enable` | start it and start at login |
+| `debug-overlay status` | is it running? |
+| `debug-overlay update` | upgrade to the latest version |
+| `debug-overlay uninstall` | remove everything |
+
+<details>
+<summary><strong>Build from source instead</strong></summary>
+
+Install your distro's Qt 6, then build:
 
 | Distribution | Command |
 | --- | --- |
@@ -42,46 +62,35 @@ Install the build tools, then build and install:
 | openSUSE Tumbleweed | `sudo zypper install gcc-c++ cmake qt6-base-devel` |
 | Alpine | `sudo apk add build-base cmake qt6-qtbase-dev` |
 
-> **Two gotchas:** on **Ubuntu 22.04 / Debian 12-or-older-era Qt 6.2**, also add
-> `libgl-dev`. On the **RHEL 9 family**, Qt 6 comes from **EPEL**, so enable it
-> first (see the command above). Distros that don't ship Qt 6 at all (RHEL 8,
-> Ubuntu 20.04, Debian 11, openSUSE Leap, Amazon Linux 2023) should use Option 2.
-
-Then:
+> **Gotchas:** on older Qt 6.2 (Ubuntu 22.04-era) also add `libgl-dev`; the RHEL 9
+> family gets Qt 6 from **EPEL** (command above).
 
 ```bash
 git clone https://github.com/codeafridi/Syspeek.git
 cd Syspeek
 cmake -S cpp -B cpp/build
 cmake --build cpp/build -j"$(nproc)"
-bash cpp/install.sh
+bash cpp/install.sh              # add --no-systemd, or --uninstall to remove
 ```
 
-That's it — it's running now and will start automatically on every login.
+</details>
 
-### Option 2 — Portable bundle (no Qt required)
+<details>
+<summary><strong>Manually download the portable bundle</strong></summary>
 
-A single self-contained tarball with Qt 6 and its dependencies bundled, so it runs
-on almost any Linux **without installing Qt**. Requires Docker only to *build* it:
+The one-liner above uses this; do it by hand if you prefer. Needs Docker only to
+build:
 
 ```bash
 git clone https://github.com/codeafridi/Syspeek.git
 cd Syspeek
 bash cpp/packaging/build_portable.sh          # writes dist/debug-overlay-portable.tar.gz
-
 mkdir -p ~/.local/opt/debug-overlay
 tar xzf dist/debug-overlay-portable.tar.gz -C ~/.local/opt/debug-overlay
 ~/.local/opt/debug-overlay/run.sh             # run it
 ```
 
-Use this on distros with no Qt 6 packages (openSUSE Leap, Amazon Linux, RHEL 8,
-older Ubuntu/Debian). See [Compatibility](#compatibility) for the exact coverage.
-
-### Other commands
-
-- Prefer no systemd service? `bash cpp/install.sh --no-systemd` (uses XDG autostart).
-- Remove it: `bash cpp/install.sh --uninstall`.
-- Try it without installing anything: `./cpp/build/debug_overlay_hud`.
+</details>
 
 > On **GNOME** or **KDE** you also need a one-time focus bridge — see
 > [GNOME / KDE setup](#gnome--kde-setup). Everything else works out of the box.
@@ -89,7 +98,7 @@ older Ubuntu/Debian). See [Compatibility](#compatibility) for the exact coverage
 ## Compatibility
 
 Tested on real containers (build + all tests + launch). "Qt 6 pkg" = built against
-the distro's own Qt; "Portable" = the Option 2 bundle, with no Qt installed.
+the distro's own Qt; "Portable" = the bundled one-liner install, with no Qt present.
 
 | Distribution | Qt 6 pkg | Portable | Notes |
 | --- | :---: | :---: | --- |
