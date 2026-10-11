@@ -75,15 +75,12 @@ builds are the ones to reach for first because they need no distro tooling.
 | --- | --- | --- |
 | Portable tarball | `cpp/packaging/build_portable.sh` | `bash cpp/packaging/build_portable.sh` |
 | AppImage | `cpp/packaging/build_appimage.sh` | `bash cpp/packaging/build_appimage.sh` |
-| Flatpak | `cpp/packaging/flatpak/io.github.codeafridi.Syspeek.yaml` | `flatpak-builder --user --install --force-clean build-dir <manifest>` |
 | Debian/Ubuntu (`.deb`) | `cpp/packaging/build_deb.sh` | `bash cpp/packaging/build_deb.sh` |
 | Fedora/RHEL (`.rpm`) | `cpp/packaging/rpm/syspeek.spec` | `rpmbuild -ba cpp/packaging/rpm/syspeek.spec` |
 | Arch (PKGBUILD) | `cpp/packaging/arch/PKGBUILD` | `makepkg -si` |
 
 `build_appimage.sh` reuses the portable bundle, so it also needs Docker unless a
-bundle already exists in `dist/`; it downloads `appimagetool` on first run. The
-Flatpak manifest and its sandbox caveats are documented in
-`cpp/packaging/flatpak/README.md`.
+bundle already exists in `dist/`; it downloads `appimagetool` on first run.
 
 The `.deb` installs the binary to `/usr/bin/syspeek`, a system-wide user
 unit to `/usr/lib/systemd/user/syspeek.service`, a launcher `.desktop`, and

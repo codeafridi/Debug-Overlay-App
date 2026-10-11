@@ -1,6 +1,5 @@
 #include "NiriFocusProvider.h"
 
-#include "HostCommand.h"
 #include "LinuxProcess.h"
 
 #include <QJsonDocument>
@@ -38,10 +37,9 @@ QString NiriFocusProvider::name() const {
 
 int NiriFocusProvider::focusedPid() const {
     QProcess process;
-    const HostCommand command =
-        hostcmd::wrap(m_command, {QStringLiteral("msg"), QStringLiteral("--json"),
-                                  QStringLiteral("focused-window")});
-    process.start(command.program, command.arguments);
+    process.start(m_command,
+                  {QStringLiteral("msg"), QStringLiteral("--json"),
+                   QStringLiteral("focused-window")});
 
     if (!process.waitForStarted(kStartTimeoutMs)) {
         return -1;

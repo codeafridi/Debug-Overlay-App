@@ -1,8 +1,7 @@
 #include "KubeSource.h"
 
-#include "HostCommand.h"
-
 #include <QDateTime>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include <algorithm>
@@ -18,7 +17,7 @@ KubeSource::KubeSource(const KubeConfig &config, QObject *parent)
 }
 
 void KubeSource::start() {
-    m_kubectlPath = hostcmd::resolveHostProgram(QStringLiteral("kubectl"));
+    m_kubectlPath = QStandardPaths::findExecutable(QStringLiteral("kubectl"));
 
     if (m_process == nullptr) {
         m_process = new QProcess(this);
@@ -103,12 +102,10 @@ void KubeSource::beginQuery() {
     m_running = true;
     m_aborting = false;
 
-    const HostCommand command =
-        hostcmd::wrap(m_kubectlPath,
-                      {QStringLiteral("get"),
-                       QStringLiteral("pods,deployments"), QStringLiteral("-A"),
-                       QStringLiteral("-o"), QStringLiteral("json")});
-    m_process->start(command.program, command.arguments);
+    m_process->start(m_kubectlPath,
+                     {QStringLiteral("get"),
+                      QStringLiteral("pods,deployments"), QStringLiteral("-A"),
+                      QStringLiteral("-o"), QStringLiteral("json")});
     m_deadlineTimer->start(m_config.timeoutMs);
 }
 

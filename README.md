@@ -108,25 +108,6 @@ the one-liner above if you want those.
 
 </details>
 
-<details>
-<summary><strong>Install with Flatpak</strong></summary>
-
-Not on Flathub yet. Build from the bundled manifest (needs `flatpak-builder`
-and the KDE runtime):
-
-```bash
-flatpak install flathub org.kde.Sdk//6.9 org.kde.Platform//6.9
-flatpak-builder --user --install --force-clean build-dir \
-  cpp/packaging/flatpak/io.github.codeafridi.Syspeek.yaml
-flatpak run io.github.codeafridi.Syspeek
-```
-
-Flatpak runs sandboxed; Syspeek routes `docker`, `kubectl`, and the compositor
-focus tools through the host with `flatpak-spawn`. Details and caveats:
-`cpp/packaging/flatpak/README.md`.
-
-</details>
-
 > On **GNOME** or **KDE** you also need a one-time focus bridge — see
 > [GNOME / KDE setup](#gnome--kde-setup). Everything else works out of the box.
 

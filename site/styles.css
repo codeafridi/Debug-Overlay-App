@@ -230,7 +230,7 @@ code {
 
 /* Install methods */
 .methods {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px; margin: 12px 0 18px; text-align: left;
 }
 .method h3 { display: flex; align-items: center; }

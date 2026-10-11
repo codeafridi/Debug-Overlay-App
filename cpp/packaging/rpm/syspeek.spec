@@ -39,6 +39,6 @@ install -Dm0644 cpp/packaging/syspeek.desktop.in \
 
 %changelog
 * Sun Oct 11 2026 Syspeek <noreply@example.com> - 0.3.2-1
-- AppImage and Flatpak packaging; host command routing under the sandbox
+- AppImage packaging
 * Thu Jan 01 2026 Syspeek <noreply@example.com> - 0.1.0-1
 - Initial package

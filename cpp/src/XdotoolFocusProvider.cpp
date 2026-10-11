@@ -1,6 +1,5 @@
 #include "XdotoolFocusProvider.h"
 
-#include "HostCommand.h"
 #include "LinuxProcess.h"
 
 #include <QProcess>
@@ -20,10 +19,9 @@ QString XdotoolFocusProvider::name() const {
 
 int XdotoolFocusProvider::focusedPid() const {
     QProcess process;
-    const HostCommand command =
-        hostcmd::wrap(m_command, {QStringLiteral("getwindowfocus"),
-                                  QStringLiteral("getwindowpid")});
-    process.start(command.program, command.arguments);
+    process.start(m_command,
+                  {QStringLiteral("getwindowfocus"),
+                   QStringLiteral("getwindowpid")});
 
     if (!process.waitForStarted(kStartTimeoutMs)) {
         return -1;
