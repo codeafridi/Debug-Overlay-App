@@ -120,6 +120,9 @@ target_link_libraries(debug_overlay_kube_tests PRIVATE debug_overlay_core)
 add_executable(debug_overlay_adapter_tests tests/test_adapters.cpp)
 target_link_libraries(debug_overlay_adapter_tests PRIVATE debug_overlay_core)
 
+add_executable(debug_overlay_screenshot EXCLUDE_FROM_ALL tools/screenshot.cpp)
+target_link_libraries(debug_overlay_screenshot PRIVATE debug_overlay_core)
+
 add_test(NAME hud_buttons COMMAND debug_overlay_tests)
 add_test(NAME focus COMMAND debug_overlay_focus_tests)
 add_test(NAME cpu COMMAND debug_overlay_cpu_tests)
