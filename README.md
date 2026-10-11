@@ -2,15 +2,14 @@
 
 # Debug Overlay
 
-### A tiny, always on top Qt 6 HUD for the focused Linux application and your Docker/Kubernetes infra.
+### A tiny, always-on-top HUD for the app you're focused on — CPU, RAM, and Docker/Kubernetes status at a glance.
 
-[![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational?style=flat-square&logo=linux&logoColor=white)](#requirements)
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)](#build-from-source)
-[![Qt 6](https://img.shields.io/badge/Qt-6-41CD52?style=flat-square&logo=qt&logoColor=white)](#requirements)
-[![CMake](https://img.shields.io/badge/build-CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)](#build-from-source)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational?style=flat-square&logo=linux&logoColor=white)](#install)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)](#install)
+[![Qt 6](https://img.shields.io/badge/Qt-6-41CD52?style=flat-square&logo=qt&logoColor=white)](#install)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f4c430?style=flat-square)](LICENSE)
 
-[Quick start](#quick-start) · [Features](#features) · [Focus detection](#focus-detection) · [Docker & Kubernetes](#docker--kubernetes) · [Configuration](#configuration) · [Architecture](#architecture) · [Testing](#testing)
+[Install](#install) · [Use](#use) · [GNOME / KDE setup](#gnome--kde-setup) · [Docker & Kubernetes](#docker--kubernetes) · [Troubleshooting](#troubleshooting)
 
 <sub>Repository: <strong>Syspeek</strong></sub>
 
@@ -22,260 +21,117 @@
 
 ---
 
-Debug Overlay is a small, always-on-top Linux desktop monitor. Instead of making
-you hunt through every process in `top`, it follows the window you are currently
-using and shows a compact view of that application's CPU and resident memory. It
-can also surface optional Docker and Kubernetes status — kept off the UI thread so
-a slow or unavailable integration never freezes the HUD.
-
-It builds and runs on any mainstream Linux desktop with Qt 6 and `/proc`.
-
-## Features
-
-- **Focused-app monitoring** — application name, PID, CPU, and RSS.
-- **Whole-app metrics** — device processes are grouped with their helpers, and a
-  start-time identity guards against reused PIDs.
-- **Compact health state** — `OK` / `WARN` / `HIGH CPU` from sustained samples,
-  not single-sample noise.
-- **Non-invasive UI** — frameless, always-on-top, and it does not take keyboard
-  focus.
-- **On-demand detail** — `MORE` opens the diagnosis panel; `HIDE` collapses to a
-  single line; Docker/Kubernetes badges expand when selected.
-- **Optional Docker** — running count plus unhealthy, restarting, and recently
-  exited containers.
-- **Optional Kubernetes** — pod failure reasons and unavailable deployment
-  replicas.
-- **Isolated slow sources** — Docker and Kubernetes run on their own worker
-  threads with bounded output, deadlines, retry backoff, and stale-result
-  handling.
-- **Validated configuration** — one INI file for thresholds and polling.
-- **Per-user install** — a systemd user service where available, with an XDG
-  autostart fallback.
-
-## What it is not
-
-This is deliberately not a replacement for a full dashboard, `htop`, Docker
-Desktop, or a Kubernetes observability stack. The normal view stays small and
-glanceable.
-
-CPU and RSS describe the focused application. Docker and Kubernetes values are
-separate infrastructure signals and are not attributed to the focused app. RSS is
-summed across the selected process group, so shared memory can be counted more
-than once.
-
-## Quick start
-
-Build and run the development binary:
-
-```bash
-cmake -S cpp -B cpp/build
-cmake --build cpp/build -j"$(nproc)"
-ctest --test-dir cpp/build --output-on-failure
-
-./cpp/build/debug_overlay_hud
-```
-
-Install for your user (adds a startup entry):
-
-```bash
-bash cpp/install.sh              # systemd user service when available
-bash cpp/install.sh --no-systemd # XDG autostart instead
-bash cpp/install.sh --uninstall  # remove everything
-```
-
-Check focus detection without opening the HUD:
-
-```bash
-DEBUG_OVERLAY_PROBE=1 ./cpp/build/debug_overlay_hud
-# provider=gnome-pidfile
-# focused_pid=2092707
-# focused_comm=cursor
-```
-
-## Requirements
-
-- A Linux desktop with `/proc`
-- CMake 3.16 or newer
-- A C++20 compiler
-- Qt 6 Widgets and Qt 6 DBus development packages
-
-Typical package names:
-
-| Distribution | Packages |
-| --- | --- |
-| Debian / Ubuntu / Mint | `build-essential cmake qt6-base-dev` |
-| Fedora / RHEL | `gcc-c++ cmake qt6-qtbase-devel` |
-| Arch / CachyOS | `base-devel cmake qt6-base` |
-| openSUSE | `gcc-c++ cmake qt6-base-devel` |
-
-Optional integrations: `xdotool` (X11 focus), `docker` (Docker status), and
-`kubectl` with an accessible current context (Kubernetes status).
+No more digging through `top`. Debug Overlay follows the window you're using and
+shows that app's CPU and RAM, plus optional Docker/Kubernetes health, in a small
+panel that stays on top and out of your way.
 
 ## Install
 
-The project ships a per-user installer, a Debian package builder, and RPM /
-Arch packaging templates. See [`cpp/packaging/README.md`](cpp/packaging/README.md).
+**1. Get the build tools** (Qt 6 Widgets + DBus dev, CMake, a C++20 compiler):
+
+| Distribution | Command |
+| --- | --- |
+| Ubuntu / Debian / Mint | `sudo apt install build-essential cmake qt6-base-dev` |
+| Fedora / RHEL | `sudo dnf install gcc-c++ cmake qt6-qtbase-devel` |
+| Arch / CachyOS | `sudo pacman -S --needed base-devel cmake qt6-base` |
+| openSUSE | `sudo zypper install gcc-c++ cmake qt6-base-devel` |
+
+**2. Build it:**
 
 ```bash
-bash cpp/packaging/build_deb.sh   # -> cpp/build/packaging/debug-overlay_*_*.deb
+git clone https://github.com/codeafridi/Syspeek.git
+cd Syspeek
+cmake -S cpp -B cpp/build
+cmake --build cpp/build -j"$(nproc)"
 ```
 
-## Focus detection
-
-Wayland has no single standard API that exposes the focused window's PID, so
-Debug Overlay selects an adapter from your session and still runs everywhere —
-compositors without an adapter simply show `no-focus`.
-
-| Desktop / session | Adapter | Extra setup |
-| --- | --- | --- |
-| GNOME | GNOME Shell PID-file bridge | Install the bridge, then log out/in |
-| KDE Plasma Wayland | KWin script + D-Bus bridge | `bash cpp/install_kde_focus.sh` |
-| Hyprland | `hyprctl` | `hyprctl` available |
-| Sway | `swaymsg` | `swaymsg` available |
-| niri | `niri msg` | `niri` available |
-| X11 / XWayland (Cinnamon, XFCE, MATE, …) | `xdotool` | `xdotool` installed |
-| Other Wayland compositors | — | HUD runs with `no-focus` |
-
-Install the GNOME bridge once:
+**3. Install it so it starts at login:**
 
 ```bash
-bash install_gnome_extension.sh   # then log out and back in
+bash cpp/install.sh
 ```
+
+That's it. The overlay is running now and will start automatically whenever you
+log in.
+
+- Prefer no systemd service? `bash cpp/install.sh --no-systemd` (uses XDG autostart).
+- To remove it: `bash cpp/install.sh --uninstall`.
+- Just try it without installing: `./cpp/build/debug_overlay_hud`.
+
+> On **GNOME** or **KDE** you also need a one-time focus bridge — see
+> [GNOME / KDE setup](#gnome--kde-setup). Everything else works out of the box.
+
+## Use
+
+- **Drag** the panel anywhere (grab it, including the buttons).
+- **`MORE` / `LESS`** — open/close the diagnosis panel.
+- **`HIDE` / `SHOW`** — collapse to a single line or expand.
+- **Click `docker:` or `k8s:`** — expand that badge's details.
+- **`Ctrl+C`** in the terminal — quit.
+
+## GNOME / KDE setup
+
+Focus detection works on GNOME, KDE, Sway, niri, and X11 out of the box. On
+**GNOME** and **KDE** the focused app is shared through a small bridge you install
+once:
+
+**GNOME** (then log out and back in):
+
+```bash
+bash install_gnome_extension.sh
+```
+
+**KDE Plasma (Wayland):**
+
+```bash
+bash cpp/install_kde_focus.sh
+```
+
+On **Sway / niri / Hyprland / X11**, install the matching tool (`swaymsg` /
+`niri` / `hyprctl` / `xdotool`) and you're done. Other Wayland compositors run
+fine but show `no-focus`.
 
 ## Docker & Kubernetes
 
-Both sources are optional; a missing tool appears as an unavailable/not-configured
-status rather than stopping the HUD.
+Both are optional. If the tool isn't installed or reachable, the overlay shows a
+status instead of failing.
 
-**Docker** performs one bounded command and never runs `docker inspect` per
-container:
+- **Docker** — shows running count and flags unhealthy, restarting, and recently
+  exited containers.
+- **Kubernetes** — flags problem pods (`CrashLoopBackOff`, image-pull failures,
+  `OOMKilled`) and deployments with too few ready replicas, using your current
+  `kubectl` context.
 
-```text
-docker ps --all --format "{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Status}}"
-```
+## Advanced (optional)
 
-**Kubernetes** performs one bounded collection using your active `kubectl`
-context:
+Thresholds and polling intervals are configurable in
+`~/.config/debug-overlay/config.ini`; sensible defaults are used if it's absent.
 
-```text
-kubectl get pods,deployments -A -o json
-```
+Handy environment variables:
 
-It recognizes `CrashLoopBackOff`, image-pull failures, `OOMKilled`, and container
-errors, plus deployments whose available replicas fall below the desired count.
-Treat it as a cluster-wide summary and ensure the context and permissions are
-appropriate before enabling it in a production environment.
+- `DEBUG_OVERLAY_PROBE=1 ./debug-overlay` — print the detected focus provider and
+  focused PID, then exit.
+- `DEBUG_OVERLAY_LOG=/tmp/overlay.log` — log status to a file.
 
-## Configuration
+## Troubleshooting
 
-Configuration is optional; missing or invalid values fall back to validated
-defaults at `~/.config/debug-overlay/config.ini` (override with
-`DEBUG_OVERLAY_CONFIG`).
+**The app column shows `--` / `no-focus`.** Focus detection isn't available yet.
 
-```ini
-[health]
-cpu_warn_percent  = 70
-cpu_high_percent  = 90
-rss_warn_kb       = 1048576
-sustained_samples = 3
+1. Run the probe to see which provider was chosen:
 
-[overlay]
-sample_interval_ms = 1000
-focus_cache_ttl_ms = 1500
+   ```bash
+   DEBUG_OVERLAY_PROBE=1 ./cpp/build/debug_overlay_hud
+   ```
 
-[docker]
-healthy_ms       = 20000
-issue_ms         = 8000
-backoff_start_ms = 15000
-backoff_cap_ms   = 240000
-absent_ms        = 300000
-timeout_ms       = 3000
+2. Set up the bridge for your desktop (see
+   [GNOME / KDE setup](#gnome--kde-setup)) and, on GNOME, **log out and back in**.
 
-[kubernetes]
-healthy_ms       = 30000
-issue_ms         = 10000
-backoff_start_ms = 15000
-backoff_cap_ms   = 240000
-absent_ms        = 300000
-timeout_ms       = 5000
-```
-
-Diagnostics (environment variables):
-
-- `DEBUG_OVERLAY_PROBE=1` prints the chosen focus provider and exits.
-- `DEBUG_OVERLAY_LOG=/path/to/file` appends lifecycle/source summaries.
-- `DEBUG_OVERLAY_LATENCY=1` writes GUI-timer and focus-update timing to stderr.
-
-## Architecture
-
-```text
-                       Qt GUI thread
-              HudWindow: input and rendering only
-                              ▲
-               typed queued snapshots
-              ┌───────────────┼────────────────┐
-              │               │                │
-    sampler worker       Docker worker      Kubernetes worker
-    focus → group →      one QProcess,      one QProcess,
-    CPU + RSS            deadline/backoff   deadline/backoff
-```
-
-- The GUI thread never scans `/proc` or waits on Docker/Kubernetes commands.
-- The focused-app sampler caches a process group and refreshes it only when
-  needed, instead of rediscovering the full tree every update.
-- Each source allows one command at a time, so a slow or unavailable integration
-  cannot queue unbounded work or delay CPU/RSS updates.
-- Results cross threads as typed snapshots; last-known-good Docker/Kubernetes
-  results are marked stale when a later query fails.
-
-## Testing
-
-The CMake project registers 12 test executables covering the HUD controls, focus
-providers, `/proc` parsing, CPU calculation, memory formatting, process grouping,
-health state, configuration, Docker, Kubernetes, and adapter failure paths.
+**It builds but won't start.** Check the platform plugin:
 
 ```bash
-ctest --test-dir cpp/build --output-on-failure
+QT_DEBUG_PLUGINS=1 ./cpp/build/debug_overlay_hud 2>&1 | tail
 ```
-
-`cpp/tools/bench.sh` is a small process-level benchmark helper. Measure your own
-environment rather than relying on headline numbers, and for any comparison use the
-same session, focused app, enabled integrations, duration, and power profile:
-
-```bash
-bash cpp/tools/bench.sh --pid "$(pgrep -n debug_overlay_hud)" --duration 60
-```
-
-## Project layout
-
-```text
-cpp/
-├── src/                 Qt HUD, samplers, focus adapters, Docker/Kubernetes sources
-├── tests/               CTest executables
-├── tools/bench.sh       process benchmark helper
-├── packaging/           Debian builder, RPM spec, Arch PKGBUILD, integration notes
-├── install.sh           per-user install, autostart, and uninstall
-├── install_kde_focus.sh KDE focus bridge installer
-└── kwin_script/         KDE Plasma focus bridge
-gnome_extension/         GNOME focus bridge
-install_gnome_extension.sh
-```
-
-## Status
-
-Implemented: focused-app CPU/RSS HUD, the focus adapters above, compact and
-details UI states, Docker/Kubernetes sources, configuration, per-user
-installation, and packaging templates.
-
-Planned: additional desktop adapters (any compositor exposing a focused PID can
-be supported), deeper Kubernetes detail, and notifications.
-
-## Contributing
-
-Issues and pull requests are welcome. Keep the monitoring core
-distribution-independent and desktop-specific behavior behind the focus-adapter
-interface.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE).
