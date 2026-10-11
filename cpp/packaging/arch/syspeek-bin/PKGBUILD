@@ -15,10 +15,16 @@ optdepends=('xdotool: focused-window detection on X11/XWayland sessions'
             'kubectl: Kubernetes workload health badges')
 provides=('syspeek')
 conflicts=('syspeek')
+# Prebuilt binaries must not be stripped (they ship their own bundled Qt).
+options=('!strip' '!debug')
 source=("syspeek-portable-$pkgver.tar.gz::https://github.com/codeafridi/Syspeek/releases/download/v$pkgver/syspeek-portable.tar.gz"
-        "syspeek.svg::https://raw.githubusercontent.com/codeafridi/Syspeek/v$pkgver/cpp/packaging/icons/syspeek.svg")
-# Release workflow refreshes these; locally run `updpkgsums`.
-sha256sums=('SKIP' 'SKIP')
+        "syspeek.svg::https://raw.githubusercontent.com/codeafridi/Syspeek/v$pkgver/cpp/packaging/icons/syspeek.svg"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/codeafridi/Syspeek/v$pkgver/LICENSE")
+# Checksums refreshed for v0.3.2 (publish .SRCINFO alongside). To refresh
+# locally on Arch: `updpkgsums && makepkg --printsrcinfo > .SRCINFO`.
+sha256sums=('084d56d365a5747c46a8bcf048690a10aa1870da659635abe62a158e983a2bc5'
+            'baf84f64c63c501ac8f22e2f2853152b4b6ddcbb18b06d24e08ccc60dbc4cc16'
+            'c0768673b1f931dbac895284d725a7e9a55c1fbe9328df52d9a800fa49aec55c')
 
 package() {
     install -dm0755 "$pkgdir/opt/syspeek"
@@ -58,4 +64,8 @@ EOF
         "$pkgdir/usr/share/applications/syspeek.desktop"
     install -Dm0644 "$srcdir/syspeek.svg" \
         "$pkgdir/usr/share/icons/hicolor/scalable/apps/syspeek.svg"
+    install -Dm0644 "$srcdir/LICENSE-$pkgver" \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm0644 "$pkgdir/opt/syspeek/README.md" \
+        "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

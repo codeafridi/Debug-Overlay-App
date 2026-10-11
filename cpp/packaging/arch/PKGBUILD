@@ -17,7 +17,7 @@ makedepends=('cmake' 'gcc')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/codeafridi/Syspeek/archive/refs/tags/v$pkgver.tar.gz")
 # Refreshed by the release workflow (publish .SRCINFO alongside). To refresh
 # locally on Arch: `updpkgsums && makepkg --printsrcinfo > .SRCINFO`.
-sha256sums=('SKIP')
+sha256sums=('9f22f5b518cbb447712e08064561259725634899a47573731899e753a9aea690')
 
 build() {
     cmake -S "Syspeek-$pkgver/cpp" -B build -DCMAKE_BUILD_TYPE=Release
