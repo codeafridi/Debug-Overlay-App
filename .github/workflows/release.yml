@@ -1,0 +1,46 @@
+name: Release
+
+# Pushing a tag like v0.2.0 builds the portable (bundled-Qt) tarball and
+# publishes it to a GitHub Release, so the one-line installer always serves
+# the newest build via releases/latest/download/debug-overlay-portable.tar.gz.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Build portable bundle
+        run: bash cpp/packaging/build_portable.sh dist
+
+      - name: Verify bundle
+        run: |
+          set -e
+          ls -lh dist/debug-overlay-portable.tar.gz
+          tar tzf dist/debug-overlay-portable.tar.gz | head -n 5
+          tar tzf dist/debug-overlay-portable.tar.gz | grep -qx './debug_overlay_hud'
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Debug Overlay ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/debug-overlay-portable.tar.gz
