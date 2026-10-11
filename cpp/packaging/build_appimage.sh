@@ -72,6 +72,7 @@ Icon=syspeek
 Terminal=false
 Categories=Utility;System;Monitor;
 X-AppImage-Version=${version}
+X-AppImage-BuildId=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || echo dev)
 EOF
 cp "$appdir/syspeek.desktop" "$appdir/usr/share/applications/syspeek.desktop"
 
@@ -99,8 +100,12 @@ if [ ! -x "$appimagetool" ]; then
   chmod +x "$appimagetool"
 fi
 
-# 4. Emit the AppImage.
+# 4. Emit the AppImage (with zsync update channel so AppImageUpdate and
+#    `syspeek update`-style in-place updates work).
+#    UPDATE_INFORMATION format:
+#    gh-releases-zsync|<owner>|<repo>|latest|<pattern>
 log "building AppImage"
+export UPDATE_INFORMATION="${UPDATE_INFORMATION:-gh-releases-zsync|codeafridi|Syspeek|latest|Syspeek-*x86_64.AppImage.zsync}"
 if ! ARCH="$arch" "$appimagetool" --no-appstream "$appdir" "$appimage" >/dev/null 2>&1; then
   ARCH="$arch" "$appimagetool" "$appdir" "$appimage"
 fi
@@ -108,3 +113,4 @@ chmod +x "$appimage" 2>/dev/null || true
 
 log "done: $appimage"
 log "run:  $appimage"
+log "update info: $UPDATE_INFORMATION (delta updates via AppImageUpdate)"

@@ -68,8 +68,22 @@ defaults.
 
 ## Distribution packages
 
-Source templates are provided for all formats; `.deb` and the portable/AppImage
-builds are the ones to reach for first because they need no distro tooling.
+Each format has a submittable source in this tree; the release workflow
+(`.github/workflows/release.yml`) builds and tests on every `v*` tag and
+uploads the `.deb` + checksums to the GitHub Release.
+
+| Format | Sources | Publish |
+| --- | --- | --- |
+| AUR source (`syspeek`) | `arch/PKGBUILD` | `bash cpp/packaging/arch/publish-aur.sh syspeek` (needs AUR SSH access; refreshes sums + `.SRCINFO` for you) |
+| AUR binary (`syspeek-bin`) | `arch/syspeek-bin/PKGBUILD` | `bash cpp/packaging/arch/publish-aur.sh syspeek-bin` (repacks the release portable bundle) |
+| Fedora/RHEL COPR | `rpm/syspeek.spec` + `.copr/Makefile` | COPR project → Build source "Custom" → spec file `syspeek.spec` |
+| openSUSE OBS | `rpm/syspeek.spec` + `obs/_service` | branch into your OBS project; service builds the tarball from the `v*` tag |
+| Ubuntu PPA | `debian/` + `build_ppa.sh` | `bash cpp/packaging/build_ppa.sh ppa:<you>/syspeek` (needs `devscripts` + GPG) |
+| AppImage (self-updating) | `build_appimage.sh` | `bash cpp/packaging/build_appimage.sh`; embeds `gh-releases-zsync` update info (`UPDATE_INFORMATION` override supported) so AppImageUpdate does delta updates |
+| Portable tarball | `build_portable.sh` | `bash cpp/packaging/build_portable.sh` |
+| Debian/Ubuntu (`.deb`) | `build_deb.sh` | `bash cpp/packaging/build_deb.sh` |
+
+Direct build commands (no distro tooling):
 
 | Format | Artifact | Build command |
 | --- | --- | --- |
@@ -91,7 +105,9 @@ systemctl --user enable --now syspeek.service   # systemd
 # or add ~/.config/autostart/syspeek.desktop     (non-systemd / desktop)
 ```
 
-Other distributions are **not yet packaged** (Arch packages must be built on
-Arch; RPM on an RPM-based distro). The source build + `install.sh` works
-everywhere Qt 6 is available.
+> What still needs your accounts (can't be done from a shell here): first
+> push to AUR (`syspeek`, `syspeek-bin`), creating the COPR project, linking
+> the OBS package, uploading the PPA key + recipe, and attaching the
+> portable/AppImage builds to the GitHub Release. Every command for those
+> steps is in the table above.
 

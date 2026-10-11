@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake qt6-base-dev libgl-dev
+
+      - name: Build and test
+        run: |
+          cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build cpp/build -j"$(nproc)"
+          QT_QPA_PLATFORM=offscreen ctest --test-dir cpp/build --output-on-failure
+
+      - name: Build .deb
+        run: bash cpp/packaging/build_deb.sh
+
+      - name: Checksums + AUR refresh data
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -i "s/^pkgver=.*/pkgver=$version/" cpp/packaging/arch/PKGBUILD cpp/packaging/arch/syspeek-bin/PKGBUILD
+          cd cpp/build/packaging && sha256sum *.deb > SHA256SUMS && cat SHA256SUMS
+          # Source tarball hash for the AUR `syspeek` package (publish-aur.sh
+          # runs updpkgsums anyway; this is a cross-check).
+          curl -sL "https://github.com/codeafridi/Syspeek/archive/refs/tags/v$version.tar.gz" -o /tmp/src.tar.gz
+          echo "source tarball:" && sha256sum /tmp/src.tar.gz | tee /tmp/src.sha
+          cp /tmp/src.sha "$GITHUB_WORKSPACE/cpp/build/packaging/SOURCE_SHA256.txt" 2>/dev/null || true
+
+      - name: Validate packaging files
+        run: |
+          bash -n cpp/packaging/arch/publish-aur.sh
+          bash -n cpp/packaging/build_ppa.sh
+          bash -n cpp/packaging/build_appimage.sh
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('cpp/packaging/obs/_service'); print('obs _service: valid XML')"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            cpp/build/packaging/*.deb
+            cpp/build/packaging/SHA256SUMS
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist-ci
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-ci/*.deb
+            dist-ci/SHA256SUMS
+          generate_release_notes: true
+      # NOTE: the portable tarball + AppImage (with zsync) are built by the
+      # maintainer via bash cpp/packaging/build_portable.sh && bash
+      # cpp/packaging/build_appimage.sh and attached to the same release, so
+      # `syspeek update` and AppImage delta updates keep working.
