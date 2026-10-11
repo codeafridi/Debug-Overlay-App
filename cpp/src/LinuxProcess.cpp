@@ -12,8 +12,6 @@
 
 #include <utility>
 
-#include <cstdio>
-
 namespace linuxproc {
 
 namespace {
@@ -39,17 +37,22 @@ bool readStatTail(int pid, QStringList &fields) {
     return true;
 }
 
-// Reads every process's stat/status/comm/exe and the aggregate CPU line on the
-// host in one shot. Output format:
-//   cpu <...>              (first line, /proc/stat)
-//   P\t<pid>\t<ppid>\t<utime>\t<stime>\t<start>\t<rss>\t<comm>\t<exe>
-const char *kHostDumpScript = R"SH(
-cat /proc/stat 2>/dev/null | head -n 1
+QString spawnProgram() {
+    return QProcessEnvironment::systemEnvironment().value(
+        QStringLiteral("SYSPEEK_HOST_SPAWN"), QStringLiteral("flatpak-spawn"));
+}
+
+// Reads the aggregate CPU line and every process's ppid/stat/rss/comm on the
+// host in one shot. Uses shell builtins only (no forks per process) so the
+// round-trip through flatpak-spawn stays fast. Output format:
+//   cpu <...>
+//   P\t<pid>\t<ppid>\t<utime>\t<stime>\t<start>\t<rss>\t<comm>
+const char *kHostDumpScript = R"SH(IFS= read -r cpu < /proc/stat; printf '%s\n' "$cpu"
 for d in /proc/[0-9]*; do
   [ -r "$d/stat" ] || continue
   pid=${d#/proc/}
-  stat=$(cat "$d/stat" 2>/dev/null) || continue
-  rest=${stat##*) }
+  IFS= read -r s < "$d/stat" || true
+  rest=${s##*) }
   set -- $rest
   ppid=${2:-}
   [ -n "$ppid" ] || continue
@@ -58,14 +61,14 @@ for d in /proc/[0-9]*; do
   start=${20:-0}
   rss=0
   if [ -r "$d/status" ]; then
-    while read -r k v _; do
+    while IFS= read -r k v _; do
       if [ "$k" = "VmRSS:" ]; then rss=$v; break; fi
     done < "$d/status"
   fi
-  comm=$(cat "$d/comm" 2>/dev/null | tr -d '\n\r')
-  exe=$(readlink "$d/exe" 2>/dev/null)
-  printf 'P\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$pid" "$ppid" "$utime" "$stime" "$start" "$rss" "$comm" "$exe"
+  comm=
+  [ -r "$d/comm" ] && IFS= read -r comm < "$d/comm"
+  printf 'P\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$pid" "$ppid" "$utime" "$stime" "$start" "$rss" "$comm"
 done
 )SH";
 
@@ -74,6 +77,7 @@ struct HostSnapshot {
     bool attempted = false;
     qint64 attemptedAtMs = 0;
     QHash<int, ProcEntry> entries;
+    QHash<int, QString> exeCache;
     unsigned long long totalTicks = 0;
 };
 
@@ -82,17 +86,34 @@ HostSnapshot &snapshot() {
     return value;
 }
 
-bool fetchHostSnapshot() {
-    const QString program =
-        QProcessEnvironment::systemEnvironment().value(
-            QStringLiteral("SYSPEEK_HOST_SPAWN"),
-            QStringLiteral("flatpak-spawn"));
+QString hostExe(int pid) {
+    HostSnapshot &s = snapshot();
+    auto cached = s.exeCache.constFind(pid);
+    if (cached != s.exeCache.constEnd()) {
+        return cached.value();
+    }
 
+    QString result;
     QProcess process;
-    process.start(program,
+    process.start(spawnProgram(),
+                  {QStringLiteral("--host"), QStringLiteral("readlink"),
+                   QStringLiteral("/proc/%1/exe").arg(pid)});
+    if (process.waitForStarted(2000) && process.waitForFinished(2000)
+        && process.exitStatus() == QProcess::NormalExit
+        && process.exitCode() == 0) {
+        result = QString::fromUtf8(process.readAllStandardOutput()).trimmed();
+    }
+
+    s.exeCache.insert(pid, result);
+    return result;
+}
+
+bool fetchHostSnapshot() {
+    QProcess process;
+    process.start(spawnProgram(),
                   {QStringLiteral("--host"), QStringLiteral("sh"),
                    QStringLiteral("-c"), QString::fromUtf8(kHostDumpScript)});
-    if (!process.waitForStarted(500)) {
+    if (!process.waitForStarted(2000)) {
         return false;
     }
     if (!process.waitForFinished(5000)) {
@@ -153,6 +174,7 @@ void beginSample() {
     HostSnapshot &s = snapshot();
     s.valid = false;
     s.attempted = false;
+    s.exeCache.clear();
 }
 
 QHash<int, ProcEntry> parseHostProcDump(const QByteArray &output,
@@ -191,7 +213,7 @@ QHash<int, ProcEntry> parseHostProcDump(const QByteArray &output,
         }
 
         const QList<QByteArray> fields = raw.split('\t');
-        if (fields.size() < 9) {
+        if (fields.size() < 8) {
             continue;
         }
 
@@ -203,7 +225,6 @@ QHash<int, ProcEntry> parseHostProcDump(const QByteArray &output,
         entry.startTime = fields.at(5).toULongLong();
         entry.rssKb = fields.at(6).toULongLong();
         entry.comm = QString::fromUtf8(fields.at(7));
-        entry.exe = QString::fromUtf8(fields.at(8));
 
         if (entry.pid > 0) {
             entries.insert(entry.pid, entry);
@@ -238,8 +259,13 @@ QString comm(int pid) {
 
 QString exePath(int pid) {
     if (hostProcEnabled()) {
-        const ProcEntry *entry = hostEntry(pid);
-        return entry != nullptr ? entry->exe : QString();
+        if (pid <= 0) {
+            return QString();
+        }
+        if (!ensureSnapshot()) {
+            return QString();
+        }
+        return hostExe(pid);
     }
 
     const QString path = procPath(pid, "exe");

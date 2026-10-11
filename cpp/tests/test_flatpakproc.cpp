@@ -42,13 +42,15 @@ int main(int argc, char *argv[]) {
     QTemporaryDir dir;
     check(dir.isValid(), "temp dir created");
 
-    const QString dump =
-        QStringLiteral("cpu  100 0 50 1000 0 0 0 0 0 0\n"
-                       "P\t1\t0\t10\t5\t3\t2048\tsystemd\t/usr/lib/systemd/systemd\n"
-                       "P\t42\t1\t100\t20\t99\t4096\tmyapp\t/usr/bin/myapp\n");
-    const QString spawn = writeScript(dir, QStringLiteral("fake-spawn"),
-                                      QStringLiteral("cat <<'SNAPSHOT'\n") + dump
-                                          + QStringLiteral("SNAPSHOT\n"));
+    const QString fake =
+        QStringLiteral("if [ \"$2\" = \"readlink\" ]; then "
+                       "printf '%s\\n' /usr/bin/myapp; exit 0; fi\n"
+                       "cat <<'SNAPSHOT'\n"
+                       "cpu  100 0 50 1000 0 0 0 0 0 0\n"
+                       "P\t1\t0\t10\t5\t3\t2048\tsystemd\n"
+                       "P\t42\t1\t100\t20\t99\t4096\tmyapp\n"
+                       "SNAPSHOT\n");
+    const QString spawn = writeScript(dir, QStringLiteral("fake-spawn"), fake);
 
     qputenv("FLATPAK_ID", QByteArrayLiteral("io.github.codeafridi.Syspeek"));
     qputenv("SYSPEEK_HOST_SPAWN", spawn.toUtf8());
@@ -72,7 +74,7 @@ int main(int argc, char *argv[]) {
     check(linuxproc::startTime(42) == 99, "start time from host dump");
     check(linuxproc::comm(42) == QStringLiteral("myapp"), "comm from host dump");
     check(linuxproc::exePath(42) == QStringLiteral("/usr/bin/myapp"),
-          "exe path from host dump");
+          "exe path resolved through the host");
 
     check(linuxproc::exists(42), "existing pid resolves in host mode");
     check(!linuxproc::exists(999), "missing pid is absent in host mode");

@@ -17,7 +17,6 @@ struct ProcEntry {
     unsigned long long stime = 0;
     unsigned long long rssKb = 0;
     QString comm;
-    QString exe;
 };
 
 // True when /proc must be read through the host (for example inside a Flatpak
