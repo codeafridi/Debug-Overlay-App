@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Syspeek
+Comment=Compact on-screen focused-process monitor
+Exec=syspeek
+Icon=io.github.codeafridi.Syspeek
+Terminal=false
+Categories=System;Monitor;
+Keywords=system;monitor;cpu;memory;rss;process;docker;kubernetes;hud;

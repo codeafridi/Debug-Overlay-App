@@ -48,10 +48,10 @@ modules:
       - cmake -S cpp -B _build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/app
       - cmake --build _build --target syspeek -j "${FLATPAK_BUILDER_NPROC:-4}"
       - install -Dm0755 _build/syspeek /app/bin/syspeek
-      - install -Dm0644 cpp/packaging/syspeek.desktop.in /app/share/applications/io.github.codeafridi.Syspeek.desktop
+      - install -Dm0644 cpp/packaging/flatpak/io.github.codeafridi.Syspeek.desktop /app/share/applications/io.github.codeafridi.Syspeek.desktop
+      - install -Dm0644 cpp/packaging/flatpak/io.github.codeafridi.Syspeek.metainfo.xml /app/share/metainfo/io.github.codeafridi.Syspeek.metainfo.xml
       - install -Dm0644 cpp/packaging/icons/syspeek.svg /app/share/icons/hicolor/scalable/apps/io.github.codeafridi.Syspeek.svg
     sources:
       - type: git
         url: https://github.com/codeafridi/Syspeek.git
-        tag: v0.3.2
-        commit: 0018aeba94decd933394b4ba6977ccc06205aa84
+        commit: PLACEHOLDER_COMMIT

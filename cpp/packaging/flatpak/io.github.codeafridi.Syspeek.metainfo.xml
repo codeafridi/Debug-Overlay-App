@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.codeafridi.Syspeek</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Syspeek</name>
+  <summary>Always-on-top HUD for the focused app's CPU, RAM, Docker and Kubernetes status</summary>
+  <description>
+    <p>
+      Syspeek is a small, always-on-top panel that follows the window you are
+      focused on and shows that application's CPU and memory usage, plus
+      optional Docker and Kubernetes health.
+    </p>
+    <p>It shows:</p>
+    <ul>
+      <li>the focused app's name, PID, CPU percentage and resident memory</li>
+      <li>metrics aggregated across the app's whole process tree</li>
+      <li>Docker container health: unhealthy, restarting and recently exited</li>
+      <li>Kubernetes problem pods and deployments with too few ready replicas</li>
+    </ul>
+    <p>
+      Docker and Kubernetes integrations are optional and run off the UI
+      thread, so a missing tool never blocks the overlay.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.codeafridi.Syspeek.desktop</launchable>
+  <url type="homepage">https://syspeek.pages.dev</url>
+  <url type="bugtracker">https://github.com/codeafridi/Syspeek/issues</url>
+  <url type="vcs-browser">https://github.com/codeafridi/Syspeek</url>
+  <developer id="io.github.codeafridi">
+    <name>codeafridi</name>
+  </developer>
+  <categories>
+    <category>Utility</category>
+    <category>System</category>
+    <category>Monitor</category>
+  </categories>
+  <keywords>
+    <keyword>system</keyword>
+    <keyword>monitor</keyword>
+    <keyword>cpu</keyword>
+    <keyword>memory</keyword>
+    <keyword>process</keyword>
+    <keyword>docker</keyword>
+    <keyword>kubernetes</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/codeafridi/Syspeek/main/docs/hud.png</image>
+      <caption>The Syspeek HUD</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.3.2" date="2026-10-11"/>
+  </releases>
+</component>
