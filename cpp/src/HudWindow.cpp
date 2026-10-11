@@ -389,9 +389,6 @@ void HudWindow::updateDiagnosis() {
     }
 
     QStringList lines;
-    lines.append(QStringLiteral(
-        "MEM (RSS): resident memory summed across the app's process group; "
-        "shared pages may be counted more than once."));
 
     if (!m_dockerSummaryText.isEmpty()) {
         lines.append(QString());

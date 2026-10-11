@@ -2,7 +2,7 @@
 
 # Syspeek
 
-### A tiny, always-on-top HUD for the app you're focused on — CPU, RAM, and Docker/Kubernetes status at a glance.
+### A tiny, always on top HUD for the app you're focused on — CPU, RAM, and Docker/Kubernetes status at a glance.
 
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational?style=flat-square&logo=linux&logoColor=white)](#compatibility)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)](#install)
@@ -130,9 +130,12 @@ SteamOS/Bazzite (glibc ≥ 2.34).
 
 ## GNOME / KDE setup
 
-Focus detection works on GNOME, KDE, Sway, niri, and X11 out of the box. On
-**GNOME** and **KDE** the focused app is shared through a small bridge you install
-once:
+Focus detection works on GNOME, KDE, Sway, niri, and X11. On **GNOME** and **KDE**
+the focused app is shared through a small bridge — the installer sets it up
+automatically when it detects your desktop, then you just **log out and back in**
+once so the shell loads it.
+
+If you installed by hand instead, add the bridge yourself:
 
 **GNOME** (then log out and back in):
 
@@ -148,7 +151,8 @@ bash cpp/install_kde_focus.sh
 
 On **Sway / niri / Hyprland / X11**, install the matching tool (`swaymsg` /
 `niri` / `hyprctl` / `xdotool`) and you're done. Other Wayland compositors run
-fine but show `no-focus`.
+fine but show `no-focus`. If the app column reads `--`, run
+`SYSPEEK_PROBE=1 syspeek` to see which focus provider was detected.
 
 ## Docker & Kubernetes
 
