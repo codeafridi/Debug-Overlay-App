@@ -1,6 +1,6 @@
 # Maintainer: Syspeek <noreply@example.com>
 pkgname=syspeek
-pkgver=0.1.0
+pkgver=0.3.2
 pkgrel=1
 pkgdesc="Compact always-on-top HUD for focused-process and infra status"
 arch=('x86_64')

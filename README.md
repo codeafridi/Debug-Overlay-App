@@ -92,6 +92,41 @@ tar xzf dist/syspeek-portable.tar.gz -C ~/.local/opt/syspeek
 
 </details>
 
+<details>
+<summary><strong>Install as an AppImage</strong></summary>
+
+One file, no install step. Runs on any glibc ≥ 2.34 x86-64 distro, Qt bundled:
+
+```bash
+curl -fLO https://github.com/codeafridi/Syspeek/releases/latest/download/Syspeek-0.3.2-x86_64.AppImage
+chmod +x Syspeek-0.3.2-x86_64.AppImage
+./Syspeek-0.3.2-x86_64.AppImage
+```
+
+The AppImage has no `syspeek` command and no start-at-login; it just runs. Use
+the one-liner above if you want those.
+
+</details>
+
+<details>
+<summary><strong>Install with Flatpak</strong></summary>
+
+Not on Flathub yet. Build from the bundled manifest (needs `flatpak-builder`
+and the KDE runtime):
+
+```bash
+flatpak install flathub org.kde.Sdk//6.9 org.kde.Platform//6.9
+flatpak-builder --user --install --force-clean build-dir \
+  cpp/packaging/flatpak/io.github.codeafridi.Syspeek.yaml
+flatpak run io.github.codeafridi.Syspeek
+```
+
+Flatpak runs sandboxed; Syspeek routes `docker`, `kubectl`, and the compositor
+focus tools through the host with `flatpak-spawn`. Details and caveats:
+`cpp/packaging/flatpak/README.md`.
+
+</details>
+
 > On **GNOME** or **KDE** you also need a one-time focus bridge — see
 > [GNOME / KDE setup](#gnome--kde-setup). Everything else works out of the box.
 

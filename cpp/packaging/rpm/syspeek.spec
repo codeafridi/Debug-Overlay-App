@@ -1,5 +1,5 @@
 Name:           syspeek
-Version:        0.1.0
+Version:        0.3.2
 Release:        1%{?dist}
 Summary:        Compact always-on-top HUD for focused-process and infra status
 
@@ -38,5 +38,7 @@ install -Dm0644 cpp/packaging/syspeek.desktop.in \
 %{_datadir}/applications/syspeek.desktop
 
 %changelog
+* Sun Oct 11 2026 Syspeek <noreply@example.com> - 0.3.2-1
+- AppImage and Flatpak packaging; host command routing under the sandbox
 * Thu Jan 01 2026 Syspeek <noreply@example.com> - 0.1.0-1
 - Initial package

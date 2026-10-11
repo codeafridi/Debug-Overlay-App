@@ -53,5 +53,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/codeafridi/Syspeek.git
-        tag: v0.3.1
-        commit: bdecaaf2910de90c84bf1a4bc6a65086263c7fa7
+        tag: v0.3.2
+        commit: 0018aeba94decd933394b4ba6977ccc06205aa84
