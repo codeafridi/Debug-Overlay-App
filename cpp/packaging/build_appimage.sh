@@ -104,10 +104,20 @@ fi
 #    `syspeek update`-style in-place updates work).
 #    UPDATE_INFORMATION format:
 #    gh-releases-zsync|<owner>|<repo>|latest|<pattern>
+#    NOTE: appimagetool needs -u passed explicitly (env alone is not picked
+#    up); when zsyncmake is on PATH it also writes the .zsync file, so we
+#    expose the copy bundled inside appimagetool if the host has none.
 log "building AppImage"
 export UPDATE_INFORMATION="${UPDATE_INFORMATION:-gh-releases-zsync|codeafridi|Syspeek|latest|Syspeek-*x86_64.AppImage.zsync}"
-if ! ARCH="$arch" "$appimagetool" --no-appstream "$appdir" "$appimage" >/dev/null 2>&1; then
-  ARCH="$arch" "$appimagetool" "$appdir" "$appimage"
+if ! command -v zsyncmake >/dev/null 2>&1; then
+  tool_tmp="$(mktemp -d)"
+  "$appimagetool" --appimage-extract "usr/bin/zsyncmake" -o "$tool_tmp" >/dev/null 2>&1 || true
+  if [ -x "$tool_tmp/usr/bin/zsyncmake" ]; then
+    export PATH="$tool_tmp/usr/bin:$PATH"
+  fi
+fi
+if ! ARCH="$arch" "$appimagetool" -u "$UPDATE_INFORMATION" --no-appstream "$appdir" "$appimage" >/dev/null 2>&1; then
+  ARCH="$arch" "$appimagetool" -u "$UPDATE_INFORMATION" "$appdir" "$appimage"
 fi
 chmod +x "$appimage" 2>/dev/null || true
 
