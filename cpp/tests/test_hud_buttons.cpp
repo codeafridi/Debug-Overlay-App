@@ -124,6 +124,31 @@ int main(int argc, char *argv[]) {
               && detailsLabel->text().contains(QStringLiteral("k8s:")),
           "diagnosis panel lists kubernetes");
 
+    DisplaySnapshot withProcs = makeSnapshot("alpha", "123", "17%", "8 MB", "OK");
+    withProcs.memDetail =
+        QStringLiteral("RSS 8 MB · VMS 9 MB · swap 0 MB · shared 1 MB");
+    ProcessRow root;
+    root.pid = 123;
+    root.depth = 0;
+    root.name = QStringLiteral("alpha");
+    root.memory = QStringLiteral("8 MB");
+    ProcessRow child;
+    child.pid = 124;
+    child.depth = 1;
+    child.name = QStringLiteral("alpha-child");
+    child.memory = QStringLiteral("4 MB");
+    withProcs.processes = {root, child};
+    hud.setSnapshot(withProcs);
+    check(detailsLabel != nullptr
+              && detailsLabel->text().contains(QStringLiteral("memory:")),
+          "diagnosis panel lists memory breakdown");
+    check(detailsLabel != nullptr
+              && detailsLabel->text().contains(QStringLiteral("alpha-child")),
+          "diagnosis panel lists child process row");
+    check(detailsLabel != nullptr
+              && detailsLabel->text().contains(QStringLiteral("(pid 124)")),
+          "diagnosis panel shows process pid");
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

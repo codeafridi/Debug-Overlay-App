@@ -3,6 +3,7 @@
 #include "FocusedWindowProvider.h"
 #include "LinuxProcess.h"
 #include "MemoryFormat.h"
+#include "ProcessGrouper.h"
 
 #include <QTimer>
 
@@ -75,6 +76,51 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     unsigned long long rss = 0;
     const bool rssValid = linuxproc::sumRssKb(group.pids, rss);
     m_memText = rssValid ? formatMemoryKb(rss) : QStringLiteral("--");
+
+    QHash<int, int> parentOf;
+    for (int pid : group.pids) {
+        const int ppid = linuxproc::parentPid(pid);
+        if (ppid > 0) {
+            parentOf.insert(pid, ppid);
+        }
+    }
+
+    const QList<ProcNode> tree =
+        ProcessGrouper::orderedTree(group.rootPid, parentOf);
+
+    unsigned long long rssTotal = 0;
+    unsigned long long vmsTotal = 0;
+    unsigned long long swapTotal = 0;
+    unsigned long long sharedTotal = 0;
+    QList<ProcessRow> rows;
+    for (const ProcNode &node : tree) {
+        linuxproc::MemInfo info;
+        if (!linuxproc::procMem(node.pid, info)) {
+            continue;
+        }
+        rssTotal += info.rssKb;
+        vmsTotal += info.vmsKb;
+        swapTotal += info.swapKb;
+        sharedTotal += info.sharedKb;
+
+        ProcessRow row;
+        row.pid = node.pid;
+        row.depth = node.depth;
+        row.name = linuxproc::comm(node.pid);
+        if (row.name.isEmpty()) {
+            row.name = QString::number(node.pid);
+        }
+        row.memory = formatMemoryKb(info.rssKb);
+        rows.append(row);
+    }
+
+    snap.processes = rows;
+    if (!rows.isEmpty()) {
+        snap.memDetail =
+            QStringLiteral("RSS %1 · VMS %2 · swap %3 · shared %4")
+                .arg(formatMemoryKb(rssTotal), formatMemoryKb(vmsTotal),
+                     formatMemoryKb(swapTotal), formatMemoryKb(sharedTotal));
+    }
 
     m_cpuIdentity = focus.identity;
 

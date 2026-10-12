@@ -277,6 +277,7 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
 
     updateCompactText();
+    updateDiagnosis();
 }
 
 void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
@@ -389,6 +390,19 @@ void HudWindow::updateDiagnosis() {
     }
 
     QStringList lines;
+
+    if (!m_lastSnapshot.memDetail.isEmpty()) {
+        lines.append(QString());
+        lines.append(QStringLiteral("memory: ") + m_lastSnapshot.memDetail);
+        for (const ProcessRow &row : m_lastSnapshot.processes) {
+            const QString indent(row.depth * 2, QLatin1Char(' '));
+            lines.append(indent
+                         + QStringLiteral("%1 (pid %2)  %3")
+                               .arg(row.name)
+                               .arg(row.pid)
+                               .arg(row.memory));
+        }
+    }
 
     if (!m_dockerSummaryText.isEmpty()) {
         lines.append(QString());
