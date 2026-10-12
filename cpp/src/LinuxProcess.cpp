@@ -120,6 +120,47 @@ bool cpuTicks(int pid, unsigned long long &out) {
     return true;
 }
 
+bool procCpu(int pid, unsigned long long &ticks, unsigned long long &startTime) {
+    QStringList fields;
+    if (!readStatTail(pid, fields) || fields.size() <= 19) {
+        return false;
+    }
+
+    bool okU = false;
+    bool okS = false;
+    bool okT = false;
+    const unsigned long long utime = fields.at(11).toULongLong(&okU);
+    const unsigned long long stime = fields.at(12).toULongLong(&okS);
+    const unsigned long long start = fields.at(19).toULongLong(&okT);
+    if (!okU || !okS || !okT || start == 0) {
+        return false;
+    }
+
+    ticks = utime + stime;
+    startTime = start;
+    return true;
+}
+
+int onlineCpuCount() {
+    QFile file(QStringLiteral("/proc/stat"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return 0;
+    }
+
+    // procfs files report size 0, so atEnd()/readLine() loops are unreliable;
+    // read the whole pseudo-file once and split it.
+    const QByteArray data = file.readAll();
+    int count = 0;
+    const QList<QByteArray> lines = data.split('\n');
+    for (const QByteArray &line : lines) {
+        if (line.size() >= 4 && line.startsWith(QByteArrayLiteral("cpu"))
+            && line.at(3) >= '0' && line.at(3) <= '9') {
+            ++count;
+        }
+    }
+    return count;
+}
+
 bool totalCpuTicks(unsigned long long &out) {
     QFile file(QStringLiteral("/proc/stat"));
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -154,8 +195,11 @@ bool rssKb(int pid, unsigned long long &out) {
         return false;
     }
 
-    const QByteArray data = file.readAll();
-    const QList<QByteArray> lines = data.split('\n');
+    return parseVmRssKb(file.readAll(), out);
+}
+
+bool parseVmRssKb(const QByteArray &statusContent, unsigned long long &out) {
+    const QList<QByteArray> lines = statusContent.split('\n');
     for (const QByteArray &line : lines) {
         if (!line.startsWith("VmRSS:")) {
             continue;
@@ -179,13 +223,13 @@ bool rssKb(int pid, unsigned long long &out) {
     return false;
 }
 
-bool sumRssKb(const QList<int> &pids, unsigned long long &out) {
+bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out) {
     unsigned long long total = 0;
     bool any = false;
 
     for (int pid : pids) {
         unsigned long long kb = 0;
-        if (rssKb(pid, kb)) {
+        if (reader && reader(pid, kb)) {
             total += kb;
             any = true;
         }
@@ -197,6 +241,11 @@ bool sumRssKb(const QList<int> &pids, unsigned long long &out) {
 
     out = total;
     return true;
+}
+
+bool sumRssKb(const QList<int> &pids, unsigned long long &out) {
+    return sumRssKbWith(
+        pids, [](int pid, unsigned long long &kb) { return rssKb(pid, kb); }, out);
 }
 
 } // namespace linuxproc
