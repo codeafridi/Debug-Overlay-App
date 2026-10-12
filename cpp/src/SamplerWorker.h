@@ -7,6 +7,7 @@
 #include "GroupCache.h"
 #include "HealthEvaluator.h"
 #include "HostSampler.h"
+#include "IoRateTracker.h"
 #include "ProcessIdentity.h"
 
 #include <QObject>
@@ -38,6 +39,7 @@ private:
     FocusSampler m_sampler;
     CpuSampler m_cpuSampler;
     HostSampler m_hostSampler;
+    IoRateTracker m_ioTracker;
     GroupCache m_groupCache;
     QTimer *m_timer = nullptr;
     int m_intervalMs = 1000;

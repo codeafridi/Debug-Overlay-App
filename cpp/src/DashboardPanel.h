@@ -52,6 +52,8 @@ private:
     QLabel *m_hostLoad = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;
+    QLabel *m_focusDetail = nullptr;
+    QLabel *m_openFiles = nullptr;
     QLabel *m_net = nullptr;
     QLabel *m_cgroup = nullptr;
     QLabel *m_docker = nullptr;

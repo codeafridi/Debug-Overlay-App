@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
     root.depth = 0;
     root.threads = 5;
     root.fds = 12;
+    root.cpuPercent = 12.5;
     root.name = QStringLiteral("alpha");
     root.memory = QStringLiteral("8 MB");
     ProcessRow child;
@@ -155,6 +156,12 @@ int main(int argc, char *argv[]) {
     withProcs.hostNetRxPerSec = 2048.0;
     withProcs.hostNetTxPerSec = 1024.0;
     withProcs.hostLoad1 = 0.42;
+    withProcs.focusThreads = 5;
+    withProcs.focusFds = 12;
+    withProcs.focusVolCtx = 100;
+    withProcs.focusInvolCtx = 3;
+    withProcs.focusOpenFiles = {QStringLiteral("/dev/null"),
+                                QStringLiteral("socket:[999]")};
     hud.setSnapshot(withProcs);
 
     auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
@@ -183,9 +190,21 @@ int main(int argc, char *argv[]) {
                      == QStringLiteral("alpha-child"),
           "panel process tree nests child");
     check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
-              && dashProcs->topLevelItem(0)->text(2) == QStringLiteral("5")
-              && dashProcs->topLevelItem(0)->text(3) == QStringLiteral("12"),
+              && dashProcs->topLevelItem(0)->text(3) == QStringLiteral("5")
+              && dashProcs->topLevelItem(0)->text(4) == QStringLiteral("12"),
           "panel process tree shows threads and fds");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->text(2) == QStringLiteral("12.5%"),
+          "panel process tree shows cpu percent");
+
+    auto *focusDetail = hud.findChild<QLabel *>(QStringLiteral("ddFocusDetail"));
+    check(focusDetail != nullptr
+              && focusDetail->text().contains(QStringLiteral("ctx sw")),
+          "panel shows focused process detail");
+    auto *openFiles = hud.findChild<QLabel *>(QStringLiteral("ddOpenFiles"));
+    check(openFiles != nullptr
+              && openFiles->text().contains(QStringLiteral("socket:[999]")),
+          "panel shows open files");
 
     auto *dashNet = hud.findChild<QLabel *>(QStringLiteral("ddNet"));
     check(dashNet != nullptr

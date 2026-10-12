@@ -11,6 +11,7 @@ struct CpuSample {
     bool available = false;
     bool warming = false;
     double percent = 0.0;
+    QHash<int, double> perPidPercent;
 };
 
 // Indirection over the raw CPU reads so tests can drive every edge case

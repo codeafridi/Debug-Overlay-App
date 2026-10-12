@@ -94,6 +94,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     unsigned long long swapTotal = 0;
     unsigned long long sharedTotal = 0;
     QList<ProcessRow> rows;
+    linuxproc::ProcDetail rootDetail;
+    int rootPid = -1;
     for (const ProcNode &node : tree) {
         linuxproc::MemInfo info;
         linuxproc::ProcDetail detail;
@@ -105,17 +107,35 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         swapTotal += info.swapKb;
         sharedTotal += info.sharedKb;
 
+        if (node.depth == 0) {
+            rootPid = node.pid;
+            rootDetail = detail;
+        }
+
         ProcessRow row;
         row.pid = node.pid;
         row.depth = node.depth;
         row.threads = detail.threads;
         row.fds = detail.fdCount;
+        row.cpuPercent = cpu.perPidPercent.value(node.pid, 0.0);
         row.name = linuxproc::comm(node.pid);
         if (row.name.isEmpty()) {
             row.name = QString::number(node.pid);
         }
         row.memory = formatMemoryKb(info.rssKb);
         rows.append(row);
+    }
+
+    if (rootPid > 0) {
+        const IoRateTracker::Rate rate =
+            m_ioTracker.update(rootPid, rootDetail.rchar, rootDetail.wchar);
+        snap.focusThreads = rootDetail.threads;
+        snap.focusFds = rootDetail.fdCount;
+        snap.focusVolCtx = rootDetail.voluntaryCtx;
+        snap.focusInvolCtx = rootDetail.involuntaryCtx;
+        snap.focusIoReadPerSec = rate.readPerSec;
+        snap.focusIoWritePerSec = rate.writePerSec;
+        snap.focusOpenFiles = linuxproc::fdTargets(rootPid);
     }
 
     snap.processes = rows;

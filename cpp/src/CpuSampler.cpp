@@ -67,6 +67,7 @@ CpuSample CpuSampler::sample(const QList<int> &pids, const ProcessIdentity &key)
     // resets are re-seeded rather than producing a bogus delta.
     unsigned long long sumDelta = 0;
     bool comparable = false;
+    QHash<int, unsigned long long> deltaByPid;
     for (auto it = current.constBegin(); it != current.constEnd(); ++it) {
         const auto prev = m_lastByPid.constFind(it.key());
         if (prev == m_lastByPid.constEnd()) {
@@ -79,7 +80,9 @@ CpuSample CpuSampler::sample(const QList<int> &pids, const ProcessIdentity &key)
             continue;
         }
         comparable = true;
-        sumDelta += it->ticks - prev->ticks;
+        const unsigned long long delta = it->ticks - prev->ticks;
+        sumDelta += delta;
+        deltaByPid.insert(it.key(), delta);
     }
 
     m_lastByPid = current;
@@ -105,6 +108,13 @@ CpuSample CpuSampler::sample(const QList<int> &pids, const ProcessIdentity &key)
     result.available = true;
     result.warming = false;
     result.percent = std::clamp(percent, 0.0, 999.0 * cores);
+
+    for (auto it = deltaByPid.constBegin(); it != deltaByPid.constEnd(); ++it) {
+        const double value = static_cast<double>(it.value())
+                             / static_cast<double>(deltaTotal) * 100.0
+                             * static_cast<double>(cores);
+        result.perPidPercent.insert(it.key(), value);
+    }
     return result;
 }
 

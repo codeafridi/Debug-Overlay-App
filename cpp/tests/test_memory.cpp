@@ -282,6 +282,21 @@ int main(int argc, char *argv[]) {
               "host sampler: mem + disk carried through");
     }
 
+    // ---- /proc/<pid>/io parsing ----
+    {
+        linuxproc::ProcDetail io;
+        check(linuxproc::parseProcIo(
+                  "rchar: 10\nwchar: 20\nsyscr: 3\nsyscw: 4\n"
+                  "read_bytes: 500\nwrite_bytes: 900\ncancelled_write_bytes: 0\n",
+                  io)
+                  && io.rchar == 10 && io.wchar == 20 && io.readBytes == 500
+                  && io.writeBytes == 900,
+              "parseProcIo: rchar/wchar + read/write_bytes");
+        linuxproc::ProcDetail io2;
+        check(!linuxproc::parseProcIo("syscr: 3\nsyscw: 4\n", io2),
+              "parseProcIo: no counters -> false");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -315,6 +330,18 @@ int main(int argc, char *argv[]) {
         const QList<unsigned long long> inodes = linuxproc::socketInodes(self);
         check(inodes.size() >= 2,
               "socketInodes finds this process's live sockets");
+
+        check(!linuxproc::fdTargets(self).isEmpty(),
+              "fdTargets(self) lists open files");
+        check(linuxproc::fdTargets(1 << 30).isEmpty(),
+              "fdTargets(bogus) is empty");
+        bool sawSocket = false;
+        for (const QString &target : linuxproc::fdTargets(self)) {
+            if (target.startsWith(QStringLiteral("socket:["))) {
+                sawSocket = true;
+            }
+        }
+        check(sawSocket, "fdTargets includes the socketpair sockets");
         if (sv[0] >= 0) {
             ::close(sv[0]);
         }

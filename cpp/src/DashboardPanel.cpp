@@ -203,6 +203,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig, #ddHostCpu, #ddHostMem,"
         " #ddHostDisk, #ddHostNet, #ddHostLoad { color: #d5dae0; }"
         "#ddMemDetail { color: #c4cad1; }"
+        "#ddFocusDetail, #ddOpenFiles { color: #c4cad1; }"
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
         "#ddKube { color: #b0a9c4; }"
@@ -305,15 +306,15 @@ QWidget *DashboardPanel::buildProcessesView() {
 
     m_procs = new QTreeWidget(view);
     m_procs->setObjectName(QStringLiteral("ddProcs"));
-    m_procs->setColumnCount(5);
+    m_procs->setColumnCount(6);
     m_procs->setHeaderLabels({QStringLiteral("Process"), QStringLiteral("PID"),
-                              QStringLiteral("Threads"), QStringLiteral("FDs"),
-                              QStringLiteral("RSS")});
+                              QStringLiteral("CPU%"), QStringLiteral("Threads"),
+                              QStringLiteral("FDs"), QStringLiteral("RSS")});
     m_procs->setRootIsDecorated(true);
     m_procs->setSelectionMode(QAbstractItemView::NoSelection);
     m_procs->setFocusPolicy(Qt::NoFocus);
     m_procs->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    for (int i = 1; i < 5; ++i) {
+    for (int i = 1; i < 6; ++i) {
         m_procs->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
     }
     connect(m_procs, &QTreeWidget::itemExpanded, this,
@@ -328,7 +329,26 @@ QWidget *DashboardPanel::buildProcessesView() {
                     m_collapsedPids.insert(item->data(0, Qt::UserRole).toInt());
                 }
             });
-    layout->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, view), 1);
+    layout->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, view), 2);
+
+    auto *detailRow = new QHBoxLayout();
+    detailRow->setSpacing(14);
+
+    m_focusDetail = new QLabel(QStringLiteral("--"), view);
+    m_focusDetail->setObjectName(QStringLiteral("ddFocusDetail"));
+    m_focusDetail->setFont(monoFont(11));
+    m_focusDetail->setWordWrap(true);
+    detailRow->addWidget(
+        makeCard(QStringLiteral("FOCUSED PROCESS"), m_focusDetail, view), 1);
+
+    m_openFiles = new QLabel(QStringLiteral("--"), view);
+    m_openFiles->setObjectName(QStringLiteral("ddOpenFiles"));
+    m_openFiles->setFont(monoFont(10));
+    m_openFiles->setWordWrap(false);
+    detailRow->addWidget(
+        makeCard(QStringLiteral("OPEN FILES"), m_openFiles, view), 1);
+
+    layout->addLayout(detailRow);
     return view;
 }
 
@@ -495,6 +515,29 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         }
     }
 
+    m_focusDetail->setText(
+        QStringLiteral("threads  %1\nfds      %2\nctx sw   %3 vol / %4 invol\n"
+                       "io read  %5\nio write %6")
+            .arg(snapshot.focusThreads)
+            .arg(snapshot.focusFds < 0 ? QStringLiteral("--")
+                                       : QString::number(snapshot.focusFds))
+            .arg(snapshot.focusVolCtx)
+            .arg(snapshot.focusInvolCtx)
+            .arg(formatRate(snapshot.focusIoReadPerSec))
+            .arg(formatRate(snapshot.focusIoWritePerSec)));
+
+    QString files;
+    int fileCount = 0;
+    for (const QString &target : snapshot.focusOpenFiles) {
+        if (fileCount >= 12) {
+            files += QStringLiteral("...\n");
+            break;
+        }
+        files += target + QStringLiteral("\n");
+        ++fileCount;
+    }
+    m_openFiles->setText(files.isEmpty() ? QStringLiteral("--") : files);
+
     m_populating = true;
     m_procs->clear();
     QList<QTreeWidgetItem *> byDepth;
@@ -506,12 +549,15 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         item->setText(0, row.name.isEmpty() ? QStringLiteral("pid %1").arg(row.pid)
                                             : row.name);
         item->setText(1, QString::number(row.pid));
-        item->setText(2, row.threads > 0 ? QString::number(row.threads)
+        item->setText(2, row.cpuPercent > 0.0
+                             ? QStringLiteral("%1%").arg(row.cpuPercent, 0, 'f', 1)
+                             : QStringLiteral("--"));
+        item->setText(3, row.threads > 0 ? QString::number(row.threads)
                                          : QStringLiteral("--"));
-        item->setText(3, row.fds < 0 ? QStringLiteral("--")
+        item->setText(4, row.fds < 0 ? QStringLiteral("--")
                                      : QString::number(row.fds));
-        item->setText(4, row.memory);
-        for (int c = 1; c < 5; ++c) {
+        item->setText(5, row.memory);
+        for (int c = 1; c < 6; ++c) {
             item->setTextAlignment(c, Qt::AlignRight | Qt::AlignVCenter);
         }
 

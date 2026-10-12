@@ -37,6 +37,8 @@ add_library(syspeek_core STATIC
     src/CpuSampler.h
     src/HostSampler.cpp
     src/HostSampler.h
+    src/IoRateTracker.cpp
+    src/IoRateTracker.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
     src/MetricStore.cpp

@@ -118,6 +118,8 @@ int main(int argc, char *argv[]) {
         const CpuSample r = s.sample({1234}, focus);
         check(r.available && !r.warming && near(r.percent, 20.0),
               "second sample -> 50t/1000t*100*4 = 20%");
+        check(near(r.perPidPercent.value(1234, -1.0), 20.0),
+              "second sample -> per-pid percent populated");
     }
 
     // ---- core scaling ----

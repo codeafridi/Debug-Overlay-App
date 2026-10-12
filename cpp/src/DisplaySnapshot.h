@@ -9,6 +9,7 @@ struct ProcessRow {
     int depth = 0;
     int threads = 0;
     int fds = -1;
+    double cpuPercent = 0.0;
     QString name;
     QString memory;
 };
@@ -55,5 +56,12 @@ struct DisplaySnapshot {
     double hostNetRxPerSec = 0.0;
     double hostNetTxPerSec = 0.0;
     double hostLoad1 = 0.0;
+    int focusThreads = 0;
+    int focusFds = -1;
+    unsigned long long focusVolCtx = 0;
+    unsigned long long focusInvolCtx = 0;
+    double focusIoReadPerSec = 0.0;
+    double focusIoWritePerSec = 0.0;
+    QList<QString> focusOpenFiles;
     quint64 sequence = 0;
 };

@@ -23,6 +23,10 @@ struct ProcDetail {
     unsigned long long voluntaryCtx = 0;
     unsigned long long involuntaryCtx = 0;
     int fdCount = -1;
+    long long rchar = -1;
+    long long wchar = -1;
+    long long readBytes = -1;
+    long long writeBytes = -1;
 };
 
 struct SocketInfo {
@@ -88,6 +92,8 @@ bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSiz
 bool procMem(int pid, MemInfo &out);
 bool procSample(int pid, MemInfo &mem, ProcDetail &detail);
 bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out);
+bool parseProcIo(const QByteArray &content, ProcDetail &out);
+QList<QString> fdTargets(int pid);
 int countFds(int pid);
 QList<unsigned long long> socketInodes(int pid);
 bool parseNetTable(const QByteArray &content, const QString &proto,

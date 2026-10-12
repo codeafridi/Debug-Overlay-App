@@ -292,6 +292,35 @@ bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out) {
     return true;
 }
 
+bool parseProcIo(const QByteArray &content, ProcDetail &out) {
+    bool found = false;
+    const QList<QByteArray> lines = content.split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> fields = line.simplified().split(' ');
+        if (fields.size() < 2) {
+            continue;
+        }
+        bool ok = false;
+        const long long value = fields.at(1).toLongLong(&ok);
+        if (!ok) {
+            continue;
+        }
+        const QByteArray key = fields.at(0);
+        if (key == "rchar:") {
+            out.rchar = value;
+            found = true;
+        } else if (key == "wchar:") {
+            out.wchar = value;
+            found = true;
+        } else if (key == "read_bytes:") {
+            out.readBytes = value;
+        } else if (key == "write_bytes:") {
+            out.writeBytes = value;
+        }
+    }
+    return found;
+}
+
 int countFds(int pid) {
     const QString path = procPath(pid, "fd");
     const QFileInfo info(path);
@@ -438,6 +467,27 @@ QList<unsigned long long> socketInodes(int pid) {
         }
     }
     return inodes;
+}
+
+QList<QString> fdTargets(int pid) {
+    QList<QString> targets;
+    const QString dir = procPath(pid, "fd");
+    const QStringList entries =
+        QDir(dir).entryList(QDir::AllEntries | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        const QByteArray path = (dir + QLatin1Char('/') + entry).toLocal8Bit();
+        char buffer[512];
+        const ssize_t length =
+            ::readlink(path.constData(), buffer, sizeof(buffer) - 1);
+        if (length <= 0) {
+            continue;
+        }
+        targets.append(QString::fromLocal8Bit(buffer, static_cast<int>(length)));
+        if (targets.size() >= 64) {
+            break;
+        }
+    }
+    return targets;
 }
 
 bool parseNetTable(const QByteArray &content, const QString &proto,
@@ -898,6 +948,11 @@ bool procSample(int pid, MemInfo &mem, ProcDetail &detail) {
         return false;
     }
     parseStatusDetail(content, detail);
+
+    QFile io(procPath(pid, "io"));
+    if (io.open(QIODevice::ReadOnly)) {
+        parseProcIo(io.readAll(), detail);
+    }
 
     QFile statm(procPath(pid, "statm"));
     if (statm.open(QIODevice::ReadOnly)) {

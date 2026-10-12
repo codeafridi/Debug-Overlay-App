@@ -1,8 +1,10 @@
 #include "MetricStore.h"
 #include "Sparkline.h"
+#include "IoRateTracker.h"
 
 #include <QApplication>
 #include <QPixmap>
+#include <QThread>
 
 #include <cstdio>
 
@@ -44,6 +46,20 @@ int main(int argc, char *argv[]) {
     check(true, "sparkline handles a single value");
     spark.setValues({});
     check(spark.valueCount() == 0, "sparkline accepts empty reset");
+
+    IoRateTracker tracker;
+    const IoRateTracker::Rate first = tracker.update(42, 1000, 2000);
+    check(first.readPerSec == 0.0 && first.writePerSec == 0.0,
+          "io tracker: first sample -> 0");
+    QThread::msleep(30);
+    const IoRateTracker::Rate second = tracker.update(42, 4000, 8000);
+    check(second.readPerSec > 0.0 && second.writePerSec > 0.0,
+          "io tracker: counters growing -> positive rate");
+    const IoRateTracker::Rate reset = tracker.update(42, 100, 100);
+    check(reset.readPerSec == 0.0 && reset.writePerSec == 0.0,
+          "io tracker: counter reset -> 0");
+    const IoRateTracker::Rate noPerm = tracker.update(7, -1, -1);
+    check(noPerm.readPerSec == 0.0, "io tracker: no permission -> 0");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
