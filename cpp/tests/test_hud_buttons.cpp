@@ -4,7 +4,6 @@
 #include <QApplication>
 #include <QLabel>
 #include <QPushButton>
-#include <QStackedWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
@@ -111,11 +110,10 @@ int main(int argc, char *argv[]) {
     }
 
     auto *moreButton2 = hud.findChild<QPushButton *>(QStringLiteral("moreButton"));
-    auto *stack = hud.findChild<QStackedWidget *>(QStringLiteral("hudStack"));
     auto *panel = hud.findChild<DashboardPanel *>();
     check(panel != nullptr, "dashboard panel exists inside the overlay");
-    check(stack != nullptr && stack->currentIndex() == 0,
-          "overlay starts on the compact page");
+    check(!hud.isExpanded() && panel->isHidden(),
+          "overlay starts collapsed with panel hidden");
     check(hud.findChild<QLabel *>(QStringLiteral("details")) == nullptr,
           "inline DIAGNOSIS panel removed");
 
@@ -181,12 +179,14 @@ int main(int argc, char *argv[]) {
     check(dashKube != nullptr && dashKube->text().contains(QStringLiteral("k8s:")),
           "panel shows kubernetes");
 
-    if (moreButton2 && stack) {
+    if (moreButton2 && panel) {
         moreButton2->click();
-        check(stack->currentIndex() == 1, "MORE expands the overlay in place");
+        check(hud.isExpanded() && !panel->isHidden(),
+              "MORE expands the overlay in place");
         check(moreButton2->text() == QStringLiteral("LESS"), "MORE -> LESS");
         moreButton2->click();
-        check(stack->currentIndex() == 0, "LESS collapses the overlay in place");
+        check(!hud.isExpanded() && panel->isHidden(),
+              "LESS collapses the overlay in place");
         check(moreButton2->text() == QStringLiteral("MORE"), "LESS -> MORE");
     }
 

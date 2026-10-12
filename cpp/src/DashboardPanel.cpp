@@ -33,15 +33,15 @@ QFont monoFont(int size, bool bold = false) {
 
 QString statusColor(const QString &status) {
     if (status == QStringLiteral("HIGH CPU")) {
-        return QStringLiteral("#ff6b6b");
+        return QStringLiteral("#d1685f");
     }
     if (status == QStringLiteral("WARN")) {
-        return QStringLiteral("#f5b955");
+        return QStringLiteral("#c9a24a");
     }
     if (status == QStringLiteral("OK")) {
-        return QStringLiteral("#3fd08a");
+        return QStringLiteral("#5fae82");
     }
-    return QStringLiteral("#8b93a1");
+    return QStringLiteral("#7f8792");
 }
 
 QLabel *makeTitle(const QString &text, QWidget *parent) {
@@ -195,32 +195,31 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     root->addWidget(body, 1);
 
     setStyleSheet(QStringLiteral(
-        "#ddRoot { background-color: #101114; }"
-        "#ddTopbar { background-color: #17181c; border-bottom: 1px solid #2b2d33; }"
-        "#ddChip { color: #ffffff; background-color: #7a3ff2;"
-        "  padding: 3px 8px; border-radius: 3px; }"
-        "#ddApp { color: #e7ebf0; }"
-        "#ddPid { color: #8b93a1; }"
-        "#ddStatus { color: #3fd08a; background-color: #1b2a22;"
-        "  padding: 3px 10px; border-radius: 10px; }"
-        "#ddCollapse { color: #cfd6dd; background-color: #2a2d33;"
-        "  border: 1px solid #3a3d44; border-radius: 4px; padding: 4px 12px; }"
-        "#ddCollapse:hover { background-color: #34373e; }"
-        "#ddCard { background-color: #17181c; border: 1px solid #2b2d33;"
-        "  border-radius: 6px; }"
-        "#ddStat { background-color: #17181c; border: 1px solid #2b2d33;"
-        "  border-left: 3px solid #7a3ff2; border-radius: 6px; }"
-        "#ddCardTitle { color: #8b93a1; }"
-        "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig { color: #e7ebf0; }"
-        "#ddMemDetail { color: #cfd6dd; }"
-        "#ddDocker { color: #8fb4e0; }"
-        "#ddKube { color: #b8a2e8; }"
+        "#ddRoot { background-color: #15171a; }"
+        "#ddTopbar { background-color: #1b1d21; border-bottom: 1px solid #2a2d33; }"
+        "#ddChip { color: #d5dae0; }"
+        "#ddApp { color: #d5dae0; }"
+        "#ddPid { color: #7f8792; }"
+        "#ddStatus { color: #7f8792; background-color: #23262b;"
+        "  padding: 3px 10px; border-radius: 3px; }"
+        "#ddCollapse { color: #c4cad1; background-color: #23262b;"
+        "  border: 1px solid #31353b; border-radius: 3px; padding: 4px 12px; }"
+        "#ddCollapse:hover { background-color: #2a2e34; }"
+        "#ddCard { background-color: #1b1d21; border: 1px solid #2a2d33;"
+        "  border-radius: 4px; }"
+        "#ddStat { background-color: #1b1d21; border: 1px solid #2a2d33;"
+        "  border-radius: 4px; }"
+        "#ddCardTitle { color: #7f8792; }"
+        "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig { color: #d5dae0; }"
+        "#ddMemDetail { color: #c4cad1; }"
+        "#ddDocker { color: #9fb0c4; }"
+        "#ddKube { color: #b0a9c4; }"
         "QTreeWidget { background-color: transparent; border: none;"
-        "  color: #cfd6dd; }"
+        "  color: #c4cad1; }"
         "QTreeWidget::item { padding: 1px 0px; }"
         "QTreeWidget::item:selected { background: transparent; }"
-        "QHeaderView::section { background-color: #1d1f24; color: #8b93a1;"
-        "  border: none; border-bottom: 1px solid #2b2d33; padding: 4px 6px; }"));
+        "QHeaderView::section { background-color: #202327; color: #7f8792;"
+        "  border: none; border-bottom: 1px solid #2a2d33; padding: 4px 6px; }"));
 }
 
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {

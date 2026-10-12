@@ -13,7 +13,6 @@ class QKeyEvent;
 class QLayout;
 class QMouseEvent;
 class QPushButton;
-class QStackedWidget;
 class DashboardPanel;
 
 class HudWindow : public QWidget {
@@ -27,6 +26,8 @@ public:
     void setDockerSnapshot(const DockerSnapshot &snapshot);
 
     void setKubeSnapshot(const KubeSnapshot &snapshot);
+
+    bool isExpanded() const { return m_detailsExpanded; }
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -64,7 +65,7 @@ private:
     QString m_kubeDetailsText;
     bool m_kubeOpen = false;
     DashboardPanel *m_panel = nullptr;
-    QStackedWidget *m_stack = nullptr;
+    QWidget *m_pages = nullptr;
     QWidget *m_compactPage = nullptr;
     QRect m_savedGeometry;
     QPushButton *m_moreButton = nullptr;

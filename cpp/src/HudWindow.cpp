@@ -12,7 +12,6 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
-#include <QStackedWidget>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWindow>
@@ -61,9 +60,11 @@ HudWindow::HudWindow(QWidget *parent)
     setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
     setObjectName(QStringLiteral("hudRoot"));
 
-    m_stack = new QStackedWidget(this);
-    m_stack->setObjectName(QStringLiteral("hudStack"));
-    m_compactPage = new QWidget(m_stack);
+    m_pages = new QWidget(this);
+    auto *pagesLayout = new QVBoxLayout(m_pages);
+    pagesLayout->setContentsMargins(0, 0, 0, 0);
+    pagesLayout->setSpacing(0);
+    m_compactPage = new QWidget(m_pages);
     auto *root = new QVBoxLayout(m_compactPage);
     root->setContentsMargins(14, 10, 14, 16);
     root->setSpacing(10);
@@ -215,17 +216,17 @@ HudWindow::HudWindow(QWidget *parent)
         "#moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
-    m_panel = new DashboardPanel(m_stack);
+    m_panel = new DashboardPanel(m_pages);
     connect(m_panel, &DashboardPanel::collapseRequested, this,
             &HudWindow::toggleDetails);
-    m_stack->addWidget(m_compactPage);
-    m_stack->addWidget(m_panel);
-    m_stack->setCurrentIndex(0);
+    m_panel->setVisible(false);
+    pagesLayout->addWidget(m_compactPage);
+    pagesLayout->addWidget(m_panel);
 
     auto *windowLayout = new QVBoxLayout(this);
     windowLayout->setContentsMargins(0, 0, 0, 0);
     windowLayout->setSpacing(0);
-    windowLayout->addWidget(m_stack);
+    windowLayout->addWidget(m_pages);
 
     setSnapshot(DisplaySnapshot{});
 
@@ -299,7 +300,9 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
             m_dockerOpen = false;
             m_dockerDetails->setVisible(false);
         }
-        adjustSize();
+        if (!m_detailsExpanded) {
+            adjustSize();
+        }
     }
 
     if (m_dockerOpen) {
@@ -331,7 +334,9 @@ void HudWindow::toggleDockerDetails() {
         m_dockerDetails->setVisible(false);
     }
 
-    adjustSize();
+    if (!m_detailsExpanded) {
+        adjustSize();
+    }
 }
 
 void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
@@ -352,7 +357,9 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
             m_kubeOpen = false;
             m_kubeDetails->setVisible(false);
         }
-        adjustSize();
+        if (!m_detailsExpanded) {
+            adjustSize();
+        }
     }
 
     if (m_kubeOpen) {
@@ -384,7 +391,9 @@ void HudWindow::toggleKubeDetails() {
         m_kubeDetails->setVisible(false);
     }
 
-    adjustSize();
+    if (!m_detailsExpanded) {
+        adjustSize();
+    }
 }
 
 void HudWindow::updateCompactText() {
@@ -400,12 +409,15 @@ void HudWindow::updateCompactText() {
 }
 
 void HudWindow::toggleDetails() {
-    if (m_stack == nullptr) {
+    if (m_pages == nullptr) {
         return;
     }
 
     if (!m_detailsExpanded) {
         m_savedGeometry = geometry();
+
+        m_compactPage->setVisible(false);
+        m_panel->setVisible(true);
 
         QScreen *screen = QGuiApplication::screenAt(frameGeometry().center());
         if (screen == nullptr) {
@@ -415,25 +427,20 @@ void HudWindow::toggleDetails() {
             const QRect avail = screen->availableGeometry();
             const int w = avail.width() * 7 / 10;
             const int h = avail.height() * 7 / 10;
-            setMinimumWidth(0);
-            setMaximumWidth(QWIDGETSIZE_MAX);
-            setMinimumHeight(0);
-            setMaximumHeight(QWIDGETSIZE_MAX);
+            setMinimumSize(0, 0);
+            setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
             resize(w, h);
             move(avail.center().x() - w / 2, avail.center().y() - h / 2);
         }
 
-        m_stack->setCurrentIndex(1);
         m_detailsExpanded = true;
     } else {
-        m_stack->setCurrentIndex(0);
+        m_panel->setVisible(false);
+        m_compactPage->setVisible(true);
         m_detailsExpanded = false;
 
-        setMinimumWidth(430);
-        setMaximumWidth(430);
-        setFixedWidth(430);
-        setMinimumHeight(0);
-        setMaximumHeight(QWIDGETSIZE_MAX);
+        setMinimumSize(430, 0);
+        setMaximumSize(430, QWIDGETSIZE_MAX);
         adjustSize();
         move(m_savedGeometry.topLeft());
     }
