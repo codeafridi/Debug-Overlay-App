@@ -206,6 +206,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddFocusDetail, #ddOpenFiles { color: #c4cad1; }"
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
+        "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddKube { color: #b0a9c4; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
@@ -369,12 +370,31 @@ QWidget *DashboardPanel::buildNetworkView() {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
     layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
 
     m_net = new QLabel(QStringLiteral("--"), view);
     m_net->setObjectName(QStringLiteral("ddNet"));
     m_net->setFont(monoFont(11));
-    layout->addWidget(makeCard(QStringLiteral("CONNECTIONS"), m_net, view));
-    layout->addStretch(1);
+    layout->addWidget(
+        makeCard(QStringLiteral("CONNECTIONS (focused app)"), m_net, view), 2);
+
+    auto *row = new QHBoxLayout();
+    row->setSpacing(14);
+    m_listen = new QLabel(QStringLiteral("--"), view);
+    m_listen->setObjectName(QStringLiteral("ddListen"));
+    m_listen->setFont(monoFont(10));
+    row->addWidget(makeCard(QStringLiteral("LISTENING ENDPOINTS"), m_listen, view), 1);
+
+    m_states = new QLabel(QStringLiteral("--"), view);
+    m_states->setObjectName(QStringLiteral("ddStates"));
+    m_states->setFont(monoFont(10));
+    row->addWidget(makeCard(QStringLiteral("SOCKET STATES"), m_states, view), 1);
+    layout->addLayout(row, 1);
+
+    m_ifaces = new QLabel(QStringLiteral("--"), view);
+    m_ifaces->setObjectName(QStringLiteral("ddIfaces"));
+    m_ifaces->setFont(monoFont(10));
+    layout->addWidget(makeCard(QStringLiteral("INTERFACES"), m_ifaces, view), 1);
     return view;
 }
 
@@ -469,6 +489,32 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         ++shown;
     }
     m_net->setText(net.isEmpty() ? QStringLiteral("no connections") : net);
+
+    QString listen;
+    int listenCount = 0;
+    for (const QString &endpoint : snapshot.listeningPorts) {
+        if (listenCount >= 20) {
+            listen += QStringLiteral("...\n");
+            break;
+        }
+        listen += endpoint + QLatin1Char('\n');
+        ++listenCount;
+    }
+    m_listen->setText(listen.isEmpty() ? QStringLiteral("none") : listen);
+
+    QString states;
+    for (const QPair<QString, int> &pair : snapshot.socketStateCounts) {
+        states += QStringLiteral("%1  %2\n").arg(pair.first, -12).arg(pair.second);
+    }
+    m_states->setText(states.isEmpty() ? QStringLiteral("none") : states);
+
+    QString ifaces;
+    for (const InterfaceRow &row : snapshot.interfaces) {
+        ifaces += QStringLiteral("%1 rx %2  tx %3\n")
+                      .arg(row.name, -10)
+                      .arg(formatRate(row.rxPerSec), formatRate(row.txPerSec));
+    }
+    m_ifaces->setText(ifaces.isEmpty() ? QStringLiteral("--") : ifaces);
 
     if (snapshot.cgroupAvailable) {
         const QString leaf = snapshot.cgroupPath.section(QLatin1Char('/'), -1);

@@ -8,6 +8,8 @@
 #include <QSet>
 #include <QTimer>
 
+#include <algorithm>
+
 SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
                              const Config &config,
                              QObject *parent)
@@ -153,31 +155,73 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     }
 
     QList<ConnectionRow> connections;
-    if (!inodeSet.isEmpty()) {
-        const QList<linuxproc::SocketInfo> sockets = linuxproc::readNetSockets();
-        for (const linuxproc::SocketInfo &socket : sockets) {
-            if (!inodeSet.contains(socket.inode)) {
-                continue;
-            }
-            ConnectionRow row;
-            row.proto = socket.proto;
-            row.local =
-                QStringLiteral("%1:%2").arg(socket.localAddr).arg(socket.localPort);
-            row.remote =
-                (socket.remotePort != 0
-                 || socket.state == QStringLiteral("ESTABLISHED"))
-                    ? QStringLiteral("%1:%2")
-                          .arg(socket.remoteAddr)
-                          .arg(socket.remotePort)
-                    : QStringLiteral("*");
-            row.state = socket.state;
-            connections.append(row);
-            if (connections.size() >= 50) {
-                break;
+    QList<QString> listening;
+    QHash<QString, int> stateCounts;
+    QSet<QString> listenSeen;
+    const QList<linuxproc::SocketInfo> sockets = linuxproc::readNetSockets();
+    for (const linuxproc::SocketInfo &socket : sockets) {
+        stateCounts[socket.state] += 1;
+
+        const bool isEndpoint =
+            socket.state == QStringLiteral("LISTEN")
+            || (socket.proto.startsWith(QStringLiteral("udp"))
+                && socket.remotePort == 0);
+        if (isEndpoint) {
+            const QString endpoint = QStringLiteral("%1 %2:%3")
+                                         .arg(socket.proto, socket.localAddr)
+                                         .arg(socket.localPort);
+            if (!listenSeen.contains(endpoint)) {
+                listenSeen.insert(endpoint);
+                listening.append(endpoint);
             }
         }
+
+        if (!inodeSet.contains(socket.inode) || connections.size() >= 50) {
+            continue;
+        }
+        ConnectionRow row;
+        row.proto = socket.proto;
+        row.local =
+            QStringLiteral("%1:%2").arg(socket.localAddr).arg(socket.localPort);
+        row.remote =
+            (socket.remotePort != 0
+             || socket.state == QStringLiteral("ESTABLISHED"))
+                ? QStringLiteral("%1:%2")
+                      .arg(socket.remoteAddr)
+                      .arg(socket.remotePort)
+                : QStringLiteral("*");
+        row.state = socket.state;
+        connections.append(row);
     }
     snap.connections = connections;
+    snap.listeningPorts = listening;
+
+    QList<QPair<QString, int>> counts;
+    for (auto it = stateCounts.constBegin(); it != stateCounts.constEnd(); ++it) {
+        counts.append(qMakePair(it.key(), it.value()));
+    }
+    std::sort(counts.begin(), counts.end(),
+              [](const QPair<QString, int> &a, const QPair<QString, int> &b) {
+                  return a.first < b.first;
+              });
+    snap.socketStateCounts = counts;
+
+    QList<linuxproc::InterfaceStats> interfaceStats;
+    if (linuxproc::hostInterfaces(interfaceStats)) {
+        QList<InterfaceRow> interfaceRows;
+        for (const linuxproc::InterfaceStats &stats : interfaceStats) {
+            InterfaceRow row;
+            row.name = stats.name;
+            row.rxBytes = stats.rxBytes;
+            row.txBytes = stats.txBytes;
+            const NetRateTracker::Rate rate =
+                m_netTracker.update(stats.name, stats.rxBytes, stats.txBytes);
+            row.rxPerSec = rate.rxPerSec;
+            row.txPerSec = rate.txPerSec;
+            interfaceRows.append(row);
+        }
+        snap.interfaces = interfaceRows;
+    }
 
     linuxproc::CgroupInfo cgroup;
     if (linuxproc::cgroupSample(focus.identity.pid, cgroup) && cgroup.available) {

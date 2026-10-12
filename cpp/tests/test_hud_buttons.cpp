@@ -162,6 +162,13 @@ int main(int argc, char *argv[]) {
     withProcs.focusInvolCtx = 3;
     withProcs.focusOpenFiles = {QStringLiteral("/dev/null"),
                                 QStringLiteral("socket:[999]")};
+    withProcs.listeningPorts = {QStringLiteral("tcp 0.0.0.0:631")};
+    withProcs.socketStateCounts = {qMakePair(QStringLiteral("ESTABLISHED"), 12)};
+    InterfaceRow ifaceRow;
+    ifaceRow.name = QStringLiteral("eth0");
+    ifaceRow.rxPerSec = 2048.0;
+    ifaceRow.txPerSec = 1024.0;
+    withProcs.interfaces = {ifaceRow};
     hud.setSnapshot(withProcs);
 
     auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
@@ -210,6 +217,19 @@ int main(int argc, char *argv[]) {
     check(dashNet != nullptr
               && dashNet->text().contains(QStringLiteral("ESTABLISHED")),
           "panel shows network connection");
+
+    auto *dashListen = hud.findChild<QLabel *>(QStringLiteral("ddListen"));
+    check(dashListen != nullptr
+              && dashListen->text().contains(QStringLiteral("0.0.0.0:631")),
+          "panel shows listening endpoints");
+    auto *dashStates = hud.findChild<QLabel *>(QStringLiteral("ddStates"));
+    check(dashStates != nullptr
+              && dashStates->text().contains(QStringLiteral("ESTABLISHED")),
+          "panel shows socket states");
+    auto *dashIfaces = hud.findChild<QLabel *>(QStringLiteral("ddIfaces"));
+    check(dashIfaces != nullptr
+              && dashIfaces->text().contains(QStringLiteral("eth0")),
+          "panel shows interfaces");
 
     auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
     check(dashCgroup != nullptr

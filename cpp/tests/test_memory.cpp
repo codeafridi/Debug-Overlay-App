@@ -297,6 +297,27 @@ int main(int argc, char *argv[]) {
               "parseProcIo: no counters -> false");
     }
 
+    // ---- interface table parsing ----
+    {
+        QList<linuxproc::InterfaceStats> interfaces;
+        check(linuxproc::parseNetDevInterfaces(
+                  "Inter-|   Receive                                                |  Transmit\n"
+                  " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n"
+                  "    lo: 999 1 2 3 0 0 0 0 888 4 5 6 0 0 0 0\n"
+                  "  eth0: 1000 5 0 0 0 0 0 0 2000 7 1 2 0 0 0 0\n",
+                  interfaces)
+                  && interfaces.size() == 2
+                  && interfaces.at(0).name == QStringLiteral("lo")
+                  && interfaces.at(0).rxBytes == 999
+                  && interfaces.at(0).txBytes == 888
+                  && interfaces.at(1).name == QStringLiteral("eth0")
+                  && interfaces.at(1).rxBytes == 1000
+                  && interfaces.at(1).txBytes == 2000
+                  && interfaces.at(1).txErrs == 1
+                  && interfaces.at(1).txDrop == 2,
+              "parseNetDevInterfaces: per-interface rows incl. lo");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;

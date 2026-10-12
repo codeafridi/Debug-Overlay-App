@@ -853,6 +853,11 @@ bool hostNet(NetTotals &out) {
     return parseNetDev(readFileBytes(QStringLiteral("/proc/net/dev")), out);
 }
 
+bool hostInterfaces(QList<InterfaceStats> &out) {
+    out.clear();
+    return parseNetDevInterfaces(readFileBytes(QStringLiteral("/proc/net/dev")), out);
+}
+
 bool hostLoad(double &l1, double &l5, double &l15) {
     return parseLoadAvg(readFileBytes(QStringLiteral("/proc/loadavg")), l1, l5, l15);
 }
@@ -868,6 +873,52 @@ bool diskUsage(const QString &path, unsigned long long &totalBytes,
     totalBytes = static_cast<unsigned long long>(stats.f_blocks) * fragment;
     freeBytes = static_cast<unsigned long long>(stats.f_bavail) * fragment;
     return true;
+}
+
+bool parseNetDevInterfaces(const QByteArray &content, QList<InterfaceStats> &out) {
+    const QList<QByteArray> lines = content.split('\n');
+    bool any = false;
+    for (const QByteArray &line : lines) {
+        const QByteArray trimmed = line.trimmed();
+        const int colon = trimmed.indexOf(':');
+        if (colon < 0) {
+            continue;
+        }
+        const QByteArray name = trimmed.left(colon).trimmed();
+        if (name.isEmpty()) {
+            continue;
+        }
+        const QList<QByteArray> fields =
+            trimmed.mid(colon + 1).simplified().split(' ');
+        if (fields.size() < 12) {
+            continue;
+        }
+
+        bool ok = true;
+        auto number = [&ok](const QByteArray &field) {
+            bool parsed = false;
+            const unsigned long long value = field.toULongLong(&parsed);
+            ok = ok && parsed;
+            return value;
+        };
+
+        InterfaceStats stats;
+        stats.name = QString::fromUtf8(name);
+        stats.rxBytes = number(fields.at(0));
+        stats.rxPackets = number(fields.at(1));
+        stats.rxErrs = number(fields.at(2));
+        stats.rxDrop = number(fields.at(3));
+        stats.txBytes = number(fields.at(8));
+        stats.txPackets = number(fields.at(9));
+        stats.txErrs = number(fields.at(10));
+        stats.txDrop = number(fields.at(11));
+        if (!ok) {
+            continue;
+        }
+        out.append(stats);
+        any = true;
+    }
+    return any;
 }
 
 double hostCpuBusyPercent(const HostCpuTimes &prev, const HostCpuTimes &cur) {

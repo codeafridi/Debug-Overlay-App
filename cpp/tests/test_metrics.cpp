@@ -1,6 +1,7 @@
 #include "MetricStore.h"
 #include "Sparkline.h"
 #include "IoRateTracker.h"
+#include "NetRateTracker.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -60,6 +61,18 @@ int main(int argc, char *argv[]) {
           "io tracker: counter reset -> 0");
     const IoRateTracker::Rate noPerm = tracker.update(7, -1, -1);
     check(noPerm.readPerSec == 0.0, "io tracker: no permission -> 0");
+
+    NetRateTracker netTracker;
+    const NetRateTracker::Rate n1 = netTracker.update(QStringLiteral("eth0"), 1000, 2000);
+    check(n1.rxPerSec == 0.0 && n1.txPerSec == 0.0,
+          "net tracker: first sample -> 0");
+    QThread::msleep(30);
+    const NetRateTracker::Rate n2 = netTracker.update(QStringLiteral("eth0"), 4000, 5000);
+    check(n2.rxPerSec > 0.0 && n2.txPerSec > 0.0,
+          "net tracker: counters growing -> positive rate");
+    const NetRateTracker::Rate n3 = netTracker.update(QStringLiteral("eth0"), 100, 100);
+    check(n3.rxPerSec == 0.0 && n3.txPerSec == 0.0,
+          "net tracker: counter reset -> 0");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

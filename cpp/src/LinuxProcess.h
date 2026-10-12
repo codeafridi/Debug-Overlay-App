@@ -39,6 +39,18 @@ struct SocketInfo {
     unsigned long long inode = 0;
 };
 
+struct InterfaceStats {
+    QString name;
+    unsigned long long rxBytes = 0;
+    unsigned long long txBytes = 0;
+    unsigned long long rxPackets = 0;
+    unsigned long long txPackets = 0;
+    unsigned long long rxErrs = 0;
+    unsigned long long txErrs = 0;
+    unsigned long long rxDrop = 0;
+    unsigned long long txDrop = 0;
+};
+
 struct CgroupInfo {
     bool available = false;
     QString version;
@@ -99,6 +111,7 @@ QList<unsigned long long> socketInodes(int pid);
 bool parseNetTable(const QByteArray &content, const QString &proto,
                    QList<SocketInfo> &out);
 QList<SocketInfo> readNetSockets();
+bool parseNetDevInterfaces(const QByteArray &content, QList<InterfaceStats> &out);
 bool parsePidCgroup(const QByteArray &content, QString &version, QString &path);
 bool parseCgroupCpuStat(const QByteArray &content, CgroupInfo &out);
 bool parseCgroupMemoryValue(const QByteArray &content, long long &out);
@@ -111,6 +124,7 @@ bool parseLoadAvg(const QByteArray &content, double &l1, double &l5, double &l15
 bool hostCpuTimes(HostCpuTimes &out);
 bool hostMem(HostMem &out);
 bool hostNet(NetTotals &out);
+bool hostInterfaces(QList<InterfaceStats> &out);
 bool hostLoad(double &l1, double &l5, double &l15);
 bool diskUsage(const QString &path, unsigned long long &totalBytes,
                unsigned long long &freeBytes);

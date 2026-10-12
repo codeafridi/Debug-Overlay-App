@@ -55,6 +55,9 @@ private:
     QLabel *m_focusDetail = nullptr;
     QLabel *m_openFiles = nullptr;
     QLabel *m_net = nullptr;
+    QLabel *m_listen = nullptr;
+    QLabel *m_states = nullptr;
+    QLabel *m_ifaces = nullptr;
     QLabel *m_cgroup = nullptr;
     QLabel *m_docker = nullptr;
     QLabel *m_kube = nullptr;

@@ -8,6 +8,7 @@
 #include "HealthEvaluator.h"
 #include "HostSampler.h"
 #include "IoRateTracker.h"
+#include "NetRateTracker.h"
 #include "ProcessIdentity.h"
 
 #include <QObject>
@@ -40,6 +41,7 @@ private:
     CpuSampler m_cpuSampler;
     HostSampler m_hostSampler;
     IoRateTracker m_ioTracker;
+    NetRateTracker m_netTracker;
     GroupCache m_groupCache;
     QTimer *m_timer = nullptr;
     int m_intervalMs = 1000;

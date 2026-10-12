@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QList>
+#include <QPair>
 #include <QString>
 #include <QtGlobal>
 
@@ -21,6 +22,14 @@ struct ConnectionRow {
     QString state;
 };
 
+struct InterfaceRow {
+    QString name;
+    unsigned long long rxBytes = 0;
+    unsigned long long txBytes = 0;
+    double rxPerSec = 0.0;
+    double txPerSec = 0.0;
+};
+
 struct DisplaySnapshot {
     QString appName = QStringLiteral("--");
     QString pid = QStringLiteral("--");
@@ -35,6 +44,9 @@ struct DisplaySnapshot {
     unsigned long long sharedKb = 0;
     QList<ProcessRow> processes;
     QList<ConnectionRow> connections;
+    QList<QString> listeningPorts;
+    QList<QPair<QString, int>> socketStateCounts;
+    QList<InterfaceRow> interfaces;
     bool cgroupAvailable = false;
     QString cgroupVersion;
     QString cgroupPath;
