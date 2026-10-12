@@ -17,7 +17,10 @@ struct DisplaySnapshot {
     QString cpu = QStringLiteral("--");
     QString memory = QStringLiteral("--");
     QString status = QStringLiteral("IDLE");
-    QString memDetail;
+    unsigned long long rssKb = 0;
+    unsigned long long vmsKb = 0;
+    unsigned long long swapKb = 0;
+    unsigned long long sharedKb = 0;
     QList<ProcessRow> processes;
     quint64 sequence = 0;
 };

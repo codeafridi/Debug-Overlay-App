@@ -1,13 +1,17 @@
 #include "HudWindow.h"
 
+#include "DashboardWindow.h"
+
 #include <QApplication>
 #include <QFont>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWindow>
@@ -138,25 +142,8 @@ HudWindow::HudWindow(QWidget *parent)
     m_kubeDetails->setVisible(false);
     root->addWidget(m_kubeDetails);
 
-    m_detailsPanel = new QFrame(this);
-    m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
-
-    auto *detailsLayout = new QVBoxLayout(m_detailsPanel);
-    detailsLayout->setContentsMargins(10, 8, 10, 10);
-    detailsLayout->setSpacing(1);
-
-    auto *detailsTitle = new QLabel(QStringLiteral("DIAGNOSIS"), m_detailsPanel);
-    detailsTitle->setObjectName(QStringLiteral("caption"));
-    detailsTitle->setFont(captionFont());
-
-    m_detailsText = new QLabel(m_detailsPanel);
-    m_detailsText->setObjectName(QStringLiteral("details"));
-    m_detailsText->setWordWrap(true);
-
-    detailsLayout->addWidget(detailsTitle);
-    detailsLayout->addWidget(m_detailsText);
-    m_detailsPanel->setVisible(false);
-    root->addWidget(m_detailsPanel);
+    m_dashboard = new DashboardWindow(this);
+    m_dashboard->setVisible(false);
 
     auto *footer = new QHBoxLayout();
     footer->setSpacing(4);
@@ -228,7 +215,6 @@ HudWindow::HudWindow(QWidget *parent)
         "QLabel   { color:rgb(198, 205, 195); }"));
 
     setSnapshot(DisplaySnapshot{});
-    updateDiagnosis();
 
     setFixedWidth(430);
     adjustSize();
@@ -277,13 +263,14 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
 
     updateCompactText();
-    updateDiagnosis();
+    if (m_dashboard != nullptr) {
+        m_dashboard->setSnapshot(snapshot);
+    }
 }
 
 void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
     const QString summary = dockerSummaryText(snapshot);
     const QString details = dockerDetailText(snapshot);
-    m_dockerSummaryText = summary;
     m_dockerDetailsText = details;
 
     const bool wasVisible = m_dockerButton->isVisibleTo(this);
@@ -312,7 +299,9 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
         }
     }
 
-    updateDiagnosis();
+    if (m_dashboard != nullptr) {
+        m_dashboard->setDockerSnapshot(snapshot);
+    }
 }
 
 void HudWindow::toggleDockerDetails() {
@@ -335,7 +324,6 @@ void HudWindow::toggleDockerDetails() {
 void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
     const QString summary = kubeSummaryText(snapshot);
     const QString details = kubeDetailText(snapshot);
-    m_kubeSummaryText = summary;
     m_kubeDetailsText = details;
 
     const bool wasVisible = m_kubeButton->isVisibleTo(this);
@@ -364,7 +352,9 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
         }
     }
 
-    updateDiagnosis();
+    if (m_dashboard != nullptr) {
+        m_dashboard->setKubeSnapshot(snapshot);
+    }
 }
 
 void HudWindow::toggleKubeDetails() {
@@ -384,47 +374,6 @@ void HudWindow::toggleKubeDetails() {
     adjustSize();
 }
 
-void HudWindow::updateDiagnosis() {
-    if (m_detailsText == nullptr) {
-        return;
-    }
-
-    QStringList lines;
-
-    if (!m_lastSnapshot.memDetail.isEmpty()) {
-        lines.append(QString());
-        lines.append(QStringLiteral("memory: ") + m_lastSnapshot.memDetail);
-        for (const ProcessRow &row : m_lastSnapshot.processes) {
-            const QString indent(row.depth * 2, QLatin1Char(' '));
-            lines.append(indent
-                         + QStringLiteral("%1 (pid %2)  %3")
-                               .arg(row.name)
-                               .arg(row.pid)
-                               .arg(row.memory));
-        }
-    }
-
-    if (!m_dockerSummaryText.isEmpty()) {
-        lines.append(QString());
-        lines.append(m_dockerSummaryText);
-        if (!m_dockerDetailsText.isEmpty()
-            && m_dockerDetailsText != QStringLiteral("no issues")) {
-            lines.append(m_dockerDetailsText);
-        }
-    }
-
-    if (!m_kubeSummaryText.isEmpty()) {
-        lines.append(QString());
-        lines.append(m_kubeSummaryText);
-        if (!m_kubeDetailsText.isEmpty()
-            && m_kubeDetailsText != QStringLiteral("no issues")) {
-            lines.append(m_kubeDetailsText);
-        }
-    }
-
-    m_detailsText->setText(lines.join(QLatin1Char('\n')));
-}
-
 void HudWindow::updateCompactText() {
     if (m_compactLabel == nullptr) {
         return;
@@ -438,11 +387,33 @@ void HudWindow::updateCompactText() {
 }
 
 void HudWindow::toggleDetails() {
-    m_detailsExpanded = !m_detailsExpanded;
-    m_detailsPanel->setVisible(m_detailsExpanded);
+    if (m_dashboard == nullptr) {
+        return;
+    }
+
+    if (m_dashboard->isVisible()) {
+        m_dashboard->hide();
+        m_detailsExpanded = false;
+    } else {
+        QScreen *screen = QGuiApplication::screenAt(frameGeometry().center());
+        if (screen == nullptr) {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen != nullptr) {
+            const QRect avail = screen->availableGeometry();
+            const QPoint topLeft =
+                avail.center()
+                - QPoint(m_dashboard->width() / 2, m_dashboard->height() / 2);
+            m_dashboard->move(topLeft);
+        }
+        m_dashboard->show();
+        m_dashboard->raise();
+        m_dashboard->activateWindow();
+        m_detailsExpanded = true;
+    }
+
     m_moreButton->setText(m_detailsExpanded ? QStringLiteral("LESS")
                                             : QStringLiteral("MORE"));
-    adjustSize();
 }
 
 void HudWindow::toggleCompact() {
@@ -455,7 +426,9 @@ void HudWindow::toggleCompact() {
 
     if (m_compact) {
         m_detailsExpanded = false;
-        m_detailsPanel->setVisible(false);
+        if (m_dashboard != nullptr) {
+            m_dashboard->hide();
+        }
         m_moreButton->setText(QStringLiteral("MORE"));
         m_moreButton->setVisible(false);
     } else {

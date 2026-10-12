@@ -115,12 +115,10 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     }
 
     snap.processes = rows;
-    if (!rows.isEmpty()) {
-        snap.memDetail =
-            QStringLiteral("RSS %1 · VMS %2 · swap %3 · shared %4")
-                .arg(formatMemoryKb(rssTotal), formatMemoryKb(vmsTotal),
-                     formatMemoryKb(swapTotal), formatMemoryKb(sharedTotal));
-    }
+    snap.rssKb = rssTotal;
+    snap.vmsKb = vmsTotal;
+    snap.swapKb = swapTotal;
+    snap.sharedKb = sharedTotal;
 
     m_cpuIdentity = focus.identity;
 

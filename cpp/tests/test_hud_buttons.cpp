@@ -1,8 +1,11 @@
 #include "HudWindow.h"
+#include "DashboardWindow.h"
 
 #include <QApplication>
 #include <QLabel>
 #include <QPushButton>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 #include <cstdio>
 
@@ -106,27 +109,17 @@ int main(int argc, char *argv[]) {
         moreButton->click();
     }
 
-    auto *detailsLabel = hud.findChild<QLabel *>(QStringLiteral("details"));
-    DockerSnapshot dockerSnap;
-    dockerSnap.state = DockerState::Ok;
-    dockerSnap.runningCount = 1;
-    dockerSnap.issueCount = 1;
-    hud.setDockerSnapshot(dockerSnap);
-    KubeSnapshot kubeSnap;
-    kubeSnap.state = KubeState::Ok;
-    kubeSnap.totalPods = 3;
-    kubeSnap.issueCount = 2;
-    hud.setKubeSnapshot(kubeSnap);
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("docker:")),
-          "diagnosis panel lists docker");
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("k8s:")),
-          "diagnosis panel lists kubernetes");
+    auto *moreButton2 = hud.findChild<QPushButton *>(QStringLiteral("moreButton"));
+    auto *dashboard = hud.findChild<DashboardWindow *>();
+    check(dashboard != nullptr, "dashboard window exists");
+    check(hud.findChild<QLabel *>(QStringLiteral("details")) == nullptr,
+          "inline DIAGNOSIS panel removed");
 
     DisplaySnapshot withProcs = makeSnapshot("alpha", "123", "17%", "8 MB", "OK");
-    withProcs.memDetail =
-        QStringLiteral("RSS 8 MB · VMS 9 MB · swap 0 MB · shared 1 MB");
+    withProcs.rssKb = 8192;
+    withProcs.vmsKb = 9216;
+    withProcs.swapKb = 0;
+    withProcs.sharedKb = 1024;
     ProcessRow root;
     root.pid = 123;
     root.depth = 0;
@@ -139,15 +132,59 @@ int main(int argc, char *argv[]) {
     child.memory = QStringLiteral("4 MB");
     withProcs.processes = {root, child};
     hud.setSnapshot(withProcs);
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("memory:")),
-          "diagnosis panel lists memory breakdown");
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("alpha-child")),
-          "diagnosis panel lists child process row");
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("(pid 124)")),
-          "diagnosis panel shows process pid");
+
+    auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("dashApp"));
+    auto *dashCpu = hud.findChild<QLabel *>(QStringLiteral("dashCpu"));
+    auto *dashMem = hud.findChild<QLabel *>(QStringLiteral("dashMem"));
+    auto *dashStatus = hud.findChild<QLabel *>(QStringLiteral("dashStatus"));
+    auto *dashMemDetail = hud.findChild<QLabel *>(QStringLiteral("dashMemDetail"));
+    auto *dashProcs = hud.findChild<QTreeWidget *>(QStringLiteral("dashProcs"));
+
+    check(dashApp != nullptr && dashApp->text() == QStringLiteral("alpha"),
+          "dashboard shows app name");
+    check(dashCpu != nullptr && dashCpu->text() == QStringLiteral("17%"),
+          "dashboard shows cpu");
+    check(dashMem != nullptr && dashMem->text() == QStringLiteral("8 MB"),
+          "dashboard shows memory");
+    check(dashStatus != nullptr && dashStatus->text() == QStringLiteral("OK"),
+          "dashboard shows status");
+    check(dashMemDetail != nullptr
+              && dashMemDetail->text().contains(QStringLiteral("RSS")),
+          "dashboard shows memory breakdown");
+    check(dashProcs != nullptr && dashProcs->topLevelItemCount() == 1,
+          "dashboard process tree has one root");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->childCount() == 1
+              && dashProcs->topLevelItem(0)->child(0)->text(0)
+                     == QStringLiteral("alpha-child"),
+          "dashboard process tree nests child");
+
+    DockerSnapshot dockerSnap;
+    dockerSnap.state = DockerState::Ok;
+    dockerSnap.runningCount = 1;
+    dockerSnap.issueCount = 1;
+    hud.setDockerSnapshot(dockerSnap);
+    KubeSnapshot kubeSnap;
+    kubeSnap.state = KubeState::Ok;
+    kubeSnap.totalPods = 3;
+    kubeSnap.issueCount = 2;
+    hud.setKubeSnapshot(kubeSnap);
+    auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("dashDocker"));
+    auto *dashKube = hud.findChild<QLabel *>(QStringLiteral("dashKube"));
+    check(dashDocker != nullptr
+              && dashDocker->text().contains(QStringLiteral("docker:")),
+          "dashboard shows docker");
+    check(dashKube != nullptr && dashKube->text().contains(QStringLiteral("k8s:")),
+          "dashboard shows kubernetes");
+
+    if (moreButton2 && dashboard) {
+        moreButton2->click();
+        check(dashboard->isVisible(), "MORE opens the dashboard");
+        check(moreButton2->text() == QStringLiteral("LESS"), "MORE -> LESS");
+        moreButton2->click();
+        check(!dashboard->isVisible(), "LESS closes the dashboard");
+        check(moreButton2->text() == QStringLiteral("MORE"), "LESS -> MORE");
+    }
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

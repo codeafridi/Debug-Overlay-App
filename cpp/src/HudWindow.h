@@ -12,6 +12,7 @@ class QKeyEvent;
 class QLayout;
 class QMouseEvent;
 class QPushButton;
+class DashboardWindow;
 
 class HudWindow : public QWidget {
     Q_OBJECT
@@ -43,7 +44,6 @@ private:
     void toggleDockerDetails();
     void toggleKubeDetails();
     void updateCompactText();
-    void updateDiagnosis();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -57,14 +57,11 @@ private:
     QLabel *m_dockerDetails = nullptr;
     QString m_dockerDetailsText;
     bool m_dockerOpen = false;
-    QString m_dockerSummaryText;
     QPushButton *m_kubeButton = nullptr;
     QLabel *m_kubeDetails = nullptr;
     QString m_kubeDetailsText;
     bool m_kubeOpen = false;
-    QString m_kubeSummaryText;
-    QWidget *m_detailsPanel = nullptr;
-    QLabel *m_detailsText = nullptr;
+    DashboardWindow *m_dashboard = nullptr;
     QPushButton *m_moreButton = nullptr;
     QPushButton *m_showHideButton = nullptr;
     DisplaySnapshot m_lastSnapshot;
