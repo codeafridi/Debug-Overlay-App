@@ -300,6 +300,182 @@ int countFds(int pid) {
     return entries.size();
 }
 
+namespace {
+
+QString socketStateName(int code) {
+    switch (code) {
+    case 0x01:
+        return QStringLiteral("ESTABLISHED");
+    case 0x02:
+        return QStringLiteral("SYN_SENT");
+    case 0x03:
+        return QStringLiteral("SYN_RECV");
+    case 0x04:
+        return QStringLiteral("FIN_WAIT1");
+    case 0x05:
+        return QStringLiteral("FIN_WAIT2");
+    case 0x06:
+        return QStringLiteral("TIME_WAIT");
+    case 0x07:
+        return QStringLiteral("CLOSE");
+    case 0x08:
+        return QStringLiteral("CLOSE_WAIT");
+    case 0x09:
+        return QStringLiteral("LAST_ACK");
+    case 0x0A:
+        return QStringLiteral("LISTEN");
+    case 0x0B:
+        return QStringLiteral("CLOSING");
+    default:
+        return QStringLiteral("UNKNOWN");
+    }
+}
+
+QString ipv4FromHex(const QString &hex) {
+    if (hex.size() != 8) {
+        return hex;
+    }
+    bool ok = false;
+    const quint32 value = hex.toUInt(&ok, 16);
+    if (!ok) {
+        return hex;
+    }
+    return QStringLiteral("%1.%2.%3.%4")
+        .arg(value & 0xFF)
+        .arg((value >> 8) & 0xFF)
+        .arg((value >> 16) & 0xFF)
+        .arg((value >> 24) & 0xFF);
+}
+
+QString ipv6FromHex(const QString &hex) {
+    if (hex.size() != 32) {
+        return hex;
+    }
+
+    quint16 groups[8];
+    for (int w = 0; w < 4; ++w) {
+        bool ok = false;
+        const quint32 word = hex.mid(w * 8, 8).toUInt(&ok, 16);
+        if (!ok) {
+            return hex;
+        }
+        groups[w * 2] = static_cast<quint16>(((word & 0xFF) << 8)
+                                             | ((word >> 8) & 0xFF));
+        groups[w * 2 + 1] = static_cast<quint16>(((word >> 16) & 0xFF) << 8
+                                                 | ((word >> 24) & 0xFF));
+    }
+
+    int bestStart = -1;
+    int bestLen = 0;
+    for (int i = 0; i < 8;) {
+        if (groups[i] != 0) {
+            ++i;
+            continue;
+        }
+        int j = i;
+        while (j < 8 && groups[j] == 0) {
+            ++j;
+        }
+        if (j - i > bestLen) {
+            bestLen = j - i;
+            bestStart = i;
+        }
+        i = j;
+    }
+
+    QString out;
+    for (int i = 0; i < 8; ++i) {
+        if (i == bestStart && bestLen > 1) {
+            out += QStringLiteral("::");
+            i += bestLen - 1;
+            continue;
+        }
+        if (!out.isEmpty() && !out.endsWith(QLatin1Char(':'))) {
+            out += QLatin1Char(':');
+        }
+        out += QString::number(groups[i], 16);
+    }
+    return out.isEmpty() ? QStringLiteral("::") : out;
+}
+
+} // namespace
+
+QList<unsigned long long> socketInodes(int pid) {
+    QList<unsigned long long> inodes;
+    const QString dir = procPath(pid, "fd");
+    const QStringList entries =
+        QDir(dir).entryList(QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        const QString target = QFile::symLinkTarget(dir + QLatin1Char('/') + entry);
+        if (!target.startsWith(QStringLiteral("socket:["))
+            || !target.endsWith(QLatin1Char(']'))) {
+            continue;
+        }
+        bool ok = false;
+        const unsigned long long inode =
+            target.mid(8, target.size() - 9).toULongLong(&ok);
+        if (ok) {
+            inodes.append(inode);
+        }
+    }
+    return inodes;
+}
+
+bool parseNetTable(const QByteArray &content, const QString &proto,
+                   QList<SocketInfo> &out) {
+    const QList<QByteArray> lines = content.split('\n');
+    if (lines.isEmpty()) {
+        return false;
+    }
+
+    const bool ipv6 = proto.endsWith(QLatin1Char('6'));
+    for (int i = 1; i < lines.size(); ++i) {
+        const QList<QByteArray> fields = lines.at(i).simplified().split(' ');
+        if (fields.size() < 10) {
+            continue;
+        }
+
+        const QString local = QString::fromLatin1(fields.at(1));
+        const QString remote = QString::fromLatin1(fields.at(2));
+        const int localColon = local.indexOf(QLatin1Char(':'));
+        const int remoteColon = remote.indexOf(QLatin1Char(':'));
+        if (localColon < 0 || remoteColon < 0) {
+            continue;
+        }
+
+        SocketInfo info;
+        info.proto = proto;
+        info.localAddr = ipv6 ? ipv6FromHex(local.left(localColon))
+                              : ipv4FromHex(local.left(localColon));
+        info.localPort = local.mid(localColon + 1).toUShort(nullptr, 16);
+        info.remoteAddr = ipv6 ? ipv6FromHex(remote.left(remoteColon))
+                               : ipv4FromHex(remote.left(remoteColon));
+        info.remotePort = remote.mid(remoteColon + 1).toUShort(nullptr, 16);
+
+        bool ok = false;
+        const int state = fields.at(3).toInt(&ok, 16);
+        info.state = ok ? socketStateName(state) : QStringLiteral("UNKNOWN");
+        info.inode = fields.at(9).toULongLong();
+        out.append(info);
+    }
+    return true;
+}
+
+QList<SocketInfo> readNetSockets() {
+    QList<SocketInfo> all;
+    const char *const files[] = {"tcp", "tcp6", "udp", "udp6"};
+    for (const char *file : files) {
+        QFile handle(QStringLiteral("/proc/net/%1").arg(QLatin1String(file)));
+        if (!handle.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        QList<SocketInfo> part;
+        parseNetTable(handle.readAll(), QString::fromLatin1(file), part);
+        all += part;
+    }
+    return all;
+}
+
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,
                       unsigned long long &sharedKb) {
     const QList<QByteArray> parts = statmContent.simplified().split(' ');

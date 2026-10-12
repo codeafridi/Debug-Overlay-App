@@ -34,6 +34,7 @@ private:
     QLabel *m_statusBig = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;
+    QLabel *m_net = nullptr;
     QLabel *m_docker = nullptr;
     QLabel *m_kube = nullptr;
     QSet<int> m_collapsedPids;

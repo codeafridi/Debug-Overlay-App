@@ -13,6 +13,13 @@ struct ProcessRow {
     QString memory;
 };
 
+struct ConnectionRow {
+    QString proto;
+    QString local;
+    QString remote;
+    QString state;
+};
+
 struct DisplaySnapshot {
     QString appName = QStringLiteral("--");
     QString pid = QStringLiteral("--");
@@ -24,5 +31,6 @@ struct DisplaySnapshot {
     unsigned long long swapKb = 0;
     unsigned long long sharedKb = 0;
     QList<ProcessRow> processes;
+    QList<ConnectionRow> connections;
     quint64 sequence = 0;
 };

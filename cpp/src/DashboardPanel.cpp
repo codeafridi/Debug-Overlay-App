@@ -183,7 +183,17 @@ DashboardPanel::DashboardPanel(QWidget *parent)
                     m_collapsedPids.insert(item->data(0, Qt::UserRole).toInt());
                 }
             });
-    columns->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, body), 3);
+    auto *left = new QVBoxLayout();
+    left->setSpacing(14);
+    left->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, body), 3);
+
+    m_net = new QLabel(QStringLiteral("--"), body);
+    m_net->setObjectName(QStringLiteral("ddNet"));
+    m_net->setFont(monoFont(10));
+    m_net->setWordWrap(false);
+    left->addWidget(makeCard(QStringLiteral("NETWORK"), m_net, body), 2);
+
+    columns->addLayout(left, 3);
 
     auto *right = new QVBoxLayout();
     right->setSpacing(14);
@@ -260,6 +270,19 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                                   formatMemoryKb(snapshot.vmsKb),
                                   formatMemoryKb(snapshot.swapKb),
                                   formatMemoryKb(snapshot.sharedKb)));
+
+    QString net;
+    int shown = 0;
+    for (const ConnectionRow &conn : snapshot.connections) {
+        if (shown >= 8) {
+            net += QStringLiteral("...\n");
+            break;
+        }
+        net += QStringLiteral("%1 %2 -> %3  %4\n")
+                   .arg(conn.proto, conn.local, conn.remote, conn.state);
+        ++shown;
+    }
+    m_net->setText(net.isEmpty() ? QStringLiteral("no connections") : net);
 
     m_populating = true;
     m_procs->clear();

@@ -117,6 +117,40 @@ int main(int argc, char *argv[]) {
               "parseStatusDetail: missing fields default 0");
     }
 
+    // ---- /proc/net parsing ----
+    {
+        const QByteArray table =
+            "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+            "   0: 0100007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 111 1\n"
+            "   1: 0100007F:9C4E 0100007F:0035 01 00000000:00000000 00:00000000 00000000  1000        0 222 1\n";
+        QList<linuxproc::SocketInfo> socks;
+        check(linuxproc::parseNetTable(table, QStringLiteral("tcp"), socks)
+                  && socks.size() == 2,
+              "parseNetTable: tcp parses both rows");
+        check(socks.at(0).localAddr == QStringLiteral("127.0.0.1")
+                  && socks.at(0).localPort == 53
+                  && socks.at(0).state == QStringLiteral("LISTEN")
+                  && socks.at(0).inode == 111,
+              "parseNetTable: LISTEN socket decoded");
+        check(socks.at(1).remoteAddr == QStringLiteral("127.0.0.1")
+                  && socks.at(1).remotePort == 53
+                  && socks.at(1).state == QStringLiteral("ESTABLISHED")
+                  && socks.at(1).inode == 222,
+              "parseNetTable: ESTABLISHED socket decoded");
+    }
+    {
+        const QByteArray table =
+            "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+            "   0: 00000000000000000000000001000000:0050 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 333 1\n";
+        QList<linuxproc::SocketInfo> socks;
+        check(linuxproc::parseNetTable(table, QStringLiteral("tcp6"), socks)
+                  && socks.size() == 1
+                  && socks.at(0).localAddr == QStringLiteral("::1")
+                  && socks.at(0).localPort == 80
+                  && socks.at(0).state == QStringLiteral("LISTEN"),
+              "parseNetTable: IPv6 ::1 decoded");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -139,6 +173,10 @@ int main(int argc, char *argv[]) {
         check(linuxproc::countFds(self) >= 0, "countFds(self) is readable");
         check(linuxproc::countFds(1 << 30) == -1,
               "countFds(bogus) -> -1 (unreadable)");
+        check(linuxproc::socketInodes(1 << 30).isEmpty(),
+              "socketInodes(bogus) is empty");
+        const QList<unsigned long long> inodes = linuxproc::socketInodes(self);
+        check(inodes.size() >= 0, "socketInodes(self) does not crash");
     }
 
     // ---- group sum (deterministic seam) ----

@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QList>
 #include <QString>
+#include <QtGlobal>
 
 #include <functional>
 
@@ -22,6 +23,16 @@ struct ProcDetail {
     unsigned long long voluntaryCtx = 0;
     unsigned long long involuntaryCtx = 0;
     int fdCount = -1;
+};
+
+struct SocketInfo {
+    QString proto;
+    QString localAddr;
+    quint16 localPort = 0;
+    QString remoteAddr;
+    quint16 remotePort = 0;
+    QString state;
+    unsigned long long inode = 0;
 };
 
 bool exists(int pid);
@@ -45,6 +56,10 @@ bool procMem(int pid, MemInfo &out);
 bool procSample(int pid, MemInfo &mem, ProcDetail &detail);
 bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out);
 int countFds(int pid);
+QList<unsigned long long> socketInodes(int pid);
+bool parseNetTable(const QByteArray &content, const QString &proto,
+                   QList<SocketInfo> &out);
+QList<SocketInfo> readNetSockets();
 using RssReader = std::function<bool(int, unsigned long long &)>;
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out);
 bool sumRssKb(const QList<int> &pids, unsigned long long &out);

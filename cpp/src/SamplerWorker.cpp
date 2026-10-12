@@ -5,6 +5,7 @@
 #include "MemoryFormat.h"
 #include "ProcessGrouper.h"
 
+#include <QSet>
 #include <QTimer>
 
 SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
@@ -122,6 +123,41 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     snap.vmsKb = vmsTotal;
     snap.swapKb = swapTotal;
     snap.sharedKb = sharedTotal;
+
+    QSet<unsigned long long> inodeSet;
+    for (const ProcNode &node : tree) {
+        const QList<unsigned long long> inodes = linuxproc::socketInodes(node.pid);
+        for (unsigned long long inode : inodes) {
+            inodeSet.insert(inode);
+        }
+    }
+
+    QList<ConnectionRow> connections;
+    if (!inodeSet.isEmpty()) {
+        const QList<linuxproc::SocketInfo> sockets = linuxproc::readNetSockets();
+        for (const linuxproc::SocketInfo &socket : sockets) {
+            if (!inodeSet.contains(socket.inode)) {
+                continue;
+            }
+            ConnectionRow row;
+            row.proto = socket.proto;
+            row.local =
+                QStringLiteral("%1:%2").arg(socket.localAddr).arg(socket.localPort);
+            row.remote =
+                (socket.remotePort != 0
+                 || socket.state == QStringLiteral("ESTABLISHED"))
+                    ? QStringLiteral("%1:%2")
+                          .arg(socket.remoteAddr)
+                          .arg(socket.remotePort)
+                    : QStringLiteral("*");
+            row.state = socket.state;
+            connections.append(row);
+            if (connections.size() >= 50) {
+                break;
+            }
+        }
+    }
+    snap.connections = connections;
 
     m_cpuIdentity = focus.identity;
 

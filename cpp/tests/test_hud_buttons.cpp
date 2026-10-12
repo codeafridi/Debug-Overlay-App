@@ -137,6 +137,12 @@ int main(int argc, char *argv[]) {
     child.name = QStringLiteral("alpha-child");
     child.memory = QStringLiteral("4 MB");
     withProcs.processes = {root, child};
+    ConnectionRow conn;
+    conn.proto = QStringLiteral("tcp");
+    conn.local = QStringLiteral("127.0.0.1:40014");
+    conn.remote = QStringLiteral("127.0.0.1:53");
+    conn.state = QStringLiteral("ESTABLISHED");
+    withProcs.connections = {conn};
     hud.setSnapshot(withProcs);
 
     auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
@@ -168,6 +174,11 @@ int main(int argc, char *argv[]) {
               && dashProcs->topLevelItem(0)->text(2) == QStringLiteral("5")
               && dashProcs->topLevelItem(0)->text(3) == QStringLiteral("12"),
           "panel process tree shows threads and fds");
+
+    auto *dashNet = hud.findChild<QLabel *>(QStringLiteral("ddNet"));
+    check(dashNet != nullptr
+              && dashNet->text().contains(QStringLiteral("ESTABLISHED")),
+          "panel shows network connection");
 
     // The tree is rebuilt every second; a user collapse must survive that.
     if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {
