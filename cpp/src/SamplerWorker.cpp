@@ -159,6 +159,21 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     }
     snap.connections = connections;
 
+    linuxproc::CgroupInfo cgroup;
+    if (linuxproc::cgroupSample(focus.identity.pid, cgroup) && cgroup.available) {
+        snap.cgroupAvailable = true;
+        snap.cgroupVersion = cgroup.version;
+        snap.cgroupPath = cgroup.path;
+        snap.cgroupMemUsage = cgroup.memUsageBytes;
+        snap.cgroupMemLimit = cgroup.memLimitBytes;
+        snap.cgroupAnon = cgroup.memAnonBytes;
+        snap.cgroupFile = cgroup.memFileBytes;
+        snap.cgroupKernel = cgroup.memKernelBytes;
+        snap.cgroupThrottled = cgroup.nrThrottled;
+        snap.cgroupPeriods = cgroup.nrPeriods;
+        snap.cgroupThrottledUsec = cgroup.throttledUsec;
+    }
+
     m_cpuIdentity = focus.identity;
 
     snap.cpu = m_cpuText;

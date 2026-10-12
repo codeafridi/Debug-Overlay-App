@@ -35,6 +35,23 @@ struct SocketInfo {
     unsigned long long inode = 0;
 };
 
+struct CgroupInfo {
+    bool available = false;
+    QString version;
+    QString path;
+    unsigned long long cpuUsageUsec = 0;
+    unsigned long long cpuUserUsec = 0;
+    unsigned long long cpuSystemUsec = 0;
+    unsigned long long nrPeriods = 0;
+    unsigned long long nrThrottled = 0;
+    unsigned long long throttledUsec = 0;
+    unsigned long long memUsageBytes = 0;
+    long long memLimitBytes = -1;
+    unsigned long long memAnonBytes = 0;
+    unsigned long long memFileBytes = 0;
+    unsigned long long memKernelBytes = 0;
+};
+
 bool exists(int pid);
 QString comm(int pid);
 QString exePath(int pid);
@@ -60,6 +77,11 @@ QList<unsigned long long> socketInodes(int pid);
 bool parseNetTable(const QByteArray &content, const QString &proto,
                    QList<SocketInfo> &out);
 QList<SocketInfo> readNetSockets();
+bool parsePidCgroup(const QByteArray &content, QString &version, QString &path);
+bool parseCgroupCpuStat(const QByteArray &content, CgroupInfo &out);
+bool parseCgroupMemoryValue(const QByteArray &content, long long &out);
+bool parseCgroupMemoryStat(const QByteArray &content, CgroupInfo &out);
+bool cgroupSample(int pid, CgroupInfo &out);
 using RssReader = std::function<bool(int, unsigned long long &)>;
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out);
 bool sumRssKb(const QList<int> &pids, unsigned long long &out);

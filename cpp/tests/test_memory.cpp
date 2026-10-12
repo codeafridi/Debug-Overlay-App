@@ -153,6 +153,55 @@ int main(int argc, char *argv[]) {
               "parseNetTable: IPv6 ::1 decoded");
     }
 
+    // ---- cgroup parsing ----
+    {
+        QString version;
+        QString path;
+        check(linuxproc::parsePidCgroup("0::/user.slice/foo.scope\n", version, path)
+                  && version == QStringLiteral("v2")
+                  && path == QStringLiteral("/user.slice/foo.scope"),
+              "parsePidCgroup: v2 unified");
+        check(linuxproc::parsePidCgroup(
+                  "5:memory:/docker/abc\n4:cpu,cpuacct:/docker/abc\n", version, path)
+                  && version == QStringLiteral("v1")
+                  && path == QStringLiteral("/docker/abc"),
+              "parsePidCgroup: v1 controllers");
+        check(!linuxproc::parsePidCgroup("", version, path),
+              "parsePidCgroup: empty -> false");
+    }
+    {
+        linuxproc::CgroupInfo info;
+        check(linuxproc::parseCgroupCpuStat(
+                  "usage_usec 100\nuser_usec 60\nsystem_usec 40\n"
+                  "nr_periods 10\nnr_throttled 2\nthrottled_usec 500\n",
+                  info)
+                  && info.cpuUsageUsec == 100 && info.cpuUserUsec == 60
+                  && info.nrPeriods == 10 && info.nrThrottled == 2
+                  && info.throttledUsec == 500,
+              "parseCgroupCpuStat: v2 fields");
+        linuxproc::CgroupInfo v1;
+        check(linuxproc::parseCgroupCpuStat(
+                  "nr_periods 7\nthrottled_time 1000000\n", v1)
+                  && v1.nrPeriods == 7 && v1.throttledUsec == 1000,
+              "parseCgroupCpuStat: v1 throttled_time ns -> us");
+    }
+    {
+        long long value = 0;
+        check(linuxproc::parseCgroupMemoryValue("max\n", value) && value == -1,
+              "parseCgroupMemoryValue: max -> unlimited");
+        check(linuxproc::parseCgroupMemoryValue("12345\n", value)
+                  && value == 12345,
+              "parseCgroupMemoryValue: number");
+        check(linuxproc::parseCgroupMemoryValue("9223372036854771712\n", value)
+                  && value == -1,
+              "parseCgroupMemoryValue: v1 unlimited sentinel");
+        linuxproc::CgroupInfo info;
+        check(linuxproc::parseCgroupMemoryStat("anon 10\nfile 20\nkernel 30\n", info)
+                  && info.memAnonBytes == 10 && info.memFileBytes == 20
+                  && info.memKernelBytes == 30,
+              "parseCgroupMemoryStat: anon/file/kernel");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -192,6 +241,11 @@ int main(int argc, char *argv[]) {
         if (sv[1] >= 0) {
             ::close(sv[1]);
         }
+
+        linuxproc::CgroupInfo cg;
+        check(linuxproc::cgroupSample(self, cg) && cg.available
+                  && !cg.version.isEmpty() && !cg.path.isEmpty(),
+              "cgroupSample(self): available with version + path");
     }
 
     // ---- group sum (deterministic seam) ----

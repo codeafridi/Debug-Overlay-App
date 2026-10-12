@@ -398,6 +398,14 @@ QString ipv6FromHex(const QString &hex) {
     return out.isEmpty() ? QStringLiteral("::") : out;
 }
 
+QByteArray readFileBytes(const QString &path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return file.readAll();
+}
+
 } // namespace
 
 QList<unsigned long long> socketInodes(int pid) {
@@ -483,6 +491,189 @@ QList<SocketInfo> readNetSockets() {
         all += part;
     }
     return all;
+}
+
+bool parsePidCgroup(const QByteArray &content, QString &version, QString &path) {
+    const QList<QByteArray> lines = content.split('\n');
+    bool any = false;
+    bool unified = false;
+    QString v1Path;
+
+    for (const QByteArray &line : lines) {
+        const QByteArray trimmed = line.trimmed();
+        if (trimmed.isEmpty()) {
+            continue;
+        }
+        const QList<QByteArray> parts = trimmed.split(':');
+        if (parts.size() < 3) {
+            continue;
+        }
+        const QByteArray controllers = parts.at(1);
+        const QString linePath = QString::fromUtf8(parts.mid(2).join(':'));
+        if (controllers.isEmpty()) {
+            unified = true;
+            path = linePath;
+            any = true;
+        } else {
+            if (v1Path.isEmpty() || controllers.contains("memory")) {
+                v1Path = linePath;
+            }
+            any = true;
+        }
+    }
+
+    if (!any) {
+        return false;
+    }
+    if (unified) {
+        version = QStringLiteral("v2");
+        return true;
+    }
+    version = QStringLiteral("v1");
+    path = v1Path;
+    return true;
+}
+
+bool parseCgroupCpuStat(const QByteArray &content, CgroupInfo &out) {
+    const QList<QByteArray> lines = content.split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> fields = line.simplified().split(' ');
+        if (fields.size() < 2) {
+            continue;
+        }
+        bool ok = false;
+        const unsigned long long value = fields.at(1).toULongLong(&ok);
+        if (!ok) {
+            continue;
+        }
+        const QByteArray key = fields.at(0);
+        if (key == "usage_usec") {
+            out.cpuUsageUsec = value;
+        } else if (key == "user_usec") {
+            out.cpuUserUsec = value;
+        } else if (key == "system_usec") {
+            out.cpuSystemUsec = value;
+        } else if (key == "nr_periods") {
+            out.nrPeriods = value;
+        } else if (key == "nr_throttled") {
+            out.nrThrottled = value;
+        } else if (key == "throttled_usec") {
+            out.throttledUsec = value;
+        } else if (key == "throttled_time") {
+            out.throttledUsec = value / 1000; // v1 reports nanoseconds
+        }
+    }
+    return true;
+}
+
+bool parseCgroupMemoryValue(const QByteArray &content, long long &out) {
+    const QByteArray trimmed = content.trimmed();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    if (trimmed == "max") {
+        out = -1;
+        return true;
+    }
+    bool ok = false;
+    const long long value = trimmed.toLongLong(&ok);
+    if (!ok) {
+        return false;
+    }
+    // v1 reports an enormous sentinel for "unlimited".
+    out = (value > (1LL << 60)) ? -1 : value;
+    return true;
+}
+
+bool parseCgroupMemoryStat(const QByteArray &content, CgroupInfo &out) {
+    const QList<QByteArray> lines = content.split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> fields = line.simplified().split(' ');
+        if (fields.size() < 2) {
+            continue;
+        }
+        bool ok = false;
+        const unsigned long long value = fields.at(1).toULongLong(&ok);
+        if (!ok) {
+            continue;
+        }
+        const QByteArray key = fields.at(0);
+        if (key == "anon") {
+            out.memAnonBytes = value;
+        } else if (key == "file") {
+            out.memFileBytes = value;
+        } else if (key == "kernel") {
+            out.memKernelBytes = value;
+        }
+    }
+    return true;
+}
+
+bool cgroupSample(int pid, CgroupInfo &out) {
+    QFile cgroup(procPath(pid, "cgroup"));
+    if (!cgroup.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    QString version;
+    QString path;
+    if (!parsePidCgroup(cgroup.readAll(), version, path)) {
+        return false;
+    }
+    out.version = version;
+    out.path = path;
+
+    const QString root = QStringLiteral("/sys/fs/cgroup");
+    if (version == QStringLiteral("v2")) {
+        const QString base = root + path;
+        parseCgroupCpuStat(readFileBytes(base + QStringLiteral("/cpu.stat")), out);
+        parseCgroupMemoryStat(readFileBytes(base + QStringLiteral("/memory.stat")), out);
+
+        long long current = 0;
+        if (parseCgroupMemoryValue(
+                readFileBytes(base + QStringLiteral("/memory.current")), current)
+            && current > 0) {
+            out.memUsageBytes = static_cast<unsigned long long>(current);
+        }
+        long long limit = -1;
+        if (parseCgroupMemoryValue(
+                readFileBytes(base + QStringLiteral("/memory.max")), limit)) {
+            out.memLimitBytes = limit;
+        }
+        out.available = true;
+    } else {
+        const QString memBase = root + QStringLiteral("/memory") + path;
+        const QString cpuBase = root + QStringLiteral("/cpu,cpuacct") + path;
+
+        parseCgroupCpuStat(readFileBytes(cpuBase + QStringLiteral("/cpu.stat")), out);
+        const QByteArray usage =
+            readFileBytes(cpuBase + QStringLiteral("/cpuacct.usage"));
+        if (!usage.isEmpty()) {
+            bool ok = false;
+            const unsigned long long ns = usage.trimmed().toULongLong(&ok);
+            if (ok) {
+                out.cpuUsageUsec = ns / 1000;
+            }
+        }
+
+        parseCgroupMemoryStat(readFileBytes(memBase + QStringLiteral("/memory.stat")), out);
+        long long current = 0;
+        if (parseCgroupMemoryValue(
+                readFileBytes(memBase + QStringLiteral("/memory.usage_in_bytes")),
+                current)
+            && current > 0) {
+            out.memUsageBytes = static_cast<unsigned long long>(current);
+        }
+        long long limit = -1;
+        if (parseCgroupMemoryValue(
+                readFileBytes(memBase + QStringLiteral("/memory.limit_in_bytes")),
+                limit)) {
+            out.memLimitBytes = limit;
+        }
+        out.available = true;
+    }
+
+    return true;
 }
 
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,

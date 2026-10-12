@@ -32,5 +32,16 @@ struct DisplaySnapshot {
     unsigned long long sharedKb = 0;
     QList<ProcessRow> processes;
     QList<ConnectionRow> connections;
+    bool cgroupAvailable = false;
+    QString cgroupVersion;
+    QString cgroupPath;
+    unsigned long long cgroupMemUsage = 0;
+    long long cgroupMemLimit = -1;
+    unsigned long long cgroupAnon = 0;
+    unsigned long long cgroupFile = 0;
+    unsigned long long cgroupKernel = 0;
+    unsigned long long cgroupThrottled = 0;
+    unsigned long long cgroupPeriods = 0;
+    unsigned long long cgroupThrottledUsec = 0;
     quint64 sequence = 0;
 };

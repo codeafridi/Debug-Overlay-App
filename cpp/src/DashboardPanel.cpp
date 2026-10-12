@@ -193,6 +193,12 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_net->setWordWrap(false);
     left->addWidget(makeCard(QStringLiteral("NETWORK"), m_net, body), 2);
 
+    m_cgroup = new QLabel(QStringLiteral("--"), body);
+    m_cgroup->setObjectName(QStringLiteral("ddCgroup"));
+    m_cgroup->setFont(monoFont(10));
+    m_cgroup->setWordWrap(true);
+    left->addWidget(makeCard(QStringLiteral("CONTAINER"), m_cgroup, body), 2);
+
     columns->addLayout(left, 3);
 
     auto *right = new QVBoxLayout();
@@ -237,6 +243,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCardTitle { color: #7f8792; }"
         "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig { color: #d5dae0; }"
         "#ddMemDetail { color: #c4cad1; }"
+        "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
         "#ddKube { color: #b0a9c4; }"
         "QTreeWidget { background-color: transparent; border: none;"
@@ -283,6 +290,29 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         ++shown;
     }
     m_net->setText(net.isEmpty() ? QStringLiteral("no connections") : net);
+
+    if (snapshot.cgroupAvailable) {
+        const QString leaf = snapshot.cgroupPath.section(QLatin1Char('/'), -1);
+        const QString limit =
+            snapshot.cgroupMemLimit < 0
+                ? QStringLiteral("unlimited")
+                : formatMemoryKb(
+                      static_cast<unsigned long long>(snapshot.cgroupMemLimit) / 1024);
+        QString text = QStringLiteral("cgroup %1  %2\n")
+                           .arg(snapshot.cgroupVersion, leaf);
+        text += QStringLiteral("memory   %1 / %2\n")
+                    .arg(formatMemoryKb(snapshot.cgroupMemUsage / 1024), limit);
+        text += QStringLiteral("anon %1  file %2  kernel %3\n")
+                    .arg(formatMemoryKb(snapshot.cgroupAnon / 1024),
+                         formatMemoryKb(snapshot.cgroupFile / 1024),
+                         formatMemoryKb(snapshot.cgroupKernel / 1024));
+        text += QStringLiteral("cpu throttled %1 / %2 periods")
+                    .arg(snapshot.cgroupThrottled)
+                    .arg(snapshot.cgroupPeriods);
+        m_cgroup->setText(text);
+    } else {
+        m_cgroup->setText(QStringLiteral("no cgroup stats"));
+    }
 
     m_populating = true;
     m_procs->clear();

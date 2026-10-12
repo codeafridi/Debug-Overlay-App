@@ -143,6 +143,11 @@ int main(int argc, char *argv[]) {
     conn.remote = QStringLiteral("127.0.0.1:53");
     conn.state = QStringLiteral("ESTABLISHED");
     withProcs.connections = {conn};
+    withProcs.cgroupAvailable = true;
+    withProcs.cgroupVersion = QStringLiteral("v2");
+    withProcs.cgroupPath = QStringLiteral("/user.slice/app.scope");
+    withProcs.cgroupMemUsage = 100ULL * 1024 * 1024;
+    withProcs.cgroupMemLimit = 512LL * 1024 * 1024;
     hud.setSnapshot(withProcs);
 
     auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
@@ -179,6 +184,11 @@ int main(int argc, char *argv[]) {
     check(dashNet != nullptr
               && dashNet->text().contains(QStringLiteral("ESTABLISHED")),
           "panel shows network connection");
+
+    auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
+    check(dashCgroup != nullptr
+              && dashCgroup->text().contains(QStringLiteral("512 MB")),
+          "panel shows container memory limit");
 
     // The tree is rebuilt every second; a user collapse must survive that.
     if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {
