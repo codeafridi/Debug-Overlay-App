@@ -4,6 +4,7 @@
 #include "DockerStatus.h"
 #include "KubeStatus.h"
 
+#include <QSet>
 #include <QWidget>
 
 class QLabel;
@@ -35,4 +36,6 @@ private:
     QTreeWidget *m_procs = nullptr;
     QLabel *m_docker = nullptr;
     QLabel *m_kube = nullptr;
+    QSet<int> m_collapsedPids;
+    bool m_populating = false;
 };

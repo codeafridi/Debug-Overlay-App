@@ -168,6 +168,18 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_procs->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_procs->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_procs->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    connect(m_procs, &QTreeWidget::itemExpanded, this,
+            [this](QTreeWidgetItem *item) {
+                if (!m_populating) {
+                    m_collapsedPids.remove(item->data(0, Qt::UserRole).toInt());
+                }
+            });
+    connect(m_procs, &QTreeWidget::itemCollapsed, this,
+            [this](QTreeWidgetItem *item) {
+                if (!m_populating) {
+                    m_collapsedPids.insert(item->data(0, Qt::UserRole).toInt());
+                }
+            });
     columns->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, body), 3);
 
     auto *right = new QVBoxLayout();
@@ -246,16 +258,23 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                                   formatMemoryKb(snapshot.swapKb),
                                   formatMemoryKb(snapshot.sharedKb)));
 
+    m_populating = true;
     m_procs->clear();
     QList<QTreeWidgetItem *> byDepth;
+    QList<QTreeWidgetItem *> allItems;
+    QSet<int> present;
     for (const ProcessRow &row : snapshot.processes) {
         auto *item = new QTreeWidgetItem();
+        item->setData(0, Qt::UserRole, row.pid);
         item->setText(0, row.name.isEmpty() ? QStringLiteral("pid %1").arg(row.pid)
                                             : row.name);
         item->setText(1, QString::number(row.pid));
         item->setText(2, row.memory);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         item->setTextAlignment(2, Qt::AlignRight | Qt::AlignVCenter);
+
+        allItems.append(item);
+        present.insert(row.pid);
 
         if (row.depth <= 0 || byDepth.size() < row.depth) {
             m_procs->addTopLevelItem(item);
@@ -267,7 +286,14 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         }
         byDepth.append(item);
     }
-    m_procs->expandAll();
+
+    // Preserve the user's expand/collapse choices across the 1s refresh.
+    m_collapsedPids.intersect(present);
+    for (QTreeWidgetItem *item : allItems) {
+        item->setExpanded(
+            !m_collapsedPids.contains(item->data(0, Qt::UserRole).toInt()));
+    }
+    m_populating = false;
 }
 
 void DashboardPanel::setDockerSnapshot(const DockerSnapshot &snapshot) {

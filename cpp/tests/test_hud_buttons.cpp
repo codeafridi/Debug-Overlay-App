@@ -161,6 +161,18 @@ int main(int argc, char *argv[]) {
                      == QStringLiteral("alpha-child"),
           "panel process tree nests child");
 
+    // The tree is rebuilt every second; a user collapse must survive that.
+    if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {
+        dashProcs->topLevelItem(0)->setExpanded(false);
+        hud.setSnapshot(withProcs);
+        check(!dashProcs->topLevelItem(0)->isExpanded(),
+              "collapsed process stays collapsed across refresh");
+        dashProcs->topLevelItem(0)->setExpanded(true);
+        hud.setSnapshot(withProcs);
+        check(dashProcs->topLevelItem(0)->isExpanded(),
+              "expanded process stays expanded across refresh");
+    }
+
     DockerSnapshot dockerSnap;
     dockerSnap.state = DockerState::Ok;
     dockerSnap.runningCount = 1;
