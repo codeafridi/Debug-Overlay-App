@@ -159,8 +159,9 @@ DashboardPanel::DashboardPanel(QWidget *parent)
 
     m_procs = new QTreeWidget(body);
     m_procs->setObjectName(QStringLiteral("ddProcs"));
-    m_procs->setColumnCount(3);
+    m_procs->setColumnCount(5);
     m_procs->setHeaderLabels({QStringLiteral("Process"), QStringLiteral("PID"),
+                              QStringLiteral("Threads"), QStringLiteral("FDs"),
                               QStringLiteral("RSS")});
     m_procs->setRootIsDecorated(true);
     m_procs->setSelectionMode(QAbstractItemView::NoSelection);
@@ -168,6 +169,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_procs->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_procs->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_procs->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_procs->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    m_procs->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
     connect(m_procs, &QTreeWidget::itemExpanded, this,
             [this](QTreeWidgetItem *item) {
                 if (!m_populating) {
@@ -269,9 +272,15 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         item->setText(0, row.name.isEmpty() ? QStringLiteral("pid %1").arg(row.pid)
                                             : row.name);
         item->setText(1, QString::number(row.pid));
-        item->setText(2, row.memory);
+        item->setText(2, row.threads > 0 ? QString::number(row.threads)
+                                         : QStringLiteral("--"));
+        item->setText(3, row.fds < 0 ? QStringLiteral("--")
+                                     : QString::number(row.fds));
+        item->setText(4, row.memory);
         item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         item->setTextAlignment(2, Qt::AlignRight | Qt::AlignVCenter);
+        item->setTextAlignment(3, Qt::AlignRight | Qt::AlignVCenter);
+        item->setTextAlignment(4, Qt::AlignRight | Qt::AlignVCenter);
 
         allItems.append(item);
         present.insert(row.pid);

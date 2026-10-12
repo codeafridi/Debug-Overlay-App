@@ -7,6 +7,8 @@
 struct ProcessRow {
     int pid = 0;
     int depth = 0;
+    int threads = 0;
+    int fds = -1;
     QString name;
     QString memory;
 };

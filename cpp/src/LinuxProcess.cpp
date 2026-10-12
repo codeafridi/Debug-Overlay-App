@@ -266,6 +266,40 @@ bool parseStatusMem(const QByteArray &statusContent, MemInfo &out) {
     return foundRss;
 }
 
+bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out) {
+    const QList<QByteArray> lines = statusContent.split('\n');
+    for (const QByteArray &line : lines) {
+        bool ok = false;
+        if (line.startsWith("Threads:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.threads = static_cast<int>(value);
+            }
+        } else if (line.startsWith("voluntary_ctxt_switches:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.voluntaryCtx = value;
+            }
+        } else if (line.startsWith("nonvoluntary_ctxt_switches:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.involuntaryCtx = value;
+            }
+        }
+    }
+    return true;
+}
+
+int countFds(int pid) {
+    const QString path = procPath(pid, "fd");
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isDir() || !info.isReadable()) {
+        return -1;
+    }
+    const QStringList entries = QDir(path).entryList(QDir::NoDotAndDotDot);
+    return entries.size();
+}
+
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,
                       unsigned long long &sharedKb) {
     const QList<QByteArray> parts = statmContent.simplified().split(' ');
@@ -303,6 +337,33 @@ bool procMem(int pid, MemInfo &out) {
         }
     }
 
+    return true;
+}
+
+bool procSample(int pid, MemInfo &mem, ProcDetail &detail) {
+    QFile status(procPath(pid, "status"));
+    if (!status.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    const QByteArray content = status.readAll();
+    if (!parseStatusMem(content, mem)) {
+        return false;
+    }
+    parseStatusDetail(content, detail);
+
+    QFile statm(procPath(pid, "statm"));
+    if (statm.open(QIODevice::ReadOnly)) {
+        const long page = ::sysconf(_SC_PAGESIZE);
+        const unsigned long long pageSize =
+            page > 0 ? static_cast<unsigned long long>(page) : 4096ULL;
+        unsigned long long shared = 0;
+        if (parseStatmShared(statm.readAll(), pageSize, shared)) {
+            mem.sharedKb = shared;
+        }
+    }
+
+    detail.fdCount = countFds(pid);
     return true;
 }
 

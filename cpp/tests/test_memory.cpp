@@ -101,6 +101,22 @@ int main(int argc, char *argv[]) {
               "parseStatmShared: non-numeric -> false");
     }
 
+    // ---- status detail (threads + ctx switches) ----
+    {
+        linuxproc::ProcDetail d;
+        check(linuxproc::parseStatusDetail(
+                  "Name:\tcat\nThreads:\t4\nvoluntary_ctxt_switches:\t12\n"
+                  "nonvoluntary_ctxt_switches:\t3\n",
+                  d)
+                  && d.threads == 4 && d.voluntaryCtx == 12
+                  && d.involuntaryCtx == 3,
+              "parseStatusDetail: threads + ctx switches");
+        linuxproc::ProcDetail e;
+        check(linuxproc::parseStatusDetail("Name:\tcat\n", e) && e.threads == 0
+                  && e.voluntaryCtx == 0 && e.involuntaryCtx == 0,
+              "parseStatusDetail: missing fields default 0");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -112,6 +128,17 @@ int main(int argc, char *argv[]) {
         linuxproc::MemInfo m;
         check(linuxproc::procMem(self, m) && m.rssKb > 0,
               "procMem(self): reads rss + vms + swap + shared");
+    }
+
+    {
+        linuxproc::MemInfo m;
+        linuxproc::ProcDetail d;
+        check(linuxproc::procSample(self, m, d) && m.rssKb > 0
+                  && d.threads > 0,
+              "procSample(self): memory + threads via one read");
+        check(linuxproc::countFds(self) >= 0, "countFds(self) is readable");
+        check(linuxproc::countFds(1 << 30) == -1,
+              "countFds(bogus) -> -1 (unreadable)");
     }
 
     // ---- group sum (deterministic seam) ----

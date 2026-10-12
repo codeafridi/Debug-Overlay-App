@@ -17,6 +17,13 @@ struct MemInfo {
     unsigned long long sharedKb = 0;
 };
 
+struct ProcDetail {
+    int threads = 0;
+    unsigned long long voluntaryCtx = 0;
+    unsigned long long involuntaryCtx = 0;
+    int fdCount = -1;
+};
+
 bool exists(int pid);
 QString comm(int pid);
 QString exePath(int pid);
@@ -35,6 +42,9 @@ bool parseStatusMem(const QByteArray &statusContent, MemInfo &out);
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,
                       unsigned long long &sharedKb);
 bool procMem(int pid, MemInfo &out);
+bool procSample(int pid, MemInfo &mem, ProcDetail &detail);
+bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out);
+int countFds(int pid);
 using RssReader = std::function<bool(int, unsigned long long &)>;
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out);
 bool sumRssKb(const QList<int> &pids, unsigned long long &out);

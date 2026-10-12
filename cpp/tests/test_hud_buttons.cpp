@@ -125,11 +125,15 @@ int main(int argc, char *argv[]) {
     ProcessRow root;
     root.pid = 123;
     root.depth = 0;
+    root.threads = 5;
+    root.fds = 12;
     root.name = QStringLiteral("alpha");
     root.memory = QStringLiteral("8 MB");
     ProcessRow child;
     child.pid = 124;
     child.depth = 1;
+    child.threads = 3;
+    child.fds = 7;
     child.name = QStringLiteral("alpha-child");
     child.memory = QStringLiteral("4 MB");
     withProcs.processes = {root, child};
@@ -160,6 +164,10 @@ int main(int argc, char *argv[]) {
               && dashProcs->topLevelItem(0)->child(0)->text(0)
                      == QStringLiteral("alpha-child"),
           "panel process tree nests child");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->text(2) == QStringLiteral("5")
+              && dashProcs->topLevelItem(0)->text(3) == QStringLiteral("12"),
+          "panel process tree shows threads and fds");
 
     // The tree is rebuilt every second; a user collapse must survive that.
     if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {

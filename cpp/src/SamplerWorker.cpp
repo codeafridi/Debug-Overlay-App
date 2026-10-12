@@ -95,7 +95,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     QList<ProcessRow> rows;
     for (const ProcNode &node : tree) {
         linuxproc::MemInfo info;
-        if (!linuxproc::procMem(node.pid, info)) {
+        linuxproc::ProcDetail detail;
+        if (!linuxproc::procSample(node.pid, info, detail)) {
             continue;
         }
         rssTotal += info.rssKb;
@@ -106,6 +107,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         ProcessRow row;
         row.pid = node.pid;
         row.depth = node.depth;
+        row.threads = detail.threads;
+        row.fds = detail.fdCount;
         row.name = linuxproc::comm(node.pid);
         if (row.name.isEmpty()) {
             row.name = QString::number(node.pid);
