@@ -6,6 +6,7 @@
 #include "FocusSampler.h"
 #include "GroupCache.h"
 #include "HealthEvaluator.h"
+#include "HostSampler.h"
 #include "ProcessIdentity.h"
 
 #include <QObject>
@@ -36,6 +37,7 @@ private:
     FocusedWindowProvider *m_provider;
     FocusSampler m_sampler;
     CpuSampler m_cpuSampler;
+    HostSampler m_hostSampler;
     GroupCache m_groupCache;
     QTimer *m_timer = nullptr;
     int m_intervalMs = 1000;

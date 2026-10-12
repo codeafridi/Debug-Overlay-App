@@ -35,6 +35,8 @@ add_library(syspeek_core STATIC
     src/FocusSampler.h
     src/CpuSampler.cpp
     src/CpuSampler.h
+    src/HostSampler.cpp
+    src/HostSampler.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
     src/ProcessGrouper.cpp

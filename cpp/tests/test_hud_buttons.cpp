@@ -148,6 +148,13 @@ int main(int argc, char *argv[]) {
     withProcs.cgroupPath = QStringLiteral("/user.slice/app.scope");
     withProcs.cgroupMemUsage = 100ULL * 1024 * 1024;
     withProcs.cgroupMemLimit = 512LL * 1024 * 1024;
+    withProcs.hostAvailable = true;
+    withProcs.hostCpuPercent = 23.0;
+    withProcs.hostMemAvailableKb = 4ULL * 1024 * 1024;
+    withProcs.hostDiskFreeBytes = 100ULL * 1024 * 1024 * 1024;
+    withProcs.hostNetRxPerSec = 2048.0;
+    withProcs.hostNetTxPerSec = 1024.0;
+    withProcs.hostLoad1 = 0.42;
     hud.setSnapshot(withProcs);
 
     auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
@@ -189,6 +196,13 @@ int main(int argc, char *argv[]) {
     check(dashCgroup != nullptr
               && dashCgroup->text().contains(QStringLiteral("512 MB")),
           "panel shows container memory limit");
+
+    auto *hostCpu = hud.findChild<QLabel *>(QStringLiteral("ddHostCpu"));
+    auto *hostLoad = hud.findChild<QLabel *>(QStringLiteral("ddHostLoad"));
+    check(hostCpu != nullptr && hostCpu->text() == QStringLiteral("23%"),
+          "panel shows host cpu");
+    check(hostLoad != nullptr && hostLoad->text() == QStringLiteral("0.42"),
+          "panel shows host load");
 
     // The tree is rebuilt every second; a user collapse must survive that.
     if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {

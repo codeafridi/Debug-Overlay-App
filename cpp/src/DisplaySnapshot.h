@@ -43,5 +43,15 @@ struct DisplaySnapshot {
     unsigned long long cgroupThrottled = 0;
     unsigned long long cgroupPeriods = 0;
     unsigned long long cgroupThrottledUsec = 0;
+    bool hostAvailable = false;
+    bool hostWarming = false;
+    double hostCpuPercent = 0.0;
+    unsigned long long hostMemTotalKb = 0;
+    unsigned long long hostMemAvailableKb = 0;
+    unsigned long long hostDiskTotalBytes = 0;
+    unsigned long long hostDiskFreeBytes = 0;
+    double hostNetRxPerSec = 0.0;
+    double hostNetTxPerSec = 0.0;
+    double hostLoad1 = 0.0;
     quint64 sequence = 0;
 };

@@ -6,6 +6,8 @@
 
 #include <unistd.h>
 
+#include <sys/statvfs.h>
+
 namespace linuxproc {
 
 namespace {
@@ -674,6 +676,175 @@ bool cgroupSample(int pid, CgroupInfo &out) {
     }
 
     return true;
+}
+
+bool parseHostCpu(const QByteArray &statContent, HostCpuTimes &out) {
+    const QList<QByteArray> lines = statContent.split('\n');
+    if (lines.isEmpty()) {
+        return false;
+    }
+    const QList<QByteArray> fields = lines.first().simplified().split(' ');
+    if (fields.isEmpty() || fields.first() != QByteArrayLiteral("cpu")) {
+        return false;
+    }
+
+    unsigned long long total = 0;
+    unsigned long long idle = 0;
+    for (int i = 1; i < fields.size() && i <= 8; ++i) {
+        bool ok = false;
+        const unsigned long long value = fields.at(i).toULongLong(&ok);
+        if (!ok) {
+            break;
+        }
+        total += value;
+        if (i == 4 || i == 5) { // idle + iowait
+            idle += value;
+        }
+    }
+
+    if (total == 0) {
+        return false;
+    }
+    out.total = total;
+    out.idle = idle;
+    return true;
+}
+
+bool parseMemInfo(const QByteArray &content, HostMem &out) {
+    bool found = false;
+    const QList<QByteArray> lines = content.split('\n');
+    for (const QByteArray &line : lines) {
+        bool ok = false;
+        if (line.startsWith("MemTotal:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.totalKb = value;
+                found = true;
+            }
+        } else if (line.startsWith("MemAvailable:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.availableKb = value;
+            }
+        } else if (line.startsWith("MemFree:")) {
+            const unsigned long long value = parseKbValue(line, ok);
+            if (ok) {
+                out.freeKb = value;
+            }
+        }
+    }
+    return found;
+}
+
+bool parseNetDev(const QByteArray &content, NetTotals &out) {
+    unsigned long long rx = 0;
+    unsigned long long tx = 0;
+    bool any = false;
+
+    const QList<QByteArray> lines = content.split('\n');
+    for (const QByteArray &line : lines) {
+        const QByteArray trimmed = line.trimmed();
+        const int colon = trimmed.indexOf(':');
+        if (colon < 0) {
+            continue;
+        }
+        const QByteArray name = trimmed.left(colon).trimmed();
+        if (name.isEmpty() || name == QByteArrayLiteral("lo")) {
+            continue;
+        }
+        const QList<QByteArray> fields =
+            trimmed.mid(colon + 1).simplified().split(' ');
+        if (fields.size() < 9) {
+            continue;
+        }
+        bool okRx = false;
+        bool okTx = false;
+        const unsigned long long rxBytes = fields.at(0).toULongLong(&okRx);
+        const unsigned long long txBytes = fields.at(8).toULongLong(&okTx);
+        if (!okRx || !okTx) {
+            continue;
+        }
+        rx += rxBytes;
+        tx += txBytes;
+        any = true;
+    }
+
+    if (!any) {
+        return false;
+    }
+    out.rxBytes = rx;
+    out.txBytes = tx;
+    return true;
+}
+
+bool parseLoadAvg(const QByteArray &content, double &l1, double &l5, double &l15) {
+    const QList<QByteArray> fields = content.simplified().split(' ');
+    if (fields.size() < 3) {
+        return false;
+    }
+    bool ok1 = false;
+    bool ok5 = false;
+    bool ok15 = false;
+    l1 = fields.at(0).toDouble(&ok1);
+    l5 = fields.at(1).toDouble(&ok5);
+    l15 = fields.at(2).toDouble(&ok15);
+    return ok1 && ok5 && ok15;
+}
+
+bool hostCpuTimes(HostCpuTimes &out) {
+    return parseHostCpu(readFileBytes(QStringLiteral("/proc/stat")), out);
+}
+
+bool hostMem(HostMem &out) {
+    return parseMemInfo(readFileBytes(QStringLiteral("/proc/meminfo")), out);
+}
+
+bool hostNet(NetTotals &out) {
+    return parseNetDev(readFileBytes(QStringLiteral("/proc/net/dev")), out);
+}
+
+bool hostLoad(double &l1, double &l5, double &l15) {
+    return parseLoadAvg(readFileBytes(QStringLiteral("/proc/loadavg")), l1, l5, l15);
+}
+
+bool diskUsage(const QString &path, unsigned long long &totalBytes,
+               unsigned long long &freeBytes) {
+    struct statvfs stats;
+    if (::statvfs(path.toLocal8Bit().constData(), &stats) != 0) {
+        return false;
+    }
+    const unsigned long long fragment =
+        stats.f_frsize != 0 ? stats.f_frsize : stats.f_bsize;
+    totalBytes = static_cast<unsigned long long>(stats.f_blocks) * fragment;
+    freeBytes = static_cast<unsigned long long>(stats.f_bavail) * fragment;
+    return true;
+}
+
+double hostCpuBusyPercent(const HostCpuTimes &prev, const HostCpuTimes &cur) {
+    const long long deltaTotal =
+        static_cast<long long>(cur.total) - static_cast<long long>(prev.total);
+    const long long deltaIdle =
+        static_cast<long long>(cur.idle) - static_cast<long long>(prev.idle);
+    if (deltaTotal <= 0) {
+        return 0.0;
+    }
+    double busy = static_cast<double>(deltaTotal - deltaIdle)
+                  / static_cast<double>(deltaTotal) * 100.0;
+    if (busy < 0.0) {
+        busy = 0.0;
+    }
+    if (busy > 100.0) {
+        busy = 100.0;
+    }
+    return busy;
+}
+
+double netRatePerSec(unsigned long long prev, unsigned long long cur,
+                     double seconds) {
+    if (seconds <= 0.0 || cur < prev) {
+        return 0.0;
+    }
+    return static_cast<double>(cur - prev) / seconds;
 }
 
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,

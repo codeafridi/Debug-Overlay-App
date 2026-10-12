@@ -52,6 +52,22 @@ struct CgroupInfo {
     unsigned long long memKernelBytes = 0;
 };
 
+struct HostCpuTimes {
+    unsigned long long total = 0;
+    unsigned long long idle = 0;
+};
+
+struct HostMem {
+    unsigned long long totalKb = 0;
+    unsigned long long availableKb = 0;
+    unsigned long long freeKb = 0;
+};
+
+struct NetTotals {
+    unsigned long long rxBytes = 0;
+    unsigned long long txBytes = 0;
+};
+
 bool exists(int pid);
 QString comm(int pid);
 QString exePath(int pid);
@@ -82,6 +98,19 @@ bool parseCgroupCpuStat(const QByteArray &content, CgroupInfo &out);
 bool parseCgroupMemoryValue(const QByteArray &content, long long &out);
 bool parseCgroupMemoryStat(const QByteArray &content, CgroupInfo &out);
 bool cgroupSample(int pid, CgroupInfo &out);
+bool parseHostCpu(const QByteArray &statContent, HostCpuTimes &out);
+bool parseMemInfo(const QByteArray &content, HostMem &out);
+bool parseNetDev(const QByteArray &content, NetTotals &out);
+bool parseLoadAvg(const QByteArray &content, double &l1, double &l5, double &l15);
+bool hostCpuTimes(HostCpuTimes &out);
+bool hostMem(HostMem &out);
+bool hostNet(NetTotals &out);
+bool hostLoad(double &l1, double &l5, double &l15);
+bool diskUsage(const QString &path, unsigned long long &totalBytes,
+               unsigned long long &freeBytes);
+double hostCpuBusyPercent(const HostCpuTimes &prev, const HostCpuTimes &cur);
+double netRatePerSec(unsigned long long prev, unsigned long long cur,
+                     double seconds);
 using RssReader = std::function<bool(int, unsigned long long &)>;
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out);
 bool sumRssKb(const QList<int> &pids, unsigned long long &out);

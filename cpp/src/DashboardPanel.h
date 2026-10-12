@@ -32,6 +32,11 @@ private:
     QLabel *m_procCount = nullptr;
     QLabel *m_statusValue = nullptr;
     QLabel *m_statusBig = nullptr;
+    QLabel *m_hostCpu = nullptr;
+    QLabel *m_hostMem = nullptr;
+    QLabel *m_hostDisk = nullptr;
+    QLabel *m_hostNet = nullptr;
+    QLabel *m_hostLoad = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;
     QLabel *m_net = nullptr;

@@ -31,6 +31,18 @@ QFont monoFont(int size, bool bold = false) {
     return font;
 }
 
+QString formatRate(double bytesPerSec) {
+    const double kb = bytesPerSec / 1024.0;
+    if (kb < 1024.0) {
+        return QStringLiteral("%1 KB/s").arg(qRound(kb));
+    }
+    const double mb = kb / 1024.0;
+    if (mb < 1024.0) {
+        return QStringLiteral("%1 MB/s").arg(mb, 0, 'f', 1);
+    }
+    return QStringLiteral("%1 GB/s").arg(mb / 1024.0, 0, 'f', 2);
+}
+
 QString statusColor(const QString &status) {
     if (status == QStringLiteral("HIGH CPU")) {
         return QStringLiteral("#d1685f");
@@ -154,6 +166,31 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     stats->addWidget(makeStatCard(QStringLiteral("STATUS"), m_statusBig, nullptr, body), 1);
     bodyLayout->addLayout(stats);
 
+    m_hostCpu = new QLabel(QStringLiteral("--"), body);
+    m_hostCpu->setObjectName(QStringLiteral("ddHostCpu"));
+    m_hostCpu->setFont(monoFont(13, true));
+    m_hostMem = new QLabel(QStringLiteral("--"), body);
+    m_hostMem->setObjectName(QStringLiteral("ddHostMem"));
+    m_hostMem->setFont(monoFont(13, true));
+    m_hostDisk = new QLabel(QStringLiteral("--"), body);
+    m_hostDisk->setObjectName(QStringLiteral("ddHostDisk"));
+    m_hostDisk->setFont(monoFont(13, true));
+    m_hostNet = new QLabel(QStringLiteral("--"), body);
+    m_hostNet->setObjectName(QStringLiteral("ddHostNet"));
+    m_hostNet->setFont(monoFont(13, true));
+    m_hostLoad = new QLabel(QStringLiteral("--"), body);
+    m_hostLoad->setObjectName(QStringLiteral("ddHostLoad"));
+    m_hostLoad->setFont(monoFont(13, true));
+
+    auto *hostRow = new QHBoxLayout();
+    hostRow->setSpacing(14);
+    hostRow->addWidget(makeStatCard(QStringLiteral("HOST CPU"), m_hostCpu, nullptr, body), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("MEM AVAILABLE"), m_hostMem, nullptr, body), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("DISK FREE"), m_hostDisk, nullptr, body), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("NET rx / tx"), m_hostNet, nullptr, body), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, nullptr, body), 1);
+    bodyLayout->addLayout(hostRow);
+
     auto *columns = new QHBoxLayout();
     columns->setSpacing(14);
 
@@ -241,7 +278,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddStat { background-color: #1b1d21; border: 1px solid #2a2d33;"
         "  border-radius: 4px; }"
         "#ddCardTitle { color: #7f8792; }"
-        "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig { color: #d5dae0; }"
+        "#ddCpu, #ddMem, #ddProcCount, #ddStatusBig, #ddHostCpu, #ddHostMem,"
+        " #ddHostDisk, #ddHostNet, #ddHostLoad { color: #d5dae0; }"
         "#ddMemDetail { color: #c4cad1; }"
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
@@ -312,6 +350,24 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         m_cgroup->setText(text);
     } else {
         m_cgroup->setText(QStringLiteral("no cgroup stats"));
+    }
+
+    if (snapshot.hostAvailable) {
+        m_hostCpu->setText(
+            snapshot.hostWarming
+                ? QStringLiteral("...")
+                : QStringLiteral("%1%").arg(qRound(snapshot.hostCpuPercent)));
+        m_hostMem->setText(formatMemoryKb(snapshot.hostMemAvailableKb));
+        m_hostDisk->setText(formatMemoryKb(snapshot.hostDiskFreeBytes / 1024));
+        m_hostNet->setText(QStringLiteral("%1 / %2")
+                               .arg(formatRate(snapshot.hostNetRxPerSec),
+                                    formatRate(snapshot.hostNetTxPerSec)));
+        m_hostLoad->setText(QString::number(snapshot.hostLoad1, 'f', 2));
+    } else {
+        for (QLabel *label :
+             {m_hostCpu, m_hostMem, m_hostDisk, m_hostNet, m_hostLoad}) {
+            label->setText(QStringLiteral("--"));
+        }
     }
 
     m_populating = true;

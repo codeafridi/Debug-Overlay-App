@@ -1,5 +1,6 @@
 #include "LinuxProcess.h"
 #include "MemoryFormat.h"
+#include "HostSampler.h"
 
 #include <QByteArray>
 #include <QCoreApplication>
@@ -10,6 +11,7 @@
 
 #include <sys/socket.h>
 
+#include <cmath>
 #include <cstdio>
 
 int main(int argc, char *argv[]) {
@@ -22,6 +24,7 @@ int main(int argc, char *argv[]) {
             ++failures;
         }
     };
+    auto near = [](double a, double b) { return std::fabs(a - b) < 1e-6; };
 
     // ---- format ----
     check(formatMemoryKb(0) == QStringLiteral("0 MB"), "0 KB -> 0 MB");
@@ -202,6 +205,83 @@ int main(int argc, char *argv[]) {
               "parseCgroupMemoryStat: anon/file/kernel");
     }
 
+    // ---- host metric parsing ----
+    {
+        linuxproc::HostCpuTimes cpu;
+        check(linuxproc::parseHostCpu(
+                  "cpu  1000 0 500 3000 200 0 0 0 0 0\ncpu0 1 2 3 4 5 6 7 8\n", cpu)
+                  && cpu.total == 4700 && cpu.idle == 3200,
+              "parseHostCpu: total 4700, idle 3200");
+
+        linuxproc::HostMem mem;
+        check(linuxproc::parseMemInfo(
+                  "MemTotal:       1000 kB\nMemFree: 200 kB\nMemAvailable: 600 kB\n",
+                  mem)
+                  && mem.totalKb == 1000 && mem.freeKb == 200
+                  && mem.availableKb == 600,
+              "parseMemInfo: total/free/available");
+
+        linuxproc::NetTotals net;
+        check(linuxproc::parseNetDev(
+                  "Inter-|   Receive                                                |  Transmit\n"
+                  " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n"
+                  "    lo: 999 0 0 0 0 0 0 0 888 0 0 0 0 0 0 0\n"
+                  "  eth0: 1000 5 0 0 0 0 0 0 2000 7 0 0 0 0 0 0\n",
+                  net)
+                  && net.rxBytes == 1000 && net.txBytes == 2000,
+              "parseNetDev: sums non-loopback rx/tx");
+
+        double l1 = 0, l5 = 0, l15 = 0;
+        check(linuxproc::parseLoadAvg("0.50 0.40 0.30 1/234 5678\n", l1, l5, l15)
+                  && near(l1, 0.5) && near(l5, 0.4) && near(l15, 0.3),
+              "parseLoadAvg: 1/5/15");
+    }
+    {
+        const linuxproc::HostCpuTimes prev{1000, 400};
+        const linuxproc::HostCpuTimes cur{2000, 700};
+        check(near(linuxproc::hostCpuBusyPercent(prev, cur), 70.0),
+              "hostCpuBusyPercent: 70% busy");
+        check(near(linuxproc::hostCpuBusyPercent(cur, prev), 0.0),
+              "hostCpuBusyPercent: counter reset -> 0");
+        check(near(linuxproc::netRatePerSec(1000, 3000, 2.0), 1000.0),
+              "netRatePerSec: 1000 B/s");
+        check(near(linuxproc::netRatePerSec(3000, 1000, 2.0), 0.0),
+              "netRatePerSec: reset -> 0");
+    }
+    {
+        HostSource src;
+        linuxproc::HostCpuTimes cpu{1000, 400};
+        linuxproc::NetTotals net{1000, 2000};
+        src.cpu = [&cpu](linuxproc::HostCpuTimes &o) { o = cpu; return true; };
+        src.mem = [](linuxproc::HostMem &o) {
+            o.totalKb = 100; o.availableKb = 40; o.freeKb = 10; return true;
+        };
+        src.net = [&net](linuxproc::NetTotals &o) { o = net; return true; };
+        src.load = [](double &a, double &b, double &c) {
+            a = 0.5; b = 0.4; c = 0.3; return true;
+        };
+        src.disk = [](unsigned long long &t, unsigned long long &f) {
+            t = 1000; f = 400; return true;
+        };
+
+        HostSampler sampler(src);
+        const HostSample first = sampler.sample();
+        check(first.available && first.warming && first.memAvailable
+                  && first.diskAvailable && first.loadAvailable,
+              "host sampler: first sample warming + mem/disk/load");
+
+        cpu.total = 2000;
+        cpu.idle = 700; // delta total 1000, idle 300 -> 70% busy
+        const HostSample second = sampler.sample();
+        check(second.available && !second.warming
+                  && near(second.cpuPercent, 70.0),
+              "host sampler: second sample 70% busy");
+        check(near(second.netRxPerSec, 0.0) && near(second.netTxPerSec, 0.0),
+              "host sampler: unchanged net -> 0 rate");
+        check(second.mem.availableKb == 40 && second.diskFreeBytes == 400,
+              "host sampler: mem + disk carried through");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -246,6 +326,27 @@ int main(int argc, char *argv[]) {
         check(linuxproc::cgroupSample(self, cg) && cg.available
                   && !cg.version.isEmpty() && !cg.path.isEmpty(),
               "cgroupSample(self): available with version + path");
+
+        linuxproc::HostCpuTimes hostCpu;
+        check(linuxproc::hostCpuTimes(hostCpu) && hostCpu.total > 0,
+              "hostCpuTimes: positive total");
+        linuxproc::HostMem hostMem;
+        check(linuxproc::hostMem(hostMem) && hostMem.totalKb > 0,
+              "hostMem: positive total");
+        double hl1 = 0, hl5 = 0, hl15 = 0;
+        check(linuxproc::hostLoad(hl1, hl5, hl15), "hostLoad: readable");
+        unsigned long long diskTotal = 0, diskFree = 0;
+        check(linuxproc::diskUsage(QStringLiteral("/"), diskTotal, diskFree)
+                  && diskTotal > 0,
+              "diskUsage(/): positive total");
+
+        HostSampler hostSampler;
+        const HostSample h1 = hostSampler.sample();
+        check(h1.available && h1.warming, "host sampler real: first warming");
+        const HostSample h2 = hostSampler.sample();
+        check(h2.available && !h2.warming && h2.cpuPercent >= 0.0
+                  && h2.cpuPercent <= 100.0,
+              "host sampler real: second measured 0-100%");
     }
 
     // ---- group sum (deterministic seam) ----

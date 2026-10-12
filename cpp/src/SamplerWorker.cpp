@@ -180,5 +180,20 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     snap.memory = m_memText;
     snap.status = HealthEvaluator::text(
         m_health.update(cpuValid, cpuValid ? cpu.percent : 0.0, rssValid, rss));
+
+    const HostSample host = m_hostSampler.sample();
+    if (host.available) {
+        snap.hostAvailable = true;
+        snap.hostWarming = host.warming;
+        snap.hostCpuPercent = host.cpuPercent;
+        snap.hostMemTotalKb = host.mem.totalKb;
+        snap.hostMemAvailableKb = host.mem.availableKb;
+        snap.hostDiskTotalBytes = host.diskTotalBytes;
+        snap.hostDiskFreeBytes = host.diskFreeBytes;
+        snap.hostNetRxPerSec = host.netRxPerSec;
+        snap.hostNetTxPerSec = host.netTxPerSec;
+        snap.hostLoad1 = host.load1;
+    }
+
     return snap;
 }
