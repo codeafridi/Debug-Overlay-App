@@ -1,9 +1,10 @@
 #include "HudWindow.h"
-#include "DashboardWindow.h"
+#include "DashboardPanel.h"
 
 #include <QApplication>
 #include <QLabel>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
@@ -110,8 +111,11 @@ int main(int argc, char *argv[]) {
     }
 
     auto *moreButton2 = hud.findChild<QPushButton *>(QStringLiteral("moreButton"));
-    auto *dashboard = hud.findChild<DashboardWindow *>();
-    check(dashboard != nullptr, "dashboard window exists");
+    auto *stack = hud.findChild<QStackedWidget *>(QStringLiteral("hudStack"));
+    auto *panel = hud.findChild<DashboardPanel *>();
+    check(panel != nullptr, "dashboard panel exists inside the overlay");
+    check(stack != nullptr && stack->currentIndex() == 0,
+          "overlay starts on the compact page");
     check(hud.findChild<QLabel *>(QStringLiteral("details")) == nullptr,
           "inline DIAGNOSIS panel removed");
 
@@ -133,31 +137,31 @@ int main(int argc, char *argv[]) {
     withProcs.processes = {root, child};
     hud.setSnapshot(withProcs);
 
-    auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("dashApp"));
-    auto *dashCpu = hud.findChild<QLabel *>(QStringLiteral("dashCpu"));
-    auto *dashMem = hud.findChild<QLabel *>(QStringLiteral("dashMem"));
-    auto *dashStatus = hud.findChild<QLabel *>(QStringLiteral("dashStatus"));
-    auto *dashMemDetail = hud.findChild<QLabel *>(QStringLiteral("dashMemDetail"));
-    auto *dashProcs = hud.findChild<QTreeWidget *>(QStringLiteral("dashProcs"));
+    auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
+    auto *dashCpu = hud.findChild<QLabel *>(QStringLiteral("ddCpu"));
+    auto *dashMem = hud.findChild<QLabel *>(QStringLiteral("ddMem"));
+    auto *dashStatus = hud.findChild<QLabel *>(QStringLiteral("ddStatus"));
+    auto *dashMemDetail = hud.findChild<QLabel *>(QStringLiteral("ddMemDetail"));
+    auto *dashProcs = hud.findChild<QTreeWidget *>(QStringLiteral("ddProcs"));
 
     check(dashApp != nullptr && dashApp->text() == QStringLiteral("alpha"),
-          "dashboard shows app name");
+          "panel shows app name");
     check(dashCpu != nullptr && dashCpu->text() == QStringLiteral("17%"),
-          "dashboard shows cpu");
+          "panel shows cpu");
     check(dashMem != nullptr && dashMem->text() == QStringLiteral("8 MB"),
-          "dashboard shows memory");
+          "panel shows memory");
     check(dashStatus != nullptr && dashStatus->text() == QStringLiteral("OK"),
-          "dashboard shows status");
+          "panel shows status");
     check(dashMemDetail != nullptr
               && dashMemDetail->text().contains(QStringLiteral("RSS")),
-          "dashboard shows memory breakdown");
+          "panel shows memory breakdown");
     check(dashProcs != nullptr && dashProcs->topLevelItemCount() == 1,
-          "dashboard process tree has one root");
+          "panel process tree has one root");
     check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
               && dashProcs->topLevelItem(0)->childCount() == 1
               && dashProcs->topLevelItem(0)->child(0)->text(0)
                      == QStringLiteral("alpha-child"),
-          "dashboard process tree nests child");
+          "panel process tree nests child");
 
     DockerSnapshot dockerSnap;
     dockerSnap.state = DockerState::Ok;
@@ -169,20 +173,20 @@ int main(int argc, char *argv[]) {
     kubeSnap.totalPods = 3;
     kubeSnap.issueCount = 2;
     hud.setKubeSnapshot(kubeSnap);
-    auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("dashDocker"));
-    auto *dashKube = hud.findChild<QLabel *>(QStringLiteral("dashKube"));
+    auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("ddDocker"));
+    auto *dashKube = hud.findChild<QLabel *>(QStringLiteral("ddKube"));
     check(dashDocker != nullptr
               && dashDocker->text().contains(QStringLiteral("docker:")),
-          "dashboard shows docker");
+          "panel shows docker");
     check(dashKube != nullptr && dashKube->text().contains(QStringLiteral("k8s:")),
-          "dashboard shows kubernetes");
+          "panel shows kubernetes");
 
-    if (moreButton2 && dashboard) {
+    if (moreButton2 && stack) {
         moreButton2->click();
-        check(dashboard->isVisible(), "MORE opens the dashboard");
+        check(stack->currentIndex() == 1, "MORE expands the overlay in place");
         check(moreButton2->text() == QStringLiteral("LESS"), "MORE -> LESS");
         moreButton2->click();
-        check(!dashboard->isVisible(), "LESS closes the dashboard");
+        check(stack->currentIndex() == 0, "LESS collapses the overlay in place");
         check(moreButton2->text() == QStringLiteral("MORE"), "LESS -> MORE");
     }
 

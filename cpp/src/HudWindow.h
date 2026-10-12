@@ -5,6 +5,7 @@
 #include "KubeStatus.h"
 
 #include <QPoint>
+#include <QRect>
 #include <QWidget>
 
 class QLabel;
@@ -12,7 +13,8 @@ class QKeyEvent;
 class QLayout;
 class QMouseEvent;
 class QPushButton;
-class DashboardWindow;
+class QStackedWidget;
+class DashboardPanel;
 
 class HudWindow : public QWidget {
     Q_OBJECT
@@ -61,7 +63,10 @@ private:
     QLabel *m_kubeDetails = nullptr;
     QString m_kubeDetailsText;
     bool m_kubeOpen = false;
-    DashboardWindow *m_dashboard = nullptr;
+    DashboardPanel *m_panel = nullptr;
+    QStackedWidget *m_stack = nullptr;
+    QWidget *m_compactPage = nullptr;
+    QRect m_savedGeometry;
     QPushButton *m_moreButton = nullptr;
     QPushButton *m_showHideButton = nullptr;
     DisplaySnapshot m_lastSnapshot;

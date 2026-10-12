@@ -22,8 +22,8 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
 add_library(syspeek_core STATIC
     src/HudWindow.cpp
     src/HudWindow.h
-    src/DashboardWindow.cpp
-    src/DashboardWindow.h
+    src/DashboardPanel.cpp
+    src/DashboardPanel.h
     src/DisplaySnapshot.h
     src/ProcessIdentity.h
     src/LinuxProcess.cpp

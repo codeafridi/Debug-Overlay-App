@@ -8,6 +8,8 @@
 #include <QFile>
 #include <QTemporaryFile>
 
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -20,10 +22,21 @@ public:
 
     QString name() const override { return QStringLiteral("fake"); }
     int focusedPid() const override { return m_pid; }
+    void setPid(int pid) { m_pid = pid; }
 
 private:
     int m_pid;
 };
+
+int spawnSleeper() {
+    const pid_t pid = fork();
+    if (pid == 0) {
+        for (;;) {
+            pause();
+        }
+    }
+    return static_cast<int>(pid);
+}
 
 } // namespace
 
@@ -69,13 +82,31 @@ int main(int argc, char *argv[]) {
     GnomePidFileProvider emptyPathProvider{QString()};
     check(emptyPathProvider.focusedPid() == -1, "empty path -> -1");
 
-    FakeProvider liveProvider(self);
+    const int live = spawnSleeper();
+    check(live > 0 && linuxproc::exists(live), "spawned a live external process");
+
+    FakeProvider liveProvider(live);
     FocusSampler liveSampler(&liveProvider);
-    const FocusSample live = liveSampler.sample();
-    check(live.available, "sampler available for live pid");
-    check(live.identity.pid == self, "sampler reports correct pid");
-    check(live.appName == linuxproc::comm(self), "sampler reports comm name");
-    check(live.providerName == QStringLiteral("fake"), "sampler reports provider name");
+    const FocusSample liveSample = liveSampler.sample();
+    check(liveSample.available, "sampler available for live pid");
+    check(liveSample.identity.pid == live, "sampler reports correct pid");
+    check(liveSample.appName == linuxproc::comm(live), "sampler reports comm name");
+    check(liveSample.providerName == QStringLiteral("fake"),
+          "sampler reports provider name");
+
+    FakeProvider selfProvider(self);
+    FocusSampler selfSampler(&selfProvider);
+    check(!selfSampler.sample().available,
+          "sampler ignores Syspeek's own pid (no prior app)");
+
+    FakeProvider fallbackProvider(live);
+    FocusSampler fallbackSampler(&fallbackProvider);
+    check(fallbackSampler.sample().identity.pid == live,
+          "fallback baseline is the live app");
+    fallbackProvider.setPid(self);
+    const FocusSample afterSelf = fallbackSampler.sample();
+    check(afterSelf.available && afterSelf.identity.pid == live,
+          "overlay focus keeps the last real app");
 
     FakeProvider deadProvider(deadPid);
     FocusSampler deadSampler(&deadProvider);
@@ -87,6 +118,9 @@ int main(int argc, char *argv[]) {
 
     FocusSampler nullSampler(nullptr);
     check(!nullSampler.sample().available, "sampler unavailable without provider");
+
+    kill(live, SIGKILL);
+    waitpid(live, nullptr, 0);
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

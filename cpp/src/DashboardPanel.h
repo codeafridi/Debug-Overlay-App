@@ -9,25 +9,28 @@
 class QLabel;
 class QTreeWidget;
 
-class DashboardWindow : public QWidget {
+// Expanded analysis page shown inside the HUD overlay (not a separate window).
+class DashboardPanel : public QWidget {
     Q_OBJECT
 
 public:
-    explicit DashboardWindow(QWidget *parent = nullptr);
+    explicit DashboardPanel(QWidget *parent = nullptr);
 
     void setSnapshot(const DisplaySnapshot &snapshot);
     void setDockerSnapshot(const DockerSnapshot &snapshot);
     void setKubeSnapshot(const KubeSnapshot &snapshot);
 
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
+signals:
+    void collapseRequested();
 
 private:
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
     QLabel *m_cpuValue = nullptr;
     QLabel *m_memValue = nullptr;
+    QLabel *m_procCount = nullptr;
     QLabel *m_statusValue = nullptr;
+    QLabel *m_statusBig = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;
     QLabel *m_docker = nullptr;

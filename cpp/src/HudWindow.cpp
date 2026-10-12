@@ -1,6 +1,6 @@
 #include "HudWindow.h"
 
-#include "DashboardWindow.h"
+#include "DashboardPanel.h"
 
 #include <QApplication>
 #include <QFont>
@@ -12,6 +12,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
+#include <QStackedWidget>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWindow>
@@ -60,7 +61,10 @@ HudWindow::HudWindow(QWidget *parent)
     setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
     setObjectName(QStringLiteral("hudRoot"));
 
-    auto *root = new QVBoxLayout(this);
+    m_stack = new QStackedWidget(this);
+    m_stack->setObjectName(QStringLiteral("hudStack"));
+    m_compactPage = new QWidget(m_stack);
+    auto *root = new QVBoxLayout(m_compactPage);
     root->setContentsMargins(14, 10, 14, 16);
     root->setSpacing(10);
 
@@ -142,9 +146,6 @@ HudWindow::HudWindow(QWidget *parent)
     m_kubeDetails->setVisible(false);
     root->addWidget(m_kubeDetails);
 
-    m_dashboard = new DashboardWindow(this);
-    m_dashboard->setVisible(false);
-
     auto *footer = new QHBoxLayout();
     footer->setSpacing(4);
     footer->addStretch(1);
@@ -214,6 +215,18 @@ HudWindow::HudWindow(QWidget *parent)
         "#moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
+    m_panel = new DashboardPanel(m_stack);
+    connect(m_panel, &DashboardPanel::collapseRequested, this,
+            &HudWindow::toggleDetails);
+    m_stack->addWidget(m_compactPage);
+    m_stack->addWidget(m_panel);
+    m_stack->setCurrentIndex(0);
+
+    auto *windowLayout = new QVBoxLayout(this);
+    windowLayout->setContentsMargins(0, 0, 0, 0);
+    windowLayout->setSpacing(0);
+    windowLayout->addWidget(m_stack);
+
     setSnapshot(DisplaySnapshot{});
 
     setFixedWidth(430);
@@ -263,8 +276,8 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
 
     updateCompactText();
-    if (m_dashboard != nullptr) {
-        m_dashboard->setSnapshot(snapshot);
+    if (m_panel != nullptr) {
+        m_panel->setSnapshot(snapshot);
     }
 }
 
@@ -299,8 +312,8 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
         }
     }
 
-    if (m_dashboard != nullptr) {
-        m_dashboard->setDockerSnapshot(snapshot);
+    if (m_panel != nullptr) {
+        m_panel->setDockerSnapshot(snapshot);
     }
 }
 
@@ -352,8 +365,8 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
         }
     }
 
-    if (m_dashboard != nullptr) {
-        m_dashboard->setKubeSnapshot(snapshot);
+    if (m_panel != nullptr) {
+        m_panel->setKubeSnapshot(snapshot);
     }
 }
 
@@ -387,29 +400,42 @@ void HudWindow::updateCompactText() {
 }
 
 void HudWindow::toggleDetails() {
-    if (m_dashboard == nullptr) {
+    if (m_stack == nullptr) {
         return;
     }
 
-    if (m_dashboard->isVisible()) {
-        m_dashboard->hide();
-        m_detailsExpanded = false;
-    } else {
+    if (!m_detailsExpanded) {
+        m_savedGeometry = geometry();
+
         QScreen *screen = QGuiApplication::screenAt(frameGeometry().center());
         if (screen == nullptr) {
             screen = QGuiApplication::primaryScreen();
         }
         if (screen != nullptr) {
             const QRect avail = screen->availableGeometry();
-            const QPoint topLeft =
-                avail.center()
-                - QPoint(m_dashboard->width() / 2, m_dashboard->height() / 2);
-            m_dashboard->move(topLeft);
+            const int w = avail.width() * 7 / 10;
+            const int h = avail.height() * 7 / 10;
+            setMinimumWidth(0);
+            setMaximumWidth(QWIDGETSIZE_MAX);
+            setMinimumHeight(0);
+            setMaximumHeight(QWIDGETSIZE_MAX);
+            resize(w, h);
+            move(avail.center().x() - w / 2, avail.center().y() - h / 2);
         }
-        m_dashboard->show();
-        m_dashboard->raise();
-        m_dashboard->activateWindow();
+
+        m_stack->setCurrentIndex(1);
         m_detailsExpanded = true;
+    } else {
+        m_stack->setCurrentIndex(0);
+        m_detailsExpanded = false;
+
+        setMinimumWidth(430);
+        setMaximumWidth(430);
+        setFixedWidth(430);
+        setMinimumHeight(0);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        adjustSize();
+        move(m_savedGeometry.topLeft());
     }
 
     m_moreButton->setText(m_detailsExpanded ? QStringLiteral("LESS")
@@ -417,6 +443,10 @@ void HudWindow::toggleDetails() {
 }
 
 void HudWindow::toggleCompact() {
+    if (m_detailsExpanded) {
+        toggleDetails();
+    }
+
     m_compact = !m_compact;
 
     m_metricsWidget->setVisible(!m_compact);
@@ -425,10 +455,6 @@ void HudWindow::toggleCompact() {
                                         : QStringLiteral("HIDE"));
 
     if (m_compact) {
-        m_detailsExpanded = false;
-        if (m_dashboard != nullptr) {
-            m_dashboard->hide();
-        }
         m_moreButton->setText(QStringLiteral("MORE"));
         m_moreButton->setVisible(false);
     } else {

@@ -7,6 +7,8 @@
 #include <QElapsedTimer>
 #include <QThread>
 
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -22,6 +24,16 @@ public:
 private:
     int m_pid;
 };
+
+int spawnSleeper() {
+    const pid_t pid = fork();
+    if (pid == 0) {
+        for (;;) {
+            pause();
+        }
+    }
+    return static_cast<int>(pid);
+}
 
 bool waitFor(int &count, int target, int timeoutMs) {
     QElapsedTimer timer;
@@ -46,8 +58,8 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    const int self = static_cast<int>(::getpid());
-    FakeProvider provider(self);
+    const int live = spawnSleeper();
+    FakeProvider provider(live);
 
     auto *thread = new QThread;
     auto *worker = new SamplerWorker(&provider);
@@ -75,8 +87,8 @@ int main(int argc, char *argv[]) {
     check(waitFor(received, 2, 3000), "worker emits on demand");
     check(maxSeq >= 2, "sequence increases across snapshots");
 
-    check(latest.appName == linuxproc::comm(self), "snapshot has focused name");
-    check(latest.pid == QString::number(self), "snapshot has focused pid");
+    check(latest.appName == linuxproc::comm(live), "snapshot has focused name");
+    check(latest.pid == QString::number(live), "snapshot has focused pid");
     check(!latest.memory.isEmpty(), "snapshot has memory text");
     check(latest.cpu == QStringLiteral("Warming up")
               || latest.cpu == QStringLiteral("--")
@@ -88,6 +100,9 @@ int main(int argc, char *argv[]) {
     check(true, "worker thread stopped cleanly");
 
     delete thread;
+
+    kill(live, SIGKILL);
+    waitpid(live, nullptr, 0);
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

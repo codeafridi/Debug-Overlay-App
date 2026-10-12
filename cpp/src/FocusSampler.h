@@ -21,4 +21,6 @@ public:
 
 private:
     const FocusedWindowProvider *m_provider;
+    mutable ProcessIdentity m_lastIdentity;
+    mutable QString m_lastName;
 };
