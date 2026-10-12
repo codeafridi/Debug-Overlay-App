@@ -39,6 +39,10 @@ add_library(syspeek_core STATIC
     src/HostSampler.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
+    src/MetricStore.cpp
+    src/MetricStore.h
+    src/Sparkline.cpp
+    src/Sparkline.h
     src/ProcessGrouper.cpp
     src/ProcessGrouper.h
     src/GroupCache.cpp
@@ -124,6 +128,9 @@ target_link_libraries(syspeek_kube_tests PRIVATE syspeek_core)
 add_executable(syspeek_adapter_tests tests/test_adapters.cpp)
 target_link_libraries(syspeek_adapter_tests PRIVATE syspeek_core)
 
+add_executable(syspeek_metrics_tests tests/test_metrics.cpp)
+target_link_libraries(syspeek_metrics_tests PRIVATE syspeek_core)
+
 add_executable(syspeek_screenshot EXCLUDE_FROM_ALL tools/screenshot.cpp)
 target_link_libraries(syspeek_screenshot PRIVATE syspeek_core)
 
@@ -139,6 +146,7 @@ add_test(NAME docker COMMAND syspeek_docker_tests)
 add_test(NAME config COMMAND syspeek_config_tests)
 add_test(NAME kube COMMAND syspeek_kube_tests)
 add_test(NAME adapters COMMAND syspeek_adapter_tests)
+add_test(NAME metrics COMMAND syspeek_metrics_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters metrics PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

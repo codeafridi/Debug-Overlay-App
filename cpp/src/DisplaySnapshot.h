@@ -26,6 +26,8 @@ struct DisplaySnapshot {
     QString cpu = QStringLiteral("--");
     QString memory = QStringLiteral("--");
     QString status = QStringLiteral("IDLE");
+    bool cpuValid = false;
+    double cpuPercent = 0.0;
     unsigned long long rssKb = 0;
     unsigned long long vmsKb = 0;
     unsigned long long swapKb = 0;

@@ -1,13 +1,16 @@
 #include "DashboardPanel.h"
 
 #include "MemoryFormat.h"
+#include "Sparkline.h"
 
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QListWidget>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
@@ -74,18 +77,14 @@ QFrame *makeCard(const QString &title, QWidget *content, QWidget *parent) {
     return card;
 }
 
-QFrame *makeStatCard(const QString &caption, QLabel *value, QLabel *sub,
-                     QWidget *parent) {
+QFrame *makeStatCard(const QString &caption, QWidget *content, QWidget *parent) {
     auto *card = new QFrame(parent);
     card->setObjectName(QStringLiteral("ddStat"));
     auto *layout = new QVBoxLayout(card);
     layout->setContentsMargins(14, 12, 14, 14);
-    layout->setSpacing(2);
+    layout->setSpacing(4);
     layout->addWidget(makeTitle(caption, card));
-    layout->addWidget(value);
-    if (sub != nullptr) {
-        layout->addWidget(sub);
-    }
+    layout->addWidget(content);
     return card;
 }
 
@@ -138,128 +137,46 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     root->addWidget(topbar);
 
     auto *body = new QWidget(this);
-    auto *bodyLayout = new QVBoxLayout(body);
-    bodyLayout->setContentsMargins(16, 16, 16, 16);
-    bodyLayout->setSpacing(14);
+    auto *bodyLayout = new QHBoxLayout(body);
+    bodyLayout->setContentsMargins(0, 0, 0, 0);
+    bodyLayout->setSpacing(0);
 
-    m_cpuValue = new QLabel(QStringLiteral("--"), body);
-    m_cpuValue->setObjectName(QStringLiteral("ddCpu"));
-    m_cpuValue->setFont(monoFont(18, true));
+    m_rail = new QListWidget(body);
+    m_rail->setObjectName(QStringLiteral("ddRail"));
+    m_rail->setFixedWidth(158);
+    m_rail->setFocusPolicy(Qt::NoFocus);
+    m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Processes"),
+                      QStringLiteral("Memory"), QStringLiteral("Network"),
+                      QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
+                      QStringLiteral("Services"), QStringLiteral("Logs"),
+                      QStringLiteral("Errors"), QStringLiteral("Dependencies"),
+                      QStringLiteral("Endpoints"),
+                      QStringLiteral("Instrumentation"),
+                      QStringLiteral("Traces"), QStringLiteral("Profiles"),
+                      QStringLiteral("Databases"), QStringLiteral("Security"),
+                      QStringLiteral("Cost"), QStringLiteral("Settings")});
+    m_rail->setCurrentRow(0);
 
-    m_memValue = new QLabel(QStringLiteral("--"), body);
-    m_memValue->setObjectName(QStringLiteral("ddMem"));
-    m_memValue->setFont(monoFont(18, true));
+    m_views = new QStackedWidget(body);
+    m_views->setObjectName(QStringLiteral("ddViews"));
+    m_views->addWidget(buildOverviewView());
+    m_views->addWidget(buildProcessesView());
+    m_views->addWidget(buildMemoryView());
+    m_views->addWidget(buildNetworkView());
+    m_views->addWidget(buildContainersView());
+    m_views->addWidget(buildKubernetesView());
+    for (const char *name :
+         {"Services", "Logs", "Errors", "Dependencies", "Endpoints",
+          "Instrumentation", "Traces", "Profiles", "Databases", "Security",
+          "Cost", "Settings"}) {
+        m_views->addWidget(buildPlaceholderView(QString::fromLatin1(name)));
+    }
 
-    m_procCount = new QLabel(QStringLiteral("0"), body);
-    m_procCount->setObjectName(QStringLiteral("ddProcCount"));
-    m_procCount->setFont(monoFont(18, true));
+    connect(m_rail, &QListWidget::currentRowChanged, m_views,
+            &QStackedWidget::setCurrentIndex);
 
-    m_statusBig = new QLabel(QStringLiteral("IDLE"), body);
-    m_statusBig->setObjectName(QStringLiteral("ddStatusBig"));
-    m_statusBig->setFont(monoFont(18, true));
-
-    auto *stats = new QHBoxLayout();
-    stats->setSpacing(14);
-    stats->addWidget(makeStatCard(QStringLiteral("CPU"), m_cpuValue, nullptr, body), 1);
-    stats->addWidget(makeStatCard(QStringLiteral("MEMORY (RSS)"), m_memValue, nullptr, body), 1);
-    stats->addWidget(makeStatCard(QStringLiteral("PROCESSES"), m_procCount, nullptr, body), 1);
-    stats->addWidget(makeStatCard(QStringLiteral("STATUS"), m_statusBig, nullptr, body), 1);
-    bodyLayout->addLayout(stats);
-
-    m_hostCpu = new QLabel(QStringLiteral("--"), body);
-    m_hostCpu->setObjectName(QStringLiteral("ddHostCpu"));
-    m_hostCpu->setFont(monoFont(13, true));
-    m_hostMem = new QLabel(QStringLiteral("--"), body);
-    m_hostMem->setObjectName(QStringLiteral("ddHostMem"));
-    m_hostMem->setFont(monoFont(13, true));
-    m_hostDisk = new QLabel(QStringLiteral("--"), body);
-    m_hostDisk->setObjectName(QStringLiteral("ddHostDisk"));
-    m_hostDisk->setFont(monoFont(13, true));
-    m_hostNet = new QLabel(QStringLiteral("--"), body);
-    m_hostNet->setObjectName(QStringLiteral("ddHostNet"));
-    m_hostNet->setFont(monoFont(13, true));
-    m_hostLoad = new QLabel(QStringLiteral("--"), body);
-    m_hostLoad->setObjectName(QStringLiteral("ddHostLoad"));
-    m_hostLoad->setFont(monoFont(13, true));
-
-    auto *hostRow = new QHBoxLayout();
-    hostRow->setSpacing(14);
-    hostRow->addWidget(makeStatCard(QStringLiteral("HOST CPU"), m_hostCpu, nullptr, body), 1);
-    hostRow->addWidget(makeStatCard(QStringLiteral("MEM AVAILABLE"), m_hostMem, nullptr, body), 1);
-    hostRow->addWidget(makeStatCard(QStringLiteral("DISK FREE"), m_hostDisk, nullptr, body), 1);
-    hostRow->addWidget(makeStatCard(QStringLiteral("NET rx / tx"), m_hostNet, nullptr, body), 1);
-    hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, nullptr, body), 1);
-    bodyLayout->addLayout(hostRow);
-
-    auto *columns = new QHBoxLayout();
-    columns->setSpacing(14);
-
-    m_procs = new QTreeWidget(body);
-    m_procs->setObjectName(QStringLiteral("ddProcs"));
-    m_procs->setColumnCount(5);
-    m_procs->setHeaderLabels({QStringLiteral("Process"), QStringLiteral("PID"),
-                              QStringLiteral("Threads"), QStringLiteral("FDs"),
-                              QStringLiteral("RSS")});
-    m_procs->setRootIsDecorated(true);
-    m_procs->setSelectionMode(QAbstractItemView::NoSelection);
-    m_procs->setFocusPolicy(Qt::NoFocus);
-    m_procs->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_procs->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_procs->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    m_procs->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-    m_procs->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
-    connect(m_procs, &QTreeWidget::itemExpanded, this,
-            [this](QTreeWidgetItem *item) {
-                if (!m_populating) {
-                    m_collapsedPids.remove(item->data(0, Qt::UserRole).toInt());
-                }
-            });
-    connect(m_procs, &QTreeWidget::itemCollapsed, this,
-            [this](QTreeWidgetItem *item) {
-                if (!m_populating) {
-                    m_collapsedPids.insert(item->data(0, Qt::UserRole).toInt());
-                }
-            });
-    auto *left = new QVBoxLayout();
-    left->setSpacing(14);
-    left->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, body), 3);
-
-    m_net = new QLabel(QStringLiteral("--"), body);
-    m_net->setObjectName(QStringLiteral("ddNet"));
-    m_net->setFont(monoFont(10));
-    m_net->setWordWrap(false);
-    left->addWidget(makeCard(QStringLiteral("NETWORK"), m_net, body), 2);
-
-    m_cgroup = new QLabel(QStringLiteral("--"), body);
-    m_cgroup->setObjectName(QStringLiteral("ddCgroup"));
-    m_cgroup->setFont(monoFont(10));
-    m_cgroup->setWordWrap(true);
-    left->addWidget(makeCard(QStringLiteral("CONTAINER"), m_cgroup, body), 2);
-
-    columns->addLayout(left, 3);
-
-    auto *right = new QVBoxLayout();
-    right->setSpacing(14);
-
-    m_memDetail = new QLabel(QStringLiteral("--"), body);
-    m_memDetail->setObjectName(QStringLiteral("ddMemDetail"));
-    m_memDetail->setFont(monoFont(10));
-    right->addWidget(makeCard(QStringLiteral("MEMORY"), m_memDetail, body));
-
-    m_docker = new QLabel(QStringLiteral("--"), body);
-    m_docker->setObjectName(QStringLiteral("ddDocker"));
-    m_docker->setFont(monoFont(10));
-    m_docker->setWordWrap(true);
-    right->addWidget(makeCard(QStringLiteral("DOCKER"), m_docker, body));
-
-    m_kube = new QLabel(QStringLiteral("--"), body);
-    m_kube->setObjectName(QStringLiteral("ddKube"));
-    m_kube->setFont(monoFont(10));
-    m_kube->setWordWrap(true);
-    right->addWidget(makeCard(QStringLiteral("KUBERNETES"), m_kube, body));
-
-    columns->addLayout(right, 2);
-    bodyLayout->addLayout(columns, 1);
+    bodyLayout->addWidget(m_rail);
+    bodyLayout->addWidget(m_views, 1);
     root->addWidget(body, 1);
 
     setStyleSheet(QStringLiteral(
@@ -273,6 +190,11 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCollapse { color: #c4cad1; background-color: #23262b;"
         "  border: 1px solid #31353b; border-radius: 3px; padding: 4px 12px; }"
         "#ddCollapse:hover { background-color: #2a2e34; }"
+        "#ddRail { background-color: #17191c; border: none;"
+        "  border-right: 1px solid #2a2d33; color: #9aa2ac; outline: none; }"
+        "#ddRail::item { padding: 8px 14px; }"
+        "#ddRail::item:selected { background-color: #22262c; color: #e2e7ec; }"
+        "#ddViews { background-color: #15171a; }"
         "#ddCard { background-color: #1b1d21; border: 1px solid #2a2d33;"
         "  border-radius: 4px; }"
         "#ddStat { background-color: #1b1d21; border: 1px solid #2a2d33;"
@@ -284,12 +206,203 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
         "#ddKube { color: #b0a9c4; }"
+        "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
         "  color: #c4cad1; }"
         "QTreeWidget::item { padding: 1px 0px; }"
         "QTreeWidget::item:selected { background: transparent; }"
         "QHeaderView::section { background-color: #202327; color: #7f8792;"
         "  border: none; border-bottom: 1px solid #2a2d33; padding: 4px 6px; }"));
+}
+
+QWidget *DashboardPanel::buildOverviewView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+
+    m_cpuValue = new QLabel(QStringLiteral("--"), view);
+    m_cpuValue->setObjectName(QStringLiteral("ddCpu"));
+    m_cpuValue->setFont(monoFont(18, true));
+    m_memValue = new QLabel(QStringLiteral("--"), view);
+    m_memValue->setObjectName(QStringLiteral("ddMem"));
+    m_memValue->setFont(monoFont(18, true));
+    m_procCount = new QLabel(QStringLiteral("0"), view);
+    m_procCount->setObjectName(QStringLiteral("ddProcCount"));
+    m_procCount->setFont(monoFont(18, true));
+    m_statusBig = new QLabel(QStringLiteral("IDLE"), view);
+    m_statusBig->setObjectName(QStringLiteral("ddStatusBig"));
+    m_statusBig->setFont(monoFont(18, true));
+
+    m_cpuSpark = new Sparkline(view);
+    m_cpuSpark->setObjectName(QStringLiteral("ddCpuSpark"));
+    m_memSpark = new Sparkline(view);
+    m_memSpark->setObjectName(QStringLiteral("ddMemSpark"));
+
+    auto *cpuContent = new QWidget(view);
+    auto *cpuLayout = new QVBoxLayout(cpuContent);
+    cpuLayout->setContentsMargins(0, 0, 0, 0);
+    cpuLayout->setSpacing(4);
+    cpuLayout->addWidget(m_cpuValue);
+    cpuLayout->addWidget(m_cpuSpark);
+
+    auto *memContent = new QWidget(view);
+    auto *memLayout = new QVBoxLayout(memContent);
+    memLayout->setContentsMargins(0, 0, 0, 0);
+    memLayout->setSpacing(4);
+    memLayout->addWidget(m_memValue);
+    memLayout->addWidget(m_memSpark);
+
+    auto *stats = new QHBoxLayout();
+    stats->setSpacing(14);
+    stats->addWidget(makeStatCard(QStringLiteral("CPU"), cpuContent, view), 1);
+    stats->addWidget(makeStatCard(QStringLiteral("MEMORY (RSS)"), memContent, view), 1);
+    stats->addWidget(makeStatCard(QStringLiteral("PROCESSES"), m_procCount, view), 1);
+    stats->addWidget(makeStatCard(QStringLiteral("STATUS"), m_statusBig, view), 1);
+    layout->addLayout(stats);
+
+    m_hostCpu = new QLabel(QStringLiteral("--"), view);
+    m_hostCpu->setObjectName(QStringLiteral("ddHostCpu"));
+    m_hostCpu->setFont(monoFont(14, true));
+    m_hostMem = new QLabel(QStringLiteral("--"), view);
+    m_hostMem->setObjectName(QStringLiteral("ddHostMem"));
+    m_hostMem->setFont(monoFont(14, true));
+    m_hostDisk = new QLabel(QStringLiteral("--"), view);
+    m_hostDisk->setObjectName(QStringLiteral("ddHostDisk"));
+    m_hostDisk->setFont(monoFont(14, true));
+    m_hostNet = new QLabel(QStringLiteral("--"), view);
+    m_hostNet->setObjectName(QStringLiteral("ddHostNet"));
+    m_hostNet->setFont(monoFont(14, true));
+    m_hostLoad = new QLabel(QStringLiteral("--"), view);
+    m_hostLoad->setObjectName(QStringLiteral("ddHostLoad"));
+    m_hostLoad->setFont(monoFont(14, true));
+
+    m_hostCpuSpark = new Sparkline(view);
+    m_hostCpuSpark->setObjectName(QStringLiteral("ddHostCpuSpark"));
+    auto *hostCpuContent = new QWidget(view);
+    auto *hostCpuLayout = new QVBoxLayout(hostCpuContent);
+    hostCpuLayout->setContentsMargins(0, 0, 0, 0);
+    hostCpuLayout->setSpacing(4);
+    hostCpuLayout->addWidget(m_hostCpu);
+    hostCpuLayout->addWidget(m_hostCpuSpark);
+
+    auto *hostRow = new QHBoxLayout();
+    hostRow->setSpacing(14);
+    hostRow->addWidget(makeStatCard(QStringLiteral("HOST CPU"), hostCpuContent, view), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("MEM AVAILABLE"), m_hostMem, view), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("DISK FREE"), m_hostDisk, view), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("NET rx / tx"), m_hostNet, view), 1);
+    hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, view), 1);
+    layout->addLayout(hostRow);
+    layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildProcessesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_procs = new QTreeWidget(view);
+    m_procs->setObjectName(QStringLiteral("ddProcs"));
+    m_procs->setColumnCount(5);
+    m_procs->setHeaderLabels({QStringLiteral("Process"), QStringLiteral("PID"),
+                              QStringLiteral("Threads"), QStringLiteral("FDs"),
+                              QStringLiteral("RSS")});
+    m_procs->setRootIsDecorated(true);
+    m_procs->setSelectionMode(QAbstractItemView::NoSelection);
+    m_procs->setFocusPolicy(Qt::NoFocus);
+    m_procs->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int i = 1; i < 5; ++i) {
+        m_procs->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    connect(m_procs, &QTreeWidget::itemExpanded, this,
+            [this](QTreeWidgetItem *item) {
+                if (!m_populating) {
+                    m_collapsedPids.remove(item->data(0, Qt::UserRole).toInt());
+                }
+            });
+    connect(m_procs, &QTreeWidget::itemCollapsed, this,
+            [this](QTreeWidgetItem *item) {
+                if (!m_populating) {
+                    m_collapsedPids.insert(item->data(0, Qt::UserRole).toInt());
+                }
+            });
+    layout->addWidget(makeCard(QStringLiteral("PROCESSES"), m_procs, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildMemoryView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_memDetail = new QLabel(QStringLiteral("--"), view);
+    m_memDetail->setObjectName(QStringLiteral("ddMemDetail"));
+    m_memDetail->setFont(monoFont(12));
+    layout->addWidget(makeCard(QStringLiteral("MEMORY BREAKDOWN"), m_memDetail, view));
+    layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildNetworkView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_net = new QLabel(QStringLiteral("--"), view);
+    m_net->setObjectName(QStringLiteral("ddNet"));
+    m_net->setFont(monoFont(11));
+    layout->addWidget(makeCard(QStringLiteral("CONNECTIONS"), m_net, view));
+    layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildContainersView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+
+    m_cgroup = new QLabel(QStringLiteral("--"), view);
+    m_cgroup->setObjectName(QStringLiteral("ddCgroup"));
+    m_cgroup->setFont(monoFont(11));
+    m_cgroup->setWordWrap(true);
+    layout->addWidget(makeCard(QStringLiteral("CGROUP"), m_cgroup, view));
+
+    m_docker = new QLabel(QStringLiteral("--"), view);
+    m_docker->setObjectName(QStringLiteral("ddDocker"));
+    m_docker->setFont(monoFont(11));
+    m_docker->setWordWrap(true);
+    layout->addWidget(makeCard(QStringLiteral("DOCKER"), m_docker, view));
+    layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildKubernetesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_kube = new QLabel(QStringLiteral("--"), view);
+    m_kube->setObjectName(QStringLiteral("ddKube"));
+    m_kube->setFont(monoFont(11));
+    m_kube->setWordWrap(true);
+    layout->addWidget(makeCard(QStringLiteral("KUBERNETES"), m_kube, view));
+    layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildPlaceholderView(const QString &text) {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    auto *label = new QLabel(text + QStringLiteral("\ncoming soon"), view);
+    label->setObjectName(QStringLiteral("ddPlaceholder"));
+    label->setAlignment(Qt::AlignCenter);
+    label->setFont(monoFont(11));
+    layout->addWidget(label, 1);
+    return view;
 }
 
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
@@ -306,9 +419,18 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
             QStringLiteral("color:%1;").arg(statusColor(snapshot.status)));
     }
     m_statusValue->setStyleSheet(
-        QStringLiteral("color:%1; background-color:#1b2a22; padding:3px 10px;"
-                       " border-radius:10px;")
+        QStringLiteral("color:%1; background-color:#23262b; padding:3px 10px;"
+                       " border-radius:3px;")
             .arg(statusColor(snapshot.status)));
+
+    if (snapshot.cpuValid) {
+        m_cpuStore.push(snapshot.cpuPercent);
+        m_cpuSpark->setValues(m_cpuStore.values());
+    }
+    if (snapshot.rssKb > 0) {
+        m_memStore.push(static_cast<double>(snapshot.rssKb));
+        m_memSpark->setValues(m_memStore.values());
+    }
 
     m_memDetail->setText(QStringLiteral("RSS      %1\nVirtual  %2\nSwap     %3\nShared   %4")
                              .arg(formatMemoryKb(snapshot.rssKb),
@@ -319,8 +441,7 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     QString net;
     int shown = 0;
     for (const ConnectionRow &conn : snapshot.connections) {
-        if (shown >= 8) {
-            net += QStringLiteral("...\n");
+        if (shown >= 200) {
             break;
         }
         net += QStringLiteral("%1 %2 -> %3  %4\n")
@@ -363,6 +484,10 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                                .arg(formatRate(snapshot.hostNetRxPerSec),
                                     formatRate(snapshot.hostNetTxPerSec)));
         m_hostLoad->setText(QString::number(snapshot.hostLoad1, 'f', 2));
+        if (!snapshot.hostWarming) {
+            m_hostCpuStore.push(snapshot.hostCpuPercent);
+            m_hostCpuSpark->setValues(m_hostCpuStore.values());
+        }
     } else {
         for (QLabel *label :
              {m_hostCpu, m_hostMem, m_hostDisk, m_hostNet, m_hostLoad}) {
@@ -386,10 +511,9 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         item->setText(3, row.fds < 0 ? QStringLiteral("--")
                                      : QString::number(row.fds));
         item->setText(4, row.memory);
-        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-        item->setTextAlignment(2, Qt::AlignRight | Qt::AlignVCenter);
-        item->setTextAlignment(3, Qt::AlignRight | Qt::AlignVCenter);
-        item->setTextAlignment(4, Qt::AlignRight | Qt::AlignVCenter);
+        for (int c = 1; c < 5; ++c) {
+            item->setTextAlignment(c, Qt::AlignRight | Qt::AlignVCenter);
+        }
 
         allItems.append(item);
         present.insert(row.pid);
@@ -405,7 +529,6 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         byDepth.append(item);
     }
 
-    // Preserve the user's expand/collapse choices across the 1s refresh.
     m_collapsedPids.intersect(present);
     for (QTreeWidgetItem *item : allItems) {
         item->setExpanded(

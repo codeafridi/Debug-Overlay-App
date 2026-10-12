@@ -178,6 +178,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
 
     snap.cpu = m_cpuText;
     snap.memory = m_memText;
+    snap.cpuValid = cpuValid;
+    snap.cpuPercent = cpuValid ? cpu.percent : 0.0;
     snap.status = HealthEvaluator::text(
         m_health.update(cpuValid, cpuValid ? cpu.percent : 0.0, rssValid, rss));
 
