@@ -404,11 +404,20 @@ QList<unsigned long long> socketInodes(int pid) {
     QList<unsigned long long> inodes;
     const QString dir = procPath(pid, "fd");
     const QStringList entries =
-        QDir(dir).entryList(QDir::NoDotAndDotDot);
+        QDir(dir).entryList(QDir::AllEntries | QDir::NoDotAndDotDot);
     for (const QString &entry : entries) {
-        const QString target = QFile::symLinkTarget(dir + QLatin1Char('/') + entry);
-        if (!target.startsWith(QStringLiteral("socket:["))
-            || !target.endsWith(QLatin1Char(']'))) {
+        // QFile::symLinkTarget() rewrites a relative target against the link's
+        // directory ("socket:[123]" -> "/proc/<pid>/fd/socket:[123]"), so it
+        // never matches on procfs. readlink() returns the raw target.
+        const QByteArray path = (dir + QLatin1Char('/') + entry).toLocal8Bit();
+        char buffer[128];
+        const ssize_t length =
+            ::readlink(path.constData(), buffer, sizeof(buffer) - 1);
+        if (length <= 0) {
+            continue;
+        }
+        const QByteArray target(buffer, static_cast<int>(length));
+        if (!target.startsWith("socket:[") || !target.endsWith(']')) {
             continue;
         }
         bool ok = false;

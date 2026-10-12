@@ -8,6 +8,8 @@
 
 #include <unistd.h>
 
+#include <sys/socket.h>
+
 #include <cstdio>
 
 int main(int argc, char *argv[]) {
@@ -175,8 +177,21 @@ int main(int argc, char *argv[]) {
               "countFds(bogus) -> -1 (unreadable)");
         check(linuxproc::socketInodes(1 << 30).isEmpty(),
               "socketInodes(bogus) is empty");
+
+        // Regression: QFile::symLinkTarget() rewrote "socket:[N]" against the
+        // link's directory, so no sockets were ever detected on procfs.
+        int sv[2] = {-1, -1};
+        check(::socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0,
+              "socketpair created for fd scan");
         const QList<unsigned long long> inodes = linuxproc::socketInodes(self);
-        check(inodes.size() >= 0, "socketInodes(self) does not crash");
+        check(inodes.size() >= 2,
+              "socketInodes finds this process's live sockets");
+        if (sv[0] >= 0) {
+            ::close(sv[0]);
+        }
+        if (sv[1] >= 0) {
+            ::close(sv[1]);
+        }
     }
 
     // ---- group sum (deterministic seam) ----
