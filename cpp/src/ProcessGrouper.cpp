@@ -4,6 +4,8 @@
 
 #include <QSet>
 
+#include <algorithm>
+
 QList<int> ProcessGrouper::descendants(int rootPid,
                                        const QHash<int, int> &parentOf) {
     QList<int> result;
@@ -25,6 +27,45 @@ QList<int> ProcessGrouper::descendants(int rootPid,
                 result.append(it.key());
                 changed = true;
             }
+        }
+    }
+
+    return result;
+}
+
+QList<ProcNode> ProcessGrouper::orderedTree(int rootPid,
+                                            const QHash<int, int> &parentOf) {
+    QList<ProcNode> result;
+    if (rootPid <= 0) {
+        return result;
+    }
+
+    QHash<int, QList<int>> children;
+    for (auto it = parentOf.constBegin(); it != parentOf.constEnd(); ++it) {
+        children[it.value()].append(it.key());
+    }
+    for (auto it = children.begin(); it != children.end(); ++it) {
+        std::sort(it.value().begin(), it.value().end());
+    }
+
+    ProcNode root;
+    root.pid = rootPid;
+    root.ppid = parentOf.value(rootPid, -1);
+    root.depth = 0;
+    result.append(root);
+
+    for (int index = 0; index < result.size(); ++index) {
+        const ProcNode node = result.at(index);
+        const auto kids = children.constFind(node.pid);
+        if (kids == children.constEnd()) {
+            continue;
+        }
+        for (int child : kids.value()) {
+            ProcNode childNode;
+            childNode.pid = child;
+            childNode.ppid = node.pid;
+            childNode.depth = node.depth + 1;
+            result.append(childNode);
         }
     }
 

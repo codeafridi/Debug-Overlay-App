@@ -57,12 +57,62 @@ int main(int argc, char *argv[]) {
               "parser: 64-bit max value tolerated");
     }
 
+    // ---- status memory struct ----
+    {
+        linuxproc::MemInfo m;
+        check(linuxproc::parseStatusMem(
+                  "Name:\tcat\nVmSize:\t   9320 kB\nVmRSS:\t   2576 kB\nVmSwap:\t0 kB\n",
+                  m)
+                  && m.rssKb == 2576 && m.vmsKb == 9320 && m.swapKb == 0,
+              "parseStatusMem: all fields");
+        check(!linuxproc::parseStatusMem("VmSize:\t100 kB\n", m),
+              "parseStatusMem: missing VmRSS -> false");
+    }
+    {
+        linuxproc::MemInfo m;
+        check(linuxproc::parseStatusMem("VmRSS:\t500 kB\n", m) && m.rssKb == 500
+                  && m.vmsKb == 0 && m.swapKb == 0,
+              "parseStatusMem: VmRSS only, others default 0");
+    }
+    {
+        linuxproc::MemInfo m;
+        check(!linuxproc::parseStatusMem("VmRSS:\tabc kB\n", m),
+              "parseStatusMem: non-numeric VmRSS -> false");
+    }
+    {
+        linuxproc::MemInfo m;
+        check(linuxproc::parseStatusMem("VmRSS:\t100 kB\r\nVmSize:\t200 kB\r\n", m)
+                  && m.rssKb == 100 && m.vmsKb == 200,
+              "parseStatusMem: CRLF tolerated");
+    }
+
+    // ---- statm shared ----
+    {
+        unsigned long long shared = 0;
+        check(linuxproc::parseStatmShared("4062 1823 1495 1208 0 139 0\n", 4096,
+                                          shared)
+                  && shared == 1495ULL * 4096 / 1024,
+              "parseStatmShared: pages -> kB (1495p -> 5980 kB)");
+        check(linuxproc::parseStatmShared("1 2 0\n", 4096, shared) && shared == 0,
+              "parseStatmShared: zero shared is valid");
+        check(!linuxproc::parseStatmShared("1 2\n", 4096, shared),
+              "parseStatmShared: too few fields -> false");
+        check(!linuxproc::parseStatmShared("1 2 abc\n", 4096, shared),
+              "parseStatmShared: non-numeric -> false");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
     check(linuxproc::rssKb(self, rss), "rssKb(self) read succeeds");
     check(rss > 0, "rssKb(self) is positive");
     check(!linuxproc::rssKb(1 << 30, rss), "rssKb(bogus) fails");
+
+    {
+        linuxproc::MemInfo m;
+        check(linuxproc::procMem(self, m) && m.rssKb > 0,
+              "procMem(self): reads rss + vms + swap + shared");
+    }
 
     // ---- group sum (deterministic seam) ----
     {

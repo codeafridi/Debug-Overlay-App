@@ -4,6 +4,8 @@
 #include <QFile>
 #include <QFileInfo>
 
+#include <unistd.h>
+
 namespace linuxproc {
 
 namespace {
@@ -221,6 +223,87 @@ bool parseVmRssKb(const QByteArray &statusContent, unsigned long long &out) {
     }
 
     return false;
+}
+
+namespace {
+
+unsigned long long parseKbValue(const QByteArray &line, bool &ok) {
+    const QList<QByteArray> parts = line.simplified().split(' ');
+    if (parts.size() < 2) {
+        ok = false;
+        return 0;
+    }
+    return parts.at(1).toULongLong(&ok);
+}
+
+} // namespace
+
+bool parseStatusMem(const QByteArray &statusContent, MemInfo &out) {
+    bool foundRss = false;
+
+    const QList<QByteArray> lines = statusContent.split('\n');
+    for (const QByteArray &line : lines) {
+        bool ok = false;
+        if (line.startsWith("VmRSS:")) {
+            const unsigned long long kb = parseKbValue(line, ok);
+            if (ok) {
+                out.rssKb = kb;
+                foundRss = true;
+            }
+        } else if (line.startsWith("VmSize:")) {
+            const unsigned long long kb = parseKbValue(line, ok);
+            if (ok) {
+                out.vmsKb = kb;
+            }
+        } else if (line.startsWith("VmSwap:")) {
+            const unsigned long long kb = parseKbValue(line, ok);
+            if (ok) {
+                out.swapKb = kb;
+            }
+        }
+    }
+
+    return foundRss;
+}
+
+bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,
+                      unsigned long long &sharedKb) {
+    const QList<QByteArray> parts = statmContent.simplified().split(' ');
+    if (parts.size() < 3) {
+        return false;
+    }
+
+    bool ok = false;
+    const unsigned long long pages = parts.at(2).toULongLong(&ok);
+    if (!ok) {
+        return false;
+    }
+
+    sharedKb = pages * pageSize / 1024;
+    return true;
+}
+
+bool procMem(int pid, MemInfo &out) {
+    QFile status(procPath(pid, "status"));
+    if (!status.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    if (!parseStatusMem(status.readAll(), out)) {
+        return false;
+    }
+
+    QFile statm(procPath(pid, "statm"));
+    if (statm.open(QIODevice::ReadOnly)) {
+        const long page = ::sysconf(_SC_PAGESIZE);
+        const unsigned long long pageSize =
+            page > 0 ? static_cast<unsigned long long>(page) : 4096ULL;
+        unsigned long long shared = 0;
+        if (parseStatmShared(statm.readAll(), pageSize, shared)) {
+            out.sharedKb = shared;
+        }
+    }
+
+    return true;
 }
 
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out) {

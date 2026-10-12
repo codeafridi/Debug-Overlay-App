@@ -42,6 +42,27 @@ int main(int argc, char *argv[]) {
     check(ProcessGrouper::descendants(0, parentOf).isEmpty(),
           "descendants(0) is empty");
 
+    const QList<ProcNode> tree = ProcessGrouper::orderedTree(1, parentOf);
+    check(tree.size() == 5, "orderedTree(1) includes whole tree");
+    check(tree.at(0).pid == 1 && tree.at(0).depth == 0,
+          "orderedTree root first at depth 0");
+    check(tree.at(1).pid == 2 && tree.at(1).depth == 1 && tree.at(2).pid == 3
+              && tree.at(2).depth == 1,
+          "orderedTree level-1 children sorted and at depth 1");
+    check(tree.at(3).pid == 4 && tree.at(3).depth == 2,
+          "orderedTree grandchild at depth 2");
+    check(tree.at(4).pid == 5 && tree.at(4).depth == 3,
+          "orderedTree deep descendant at depth 3");
+    check(tree.at(4).ppid == 4, "orderedTree records parent pid");
+
+    const QList<ProcNode> subtree = ProcessGrouper::orderedTree(2, parentOf);
+    check(subtree.size() == 3 && subtree.at(0).pid == 2 && subtree.at(2).pid == 5,
+          "orderedTree(2) is its subtree only");
+    check(ProcessGrouper::orderedTree(0, parentOf).isEmpty(),
+          "orderedTree(0) is empty");
+    check(ProcessGrouper::orderedTree(99, parentOf).size() == 1,
+          "orderedTree(unknown) is just the root");
+
     const int self = static_cast<int>(::getpid());
     const ProcessGroup group = ProcessGrouper().discover(self);
     check(group.rootPid > 0, "discover(self) has a root");

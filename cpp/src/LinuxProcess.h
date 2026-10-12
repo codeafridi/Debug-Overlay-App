@@ -10,6 +10,13 @@
 
 namespace linuxproc {
 
+struct MemInfo {
+    unsigned long long rssKb = 0;
+    unsigned long long vmsKb = 0;
+    unsigned long long swapKb = 0;
+    unsigned long long sharedKb = 0;
+};
+
 bool exists(int pid);
 QString comm(int pid);
 QString exePath(int pid);
@@ -24,6 +31,10 @@ bool totalCpuTicks(unsigned long long &out);
 int onlineCpuCount();
 bool rssKb(int pid, unsigned long long &out);
 bool parseVmRssKb(const QByteArray &statusContent, unsigned long long &out);
+bool parseStatusMem(const QByteArray &statusContent, MemInfo &out);
+bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,
+                      unsigned long long &sharedKb);
+bool procMem(int pid, MemInfo &out);
 using RssReader = std::function<bool(int, unsigned long long &)>;
 bool sumRssKbWith(const QList<int> &pids, const RssReader &reader, unsigned long long &out);
 bool sumRssKb(const QList<int> &pids, unsigned long long &out);
