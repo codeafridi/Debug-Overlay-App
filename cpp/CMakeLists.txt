@@ -22,6 +22,8 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
 add_library(syspeek_core STATIC
     src/HudWindow.cpp
     src/HudWindow.h
+    src/DashboardPanel.cpp
+    src/DashboardPanel.h
     src/DisplaySnapshot.h
     src/ProcessIdentity.h
     src/LinuxProcess.cpp
@@ -33,8 +35,26 @@ add_library(syspeek_core STATIC
     src/FocusSampler.h
     src/CpuSampler.cpp
     src/CpuSampler.h
+    src/HostSampler.cpp
+    src/HostSampler.h
+    src/IoRateTracker.cpp
+    src/IoRateTracker.h
+    src/NetRateTracker.cpp
+    src/NetRateTracker.h
+    src/ServicesStatus.cpp
+    src/ServicesStatus.h
+    src/ServicesSource.cpp
+    src/ServicesSource.h
+    src/JournalStatus.cpp
+    src/JournalStatus.h
+    src/JournalSource.cpp
+    src/JournalSource.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
+    src/MetricStore.cpp
+    src/MetricStore.h
+    src/Sparkline.cpp
+    src/Sparkline.h
     src/ProcessGrouper.cpp
     src/ProcessGrouper.h
     src/GroupCache.cpp
@@ -120,6 +140,9 @@ target_link_libraries(syspeek_kube_tests PRIVATE syspeek_core)
 add_executable(syspeek_adapter_tests tests/test_adapters.cpp)
 target_link_libraries(syspeek_adapter_tests PRIVATE syspeek_core)
 
+add_executable(syspeek_metrics_tests tests/test_metrics.cpp)
+target_link_libraries(syspeek_metrics_tests PRIVATE syspeek_core)
+
 add_executable(syspeek_screenshot EXCLUDE_FROM_ALL tools/screenshot.cpp)
 target_link_libraries(syspeek_screenshot PRIVATE syspeek_core)
 
@@ -135,6 +158,7 @@ add_test(NAME docker COMMAND syspeek_docker_tests)
 add_test(NAME config COMMAND syspeek_config_tests)
 add_test(NAME kube COMMAND syspeek_kube_tests)
 add_test(NAME adapters COMMAND syspeek_adapter_tests)
+add_test(NAME metrics COMMAND syspeek_metrics_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters metrics PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

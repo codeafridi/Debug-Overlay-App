@@ -8,6 +8,8 @@
 #include "KdeFocusService.h"
 #include "LinuxProcess.h"
 #include "SamplerWorker.h"
+#include "ServicesSource.h"
+#include "JournalSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -90,6 +92,8 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<DisplaySnapshot>("DisplaySnapshot");
     qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
     qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
+    qRegisterMetaType<ServicesSnapshot>("ServicesSnapshot");
+    qRegisterMetaType<JournalSnapshot>("JournalSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -205,6 +209,33 @@ int main(int argc, char *argv[]) {
                          hud.setKubeSnapshot(snapshot);
                      });
     kubeThread->start();
+
+    auto *servicesThread = new QThread;
+    auto *services = new ServicesSource();
+    services->moveToThread(servicesThread);
+    QObject::connect(servicesThread, &QThread::started, services,
+                     &ServicesSource::start);
+    QObject::connect(servicesThread, &QThread::finished, services,
+                     &QObject::deleteLater);
+    QObject::connect(services, &ServicesSource::servicesReady, &hud,
+                     [&hud](const ServicesSnapshot &snapshot) {
+                         logLine(servicesSummaryText(snapshot));
+                         hud.setServicesSnapshot(snapshot);
+                     });
+    servicesThread->start();
+
+    auto *journalThread = new QThread;
+    auto *journal = new JournalSource();
+    journal->moveToThread(journalThread);
+    QObject::connect(journalThread, &QThread::started, journal,
+                     &JournalSource::start);
+    QObject::connect(journalThread, &QThread::finished, journal,
+                     &QObject::deleteLater);
+    QObject::connect(journal, &JournalSource::journalReady, &hud,
+                     [&hud](const JournalSnapshot &snapshot) {
+                         hud.setJournalSnapshot(snapshot);
+                     });
+    journalThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

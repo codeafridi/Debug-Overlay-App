@@ -1,8 +1,11 @@
 #include "HudWindow.h"
+#include "DashboardPanel.h"
 
 #include <QApplication>
 #include <QLabel>
 #include <QPushButton>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 #include <cstdio>
 
@@ -106,7 +109,197 @@ int main(int argc, char *argv[]) {
         moreButton->click();
     }
 
-    auto *detailsLabel = hud.findChild<QLabel *>(QStringLiteral("details"));
+    auto *moreButton2 = hud.findChild<QPushButton *>(QStringLiteral("moreButton"));
+    auto *panel = hud.findChild<DashboardPanel *>();
+    check(panel != nullptr, "dashboard panel exists inside the overlay");
+    check(!hud.isExpanded() && panel->isHidden(),
+          "overlay starts collapsed with panel hidden");
+    check(hud.findChild<QLabel *>(QStringLiteral("details")) == nullptr,
+          "inline DIAGNOSIS panel removed");
+
+    DisplaySnapshot withProcs = makeSnapshot("alpha", "123", "17%", "8 MB", "OK");
+    withProcs.rssKb = 8192;
+    withProcs.vmsKb = 9216;
+    withProcs.swapKb = 0;
+    withProcs.sharedKb = 1024;
+    ProcessRow root;
+    root.pid = 123;
+    root.depth = 0;
+    root.threads = 5;
+    root.fds = 12;
+    root.cpuPercent = 12.5;
+    root.name = QStringLiteral("alpha");
+    root.memory = QStringLiteral("8 MB");
+    ProcessRow child;
+    child.pid = 124;
+    child.depth = 1;
+    child.threads = 3;
+    child.fds = 7;
+    child.name = QStringLiteral("alpha-child");
+    child.memory = QStringLiteral("4 MB");
+    withProcs.processes = {root, child};
+    ConnectionRow conn;
+    conn.proto = QStringLiteral("tcp");
+    conn.local = QStringLiteral("127.0.0.1:40014");
+    conn.remote = QStringLiteral("127.0.0.1:53");
+    conn.state = QStringLiteral("ESTABLISHED");
+    withProcs.connections = {conn};
+    withProcs.cgroupAvailable = true;
+    withProcs.cgroupVersion = QStringLiteral("v2");
+    withProcs.cgroupPath = QStringLiteral("/user.slice/app.scope");
+    withProcs.cgroupMemUsage = 100ULL * 1024 * 1024;
+    withProcs.cgroupMemLimit = 512LL * 1024 * 1024;
+    withProcs.hostAvailable = true;
+    withProcs.hostCpuPercent = 23.0;
+    withProcs.hostMemAvailableKb = 4ULL * 1024 * 1024;
+    withProcs.hostDiskFreeBytes = 100ULL * 1024 * 1024 * 1024;
+    withProcs.hostNetRxPerSec = 2048.0;
+    withProcs.hostNetTxPerSec = 1024.0;
+    withProcs.hostLoad1 = 0.42;
+    withProcs.focusThreads = 5;
+    withProcs.focusFds = 12;
+    withProcs.focusVolCtx = 100;
+    withProcs.focusInvolCtx = 3;
+    withProcs.focusOpenFiles = {QStringLiteral("/dev/null"),
+                                QStringLiteral("socket:[999]")};
+    withProcs.listeningPorts = {QStringLiteral("tcp 0.0.0.0:631")};
+    withProcs.dependencies = {QStringLiteral("/usr/lib/libc.so.6")};
+    withProcs.socketStateCounts = {qMakePair(QStringLiteral("ESTABLISHED"), 12)};
+    InterfaceRow ifaceRow;
+    ifaceRow.name = QStringLiteral("eth0");
+    ifaceRow.rxPerSec = 2048.0;
+    ifaceRow.txPerSec = 1024.0;
+    withProcs.interfaces = {ifaceRow};
+    hud.setSnapshot(withProcs);
+
+    auto *dashApp = hud.findChild<QLabel *>(QStringLiteral("ddApp"));
+    auto *dashCpu = hud.findChild<QLabel *>(QStringLiteral("ddCpu"));
+    auto *dashMem = hud.findChild<QLabel *>(QStringLiteral("ddMem"));
+    auto *dashStatus = hud.findChild<QLabel *>(QStringLiteral("ddStatus"));
+    auto *dashMemDetail = hud.findChild<QLabel *>(QStringLiteral("ddMemDetail"));
+    auto *dashProcs = hud.findChild<QTreeWidget *>(QStringLiteral("ddProcs"));
+
+    check(dashApp != nullptr && dashApp->text() == QStringLiteral("alpha"),
+          "panel shows app name");
+    check(dashCpu != nullptr && dashCpu->text() == QStringLiteral("17%"),
+          "panel shows cpu");
+    check(dashMem != nullptr && dashMem->text() == QStringLiteral("8 MB"),
+          "panel shows memory");
+    check(dashStatus != nullptr && dashStatus->text() == QStringLiteral("OK"),
+          "panel shows status");
+    check(dashMemDetail != nullptr
+              && dashMemDetail->text().contains(QStringLiteral("RSS")),
+          "panel shows memory breakdown");
+    check(dashProcs != nullptr && dashProcs->topLevelItemCount() == 1,
+          "panel process tree has one root");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->childCount() == 1
+              && dashProcs->topLevelItem(0)->child(0)->text(0)
+                     == QStringLiteral("alpha-child"),
+          "panel process tree nests child");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->text(3) == QStringLiteral("5")
+              && dashProcs->topLevelItem(0)->text(4) == QStringLiteral("12"),
+          "panel process tree shows threads and fds");
+    check(dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr
+              && dashProcs->topLevelItem(0)->text(2) == QStringLiteral("12.5%"),
+          "panel process tree shows cpu percent");
+
+    auto *focusDetail = hud.findChild<QLabel *>(QStringLiteral("ddFocusDetail"));
+    check(focusDetail != nullptr
+              && focusDetail->text().contains(QStringLiteral("ctx sw")),
+          "panel shows focused process detail");
+    auto *openFiles = hud.findChild<QLabel *>(QStringLiteral("ddOpenFiles"));
+    check(openFiles != nullptr
+              && openFiles->text().contains(QStringLiteral("socket:[999]")),
+          "panel shows open files");
+
+    auto *dashNet = hud.findChild<QLabel *>(QStringLiteral("ddNet"));
+    check(dashNet != nullptr
+              && dashNet->text().contains(QStringLiteral("ESTABLISHED")),
+          "panel shows network connection");
+
+    auto *dashListen = hud.findChild<QLabel *>(QStringLiteral("ddListen"));
+    check(dashListen != nullptr
+              && dashListen->text().contains(QStringLiteral("0.0.0.0:631")),
+          "panel shows listening endpoints");
+    auto *dashStates = hud.findChild<QLabel *>(QStringLiteral("ddStates"));
+    check(dashStates != nullptr
+              && dashStates->text().contains(QStringLiteral("ESTABLISHED")),
+          "panel shows socket states");
+    auto *dashIfaces = hud.findChild<QLabel *>(QStringLiteral("ddIfaces"));
+    check(dashIfaces != nullptr
+              && dashIfaces->text().contains(QStringLiteral("eth0")),
+          "panel shows interfaces");
+
+    auto *dashDeps = hud.findChild<QLabel *>(QStringLiteral("ddDeps"));
+    check(dashDeps != nullptr
+              && dashDeps->text().contains(QStringLiteral("libc.so.6")),
+          "panel shows shared libraries");
+
+    ServicesSnapshot services;
+    services.available = true;
+    services.runningCount = 2;
+    services.failedCount = 1;
+    UnitRow unit;
+    unit.name = QStringLiteral("db.service");
+    unit.active = QStringLiteral("failed");
+    unit.sub = QStringLiteral("failed");
+    services.units = {unit};
+    hud.setServicesSnapshot(services);
+    auto *svcSummary =
+        hud.findChild<QLabel *>(QStringLiteral("ddServicesSummary"));
+    check(svcSummary != nullptr
+              && svcSummary->text().contains(QStringLiteral("1 failed")),
+          "panel shows services summary");
+    auto *svcList = hud.findChild<QLabel *>(QStringLiteral("ddServices"));
+    check(svcList != nullptr
+              && svcList->text().contains(QStringLiteral("db.service")),
+          "panel lists failed service");
+
+    JournalSnapshot journal;
+    journal.available = true;
+    JournalEntry je;
+    je.timestampUsec = 1791907430214266LL;
+    je.priority = 3;
+    je.comm = QStringLiteral("nginx");
+    je.message = QStringLiteral("boom");
+    journal.entries = {je};
+    journal.errorCount = 1;
+    hud.setJournalSnapshot(journal);
+    auto *logsSummary =
+        hud.findChild<QLabel *>(QStringLiteral("ddLogsSummary"));
+    check(logsSummary != nullptr
+              && logsSummary->text().contains(QStringLiteral("1 errors")),
+          "panel shows journal summary");
+    auto *errors = hud.findChild<QLabel *>(QStringLiteral("ddErrors"));
+    check(errors != nullptr && errors->text().contains(QStringLiteral("boom")),
+          "panel shows errors");
+
+    auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
+    check(dashCgroup != nullptr
+              && dashCgroup->text().contains(QStringLiteral("512 MB")),
+          "panel shows container memory limit");
+
+    auto *hostCpu = hud.findChild<QLabel *>(QStringLiteral("ddHostCpu"));
+    auto *hostLoad = hud.findChild<QLabel *>(QStringLiteral("ddHostLoad"));
+    check(hostCpu != nullptr && hostCpu->text() == QStringLiteral("23%"),
+          "panel shows host cpu");
+    check(hostLoad != nullptr && hostLoad->text() == QStringLiteral("0.42"),
+          "panel shows host load");
+
+    // The tree is rebuilt every second; a user collapse must survive that.
+    if (dashProcs != nullptr && dashProcs->topLevelItem(0) != nullptr) {
+        dashProcs->topLevelItem(0)->setExpanded(false);
+        hud.setSnapshot(withProcs);
+        check(!dashProcs->topLevelItem(0)->isExpanded(),
+              "collapsed process stays collapsed across refresh");
+        dashProcs->topLevelItem(0)->setExpanded(true);
+        hud.setSnapshot(withProcs);
+        check(dashProcs->topLevelItem(0)->isExpanded(),
+              "expanded process stays expanded across refresh");
+    }
+
     DockerSnapshot dockerSnap;
     dockerSnap.state = DockerState::Ok;
     dockerSnap.runningCount = 1;
@@ -117,12 +310,24 @@ int main(int argc, char *argv[]) {
     kubeSnap.totalPods = 3;
     kubeSnap.issueCount = 2;
     hud.setKubeSnapshot(kubeSnap);
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("docker:")),
-          "diagnosis panel lists docker");
-    check(detailsLabel != nullptr
-              && detailsLabel->text().contains(QStringLiteral("k8s:")),
-          "diagnosis panel lists kubernetes");
+    auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("ddDocker"));
+    auto *dashKube = hud.findChild<QLabel *>(QStringLiteral("ddKube"));
+    check(dashDocker != nullptr
+              && dashDocker->text().contains(QStringLiteral("docker:")),
+          "panel shows docker");
+    check(dashKube != nullptr && dashKube->text().contains(QStringLiteral("k8s:")),
+          "panel shows kubernetes");
+
+    if (moreButton2 && panel) {
+        moreButton2->click();
+        check(hud.isExpanded() && !panel->isHidden(),
+              "MORE expands the overlay in place");
+        check(moreButton2->text() == QStringLiteral("LESS"), "MORE -> LESS");
+        moreButton2->click();
+        check(!hud.isExpanded() && panel->isHidden(),
+              "LESS collapses the overlay in place");
+        check(moreButton2->text() == QStringLiteral("MORE"), "LESS -> MORE");
+    }
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

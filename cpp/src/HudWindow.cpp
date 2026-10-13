@@ -1,13 +1,17 @@
 #include "HudWindow.h"
 
+#include "DashboardPanel.h"
+
 #include <QApplication>
 #include <QFont>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWindow>
@@ -56,7 +60,12 @@ HudWindow::HudWindow(QWidget *parent)
     setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
     setObjectName(QStringLiteral("hudRoot"));
 
-    auto *root = new QVBoxLayout(this);
+    m_pages = new QWidget(this);
+    auto *pagesLayout = new QVBoxLayout(m_pages);
+    pagesLayout->setContentsMargins(0, 0, 0, 0);
+    pagesLayout->setSpacing(0);
+    m_compactPage = new QWidget(m_pages);
+    auto *root = new QVBoxLayout(m_compactPage);
     root->setContentsMargins(14, 10, 14, 16);
     root->setSpacing(10);
 
@@ -138,26 +147,6 @@ HudWindow::HudWindow(QWidget *parent)
     m_kubeDetails->setVisible(false);
     root->addWidget(m_kubeDetails);
 
-    m_detailsPanel = new QFrame(this);
-    m_detailsPanel->setObjectName(QStringLiteral("detailsPanel"));
-
-    auto *detailsLayout = new QVBoxLayout(m_detailsPanel);
-    detailsLayout->setContentsMargins(10, 8, 10, 10);
-    detailsLayout->setSpacing(1);
-
-    auto *detailsTitle = new QLabel(QStringLiteral("DIAGNOSIS"), m_detailsPanel);
-    detailsTitle->setObjectName(QStringLiteral("caption"));
-    detailsTitle->setFont(captionFont());
-
-    m_detailsText = new QLabel(m_detailsPanel);
-    m_detailsText->setObjectName(QStringLiteral("details"));
-    m_detailsText->setWordWrap(true);
-
-    detailsLayout->addWidget(detailsTitle);
-    detailsLayout->addWidget(m_detailsText);
-    m_detailsPanel->setVisible(false);
-    root->addWidget(m_detailsPanel);
-
     auto *footer = new QHBoxLayout();
     footer->setSpacing(4);
     footer->addStretch(1);
@@ -227,8 +216,19 @@ HudWindow::HudWindow(QWidget *parent)
         "#moreButton:hover, #showHideButton:hover { background-color:rgb(96, 100, 110); }"
         "QLabel   { color:rgb(198, 205, 195); }"));
 
+    m_panel = new DashboardPanel(m_pages);
+    connect(m_panel, &DashboardPanel::collapseRequested, this,
+            &HudWindow::toggleDetails);
+    m_panel->setVisible(false);
+    pagesLayout->addWidget(m_compactPage);
+    pagesLayout->addWidget(m_panel);
+
+    auto *windowLayout = new QVBoxLayout(this);
+    windowLayout->setContentsMargins(0, 0, 0, 0);
+    windowLayout->setSpacing(0);
+    windowLayout->addWidget(m_pages);
+
     setSnapshot(DisplaySnapshot{});
-    updateDiagnosis();
 
     setFixedWidth(430);
     adjustSize();
@@ -277,12 +277,14 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     }
 
     updateCompactText();
+    if (m_panel != nullptr) {
+        m_panel->setSnapshot(snapshot);
+    }
 }
 
 void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
     const QString summary = dockerSummaryText(snapshot);
     const QString details = dockerDetailText(snapshot);
-    m_dockerSummaryText = summary;
     m_dockerDetailsText = details;
 
     const bool wasVisible = m_dockerButton->isVisibleTo(this);
@@ -298,7 +300,9 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
             m_dockerOpen = false;
             m_dockerDetails->setVisible(false);
         }
-        adjustSize();
+        if (!m_detailsExpanded) {
+            adjustSize();
+        }
     }
 
     if (m_dockerOpen) {
@@ -311,7 +315,9 @@ void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
         }
     }
 
-    updateDiagnosis();
+    if (m_panel != nullptr) {
+        m_panel->setDockerSnapshot(snapshot);
+    }
 }
 
 void HudWindow::toggleDockerDetails() {
@@ -328,13 +334,14 @@ void HudWindow::toggleDockerDetails() {
         m_dockerDetails->setVisible(false);
     }
 
-    adjustSize();
+    if (!m_detailsExpanded) {
+        adjustSize();
+    }
 }
 
 void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
     const QString summary = kubeSummaryText(snapshot);
     const QString details = kubeDetailText(snapshot);
-    m_kubeSummaryText = summary;
     m_kubeDetailsText = details;
 
     const bool wasVisible = m_kubeButton->isVisibleTo(this);
@@ -350,7 +357,9 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
             m_kubeOpen = false;
             m_kubeDetails->setVisible(false);
         }
-        adjustSize();
+        if (!m_detailsExpanded) {
+            adjustSize();
+        }
     }
 
     if (m_kubeOpen) {
@@ -363,7 +372,21 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
         }
     }
 
-    updateDiagnosis();
+    if (m_panel != nullptr) {
+        m_panel->setKubeSnapshot(snapshot);
+    }
+}
+
+void HudWindow::setServicesSnapshot(const ServicesSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setServicesSnapshot(snapshot);
+    }
+}
+
+void HudWindow::setJournalSnapshot(const JournalSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setJournalSnapshot(snapshot);
+    }
 }
 
 void HudWindow::toggleKubeDetails() {
@@ -380,35 +403,9 @@ void HudWindow::toggleKubeDetails() {
         m_kubeDetails->setVisible(false);
     }
 
-    adjustSize();
-}
-
-void HudWindow::updateDiagnosis() {
-    if (m_detailsText == nullptr) {
-        return;
+    if (!m_detailsExpanded) {
+        adjustSize();
     }
-
-    QStringList lines;
-
-    if (!m_dockerSummaryText.isEmpty()) {
-        lines.append(QString());
-        lines.append(m_dockerSummaryText);
-        if (!m_dockerDetailsText.isEmpty()
-            && m_dockerDetailsText != QStringLiteral("no issues")) {
-            lines.append(m_dockerDetailsText);
-        }
-    }
-
-    if (!m_kubeSummaryText.isEmpty()) {
-        lines.append(QString());
-        lines.append(m_kubeSummaryText);
-        if (!m_kubeDetailsText.isEmpty()
-            && m_kubeDetailsText != QStringLiteral("no issues")) {
-            lines.append(m_kubeDetailsText);
-        }
-    }
-
-    m_detailsText->setText(lines.join(QLatin1Char('\n')));
 }
 
 void HudWindow::updateCompactText() {
@@ -424,14 +421,51 @@ void HudWindow::updateCompactText() {
 }
 
 void HudWindow::toggleDetails() {
-    m_detailsExpanded = !m_detailsExpanded;
-    m_detailsPanel->setVisible(m_detailsExpanded);
+    if (m_pages == nullptr) {
+        return;
+    }
+
+    if (!m_detailsExpanded) {
+        m_savedGeometry = geometry();
+
+        m_compactPage->setVisible(false);
+        m_panel->setVisible(true);
+
+        QScreen *screen = QGuiApplication::screenAt(frameGeometry().center());
+        if (screen == nullptr) {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen != nullptr) {
+            const QRect avail = screen->availableGeometry();
+            const int w = avail.width() * 7 / 10;
+            const int h = avail.height() * 7 / 10;
+            setMinimumSize(0, 0);
+            setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+            resize(w, h);
+            move(avail.center().x() - w / 2, avail.center().y() - h / 2);
+        }
+
+        m_detailsExpanded = true;
+    } else {
+        m_panel->setVisible(false);
+        m_compactPage->setVisible(true);
+        m_detailsExpanded = false;
+
+        setMinimumSize(430, 0);
+        setMaximumSize(430, QWIDGETSIZE_MAX);
+        adjustSize();
+        move(m_savedGeometry.topLeft());
+    }
+
     m_moreButton->setText(m_detailsExpanded ? QStringLiteral("LESS")
                                             : QStringLiteral("MORE"));
-    adjustSize();
 }
 
 void HudWindow::toggleCompact() {
+    if (m_detailsExpanded) {
+        toggleDetails();
+    }
+
     m_compact = !m_compact;
 
     m_metricsWidget->setVisible(!m_compact);
@@ -440,8 +474,6 @@ void HudWindow::toggleCompact() {
                                         : QStringLiteral("HIDE"));
 
     if (m_compact) {
-        m_detailsExpanded = false;
-        m_detailsPanel->setVisible(false);
         m_moreButton->setText(QStringLiteral("MORE"));
         m_moreButton->setVisible(false);
     } else {

@@ -2,9 +2,12 @@
 
 #include "DisplaySnapshot.h"
 #include "DockerStatus.h"
+#include "JournalStatus.h"
 #include "KubeStatus.h"
+#include "ServicesStatus.h"
 
 #include <QPoint>
+#include <QRect>
 #include <QWidget>
 
 class QLabel;
@@ -12,6 +15,7 @@ class QKeyEvent;
 class QLayout;
 class QMouseEvent;
 class QPushButton;
+class DashboardPanel;
 
 class HudWindow : public QWidget {
     Q_OBJECT
@@ -24,6 +28,12 @@ public:
     void setDockerSnapshot(const DockerSnapshot &snapshot);
 
     void setKubeSnapshot(const KubeSnapshot &snapshot);
+
+    void setServicesSnapshot(const ServicesSnapshot &snapshot);
+
+    void setJournalSnapshot(const JournalSnapshot &snapshot);
+
+    bool isExpanded() const { return m_detailsExpanded; }
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -43,7 +53,6 @@ private:
     void toggleDockerDetails();
     void toggleKubeDetails();
     void updateCompactText();
-    void updateDiagnosis();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -57,14 +66,14 @@ private:
     QLabel *m_dockerDetails = nullptr;
     QString m_dockerDetailsText;
     bool m_dockerOpen = false;
-    QString m_dockerSummaryText;
     QPushButton *m_kubeButton = nullptr;
     QLabel *m_kubeDetails = nullptr;
     QString m_kubeDetailsText;
     bool m_kubeOpen = false;
-    QString m_kubeSummaryText;
-    QWidget *m_detailsPanel = nullptr;
-    QLabel *m_detailsText = nullptr;
+    DashboardPanel *m_panel = nullptr;
+    QWidget *m_pages = nullptr;
+    QWidget *m_compactPage = nullptr;
+    QRect m_savedGeometry;
     QPushButton *m_moreButton = nullptr;
     QPushButton *m_showHideButton = nullptr;
     DisplaySnapshot m_lastSnapshot;
