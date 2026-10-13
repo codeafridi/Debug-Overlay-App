@@ -45,6 +45,10 @@ add_library(syspeek_core STATIC
     src/ServicesStatus.h
     src/ServicesSource.cpp
     src/ServicesSource.h
+    src/JournalStatus.cpp
+    src/JournalStatus.h
+    src/JournalSource.cpp
+    src/JournalSource.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
     src/MetricStore.cpp

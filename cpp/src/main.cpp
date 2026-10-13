@@ -9,6 +9,7 @@
 #include "LinuxProcess.h"
 #include "SamplerWorker.h"
 #include "ServicesSource.h"
+#include "JournalSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -92,6 +93,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<DockerSnapshot>("DockerSnapshot");
     qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
     qRegisterMetaType<ServicesSnapshot>("ServicesSnapshot");
+    qRegisterMetaType<JournalSnapshot>("JournalSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -221,6 +223,19 @@ int main(int argc, char *argv[]) {
                          hud.setServicesSnapshot(snapshot);
                      });
     servicesThread->start();
+
+    auto *journalThread = new QThread;
+    auto *journal = new JournalSource();
+    journal->moveToThread(journalThread);
+    QObject::connect(journalThread, &QThread::started, journal,
+                     &JournalSource::start);
+    QObject::connect(journalThread, &QThread::finished, journal,
+                     &QObject::deleteLater);
+    QObject::connect(journal, &JournalSource::journalReady, &hud,
+                     [&hud](const JournalSnapshot &snapshot) {
+                         hud.setJournalSnapshot(snapshot);
+                     });
+    journalThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

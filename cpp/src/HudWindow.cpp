@@ -383,6 +383,12 @@ void HudWindow::setServicesSnapshot(const ServicesSnapshot &snapshot) {
     }
 }
 
+void HudWindow::setJournalSnapshot(const JournalSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setJournalSnapshot(snapshot);
+    }
+}
+
 void HudWindow::toggleKubeDetails() {
     if (!m_kubeOpen && m_kubeDetailsText.isEmpty()) {
         return;

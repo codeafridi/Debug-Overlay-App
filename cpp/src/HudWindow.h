@@ -2,6 +2,7 @@
 
 #include "DisplaySnapshot.h"
 #include "DockerStatus.h"
+#include "JournalStatus.h"
 #include "KubeStatus.h"
 #include "ServicesStatus.h"
 
@@ -29,6 +30,8 @@ public:
     void setKubeSnapshot(const KubeSnapshot &snapshot);
 
     void setServicesSnapshot(const ServicesSnapshot &snapshot);
+
+    void setJournalSnapshot(const JournalSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

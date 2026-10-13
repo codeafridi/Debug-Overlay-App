@@ -3,6 +3,7 @@
 #include "IoRateTracker.h"
 #include "NetRateTracker.h"
 #include "ServicesStatus.h"
+#include "JournalStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -109,6 +110,31 @@ int main(int argc, char *argv[]) {
     check(servicesSummaryText(services).contains(QStringLiteral("3 running"))
               && servicesSummaryText(services).contains(QStringLiteral("1 failed")),
           "services summary text");
+
+    QList<JournalEntry> entries;
+    const QByteArray journal =
+        "{\"__REALTIME_TIMESTAMP\":\"1791907430214266\",\"PRIORITY\":\"3\","
+        "\"_PID\":\"2196\",\"_COMM\":\"nginx\",\"MESSAGE\":\"boom\"}\n"
+        "{\"PRIORITY\":\"6\",\"_COMM\":\"cron\",\"MESSAGE\":\"tick\"}\n"
+        "not json\n"
+        "{\"PRIORITY\":\"2\",\"_COMM\":\"kernel\",\"MESSAGE\":[104,105]}\n";
+    check(parseJournalJson(journal, entries) && entries.size() == 3,
+          "parseJournalJson: 3 objects, junk skipped");
+    check(entries.at(0).comm == QStringLiteral("nginx")
+              && entries.at(0).message == QStringLiteral("boom")
+              && entries.at(0).priority == 3 && entries.at(0).pid == 2196
+              && entries.at(0).timestampUsec == 1791907430214266LL,
+          "parseJournalJson: fields decoded");
+    check(entries.at(2).message == QStringLiteral("hi"),
+          "parseJournalJson: byte-array MESSAGE decoded");
+    check(journalErrorCount(entries) == 2, "journalErrorCount: priority <= 3");
+
+    JournalSnapshot journal2;
+    journal2.available = true;
+    journal2.entries = entries;
+    journal2.errorCount = 2;
+    check(journalSummaryText(journal2).contains(QStringLiteral("2 errors")),
+          "journal summary text");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

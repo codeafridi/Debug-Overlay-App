@@ -257,6 +257,25 @@ int main(int argc, char *argv[]) {
               && svcList->text().contains(QStringLiteral("db.service")),
           "panel lists failed service");
 
+    JournalSnapshot journal;
+    journal.available = true;
+    JournalEntry je;
+    je.timestampUsec = 1791907430214266LL;
+    je.priority = 3;
+    je.comm = QStringLiteral("nginx");
+    je.message = QStringLiteral("boom");
+    journal.entries = {je};
+    journal.errorCount = 1;
+    hud.setJournalSnapshot(journal);
+    auto *logsSummary =
+        hud.findChild<QLabel *>(QStringLiteral("ddLogsSummary"));
+    check(logsSummary != nullptr
+              && logsSummary->text().contains(QStringLiteral("1 errors")),
+          "panel shows journal summary");
+    auto *errors = hud.findChild<QLabel *>(QStringLiteral("ddErrors"));
+    check(errors != nullptr && errors->text().contains(QStringLiteral("boom")),
+          "panel shows errors");
+
     auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
     check(dashCgroup != nullptr
               && dashCgroup->text().contains(QStringLiteral("512 MB")),

@@ -169,8 +169,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildContainersView());
     m_views->addWidget(buildKubernetesView());
     m_views->addWidget(buildServicesView());
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Logs")));
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Errors")));
+    m_views->addWidget(buildLogsView());
+    m_views->addWidget(buildErrorsView());
     m_views->addWidget(buildDependenciesView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Endpoints")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Instrumentation")));
@@ -217,6 +217,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDocker { color: #9fb0c4; }"
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
+        "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
         "#ddKube { color: #b0a9c4; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
@@ -477,6 +478,38 @@ QWidget *DashboardPanel::buildDependenciesView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildLogsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+
+    m_logsSummary = new QLabel(QStringLiteral("--"), view);
+    m_logsSummary->setObjectName(QStringLiteral("ddLogsSummary"));
+    m_logsSummary->setFont(monoFont(12, true));
+    layout->addWidget(makeCard(QStringLiteral("JOURNALD"), m_logsSummary, view));
+
+    m_logs = new QLabel(QStringLiteral("--"), view);
+    m_logs->setObjectName(QStringLiteral("ddLogs"));
+    m_logs->setFont(monoFont(10));
+    m_logs->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("RECENT LOGS"), m_logs, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildErrorsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_errors = new QLabel(QStringLiteral("--"), view);
+    m_errors->setObjectName(QStringLiteral("ddErrors"));
+    m_errors->setFont(monoFont(10));
+    m_errors->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("ERRORS AND WORSE"), m_errors, view), 1);
+    return view;
+}
+
 QWidget *DashboardPanel::buildPlaceholderView(const QString &text) {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
@@ -731,4 +764,12 @@ void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {
                                   : QStringLiteral("--");
     }
     m_services->setText(text);
+}
+
+void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
+    m_logsSummary->setText(journalSummaryText(snapshot));
+    m_logs->setText(snapshot.available ? journalLogsText(snapshot, 40)
+                                       : QStringLiteral("--"));
+    m_errors->setText(snapshot.available ? journalErrorsText(snapshot)
+                                         : QStringLiteral("--"));
 }
