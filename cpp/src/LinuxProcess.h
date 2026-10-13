@@ -106,6 +106,7 @@ bool procSample(int pid, MemInfo &mem, ProcDetail &detail);
 bool parseStatusDetail(const QByteArray &statusContent, ProcDetail &out);
 bool parseProcIo(const QByteArray &content, ProcDetail &out);
 QList<QString> fdTargets(int pid);
+bool sharedLibraries(int pid, QList<QString> &out);
 int countFds(int pid);
 QList<unsigned long long> socketInodes(int pid);
 bool parseNetTable(const QByteArray &content, const QString &proto,

@@ -73,6 +73,9 @@ QFrame *makeCard(const QString &title, QWidget *content, QWidget *parent) {
     layout->setContentsMargins(14, 12, 14, 14);
     layout->setSpacing(10);
     layout->addWidget(makeTitle(title, card));
+    if (auto *label = qobject_cast<QLabel *>(content)) {
+        label->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    }
     layout->addWidget(content, 1);
     return card;
 }
@@ -165,12 +168,18 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildNetworkView());
     m_views->addWidget(buildContainersView());
     m_views->addWidget(buildKubernetesView());
-    for (const char *name :
-         {"Services", "Logs", "Errors", "Dependencies", "Endpoints",
-          "Instrumentation", "Traces", "Profiles", "Databases", "Security",
-          "Cost", "Settings"}) {
-        m_views->addWidget(buildPlaceholderView(QString::fromLatin1(name)));
-    }
+    m_views->addWidget(buildServicesView());
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Logs")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Errors")));
+    m_views->addWidget(buildDependenciesView());
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Endpoints")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Instrumentation")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Traces")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Databases")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Security")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Cost")));
+    m_views->addWidget(buildPlaceholderView(QStringLiteral("Settings")));
 
     connect(m_rail, &QListWidget::currentRowChanged, m_views,
             &QStackedWidget::setCurrentIndex);
@@ -207,6 +216,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
+        "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddKube { color: #b0a9c4; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
@@ -433,6 +443,40 @@ QWidget *DashboardPanel::buildKubernetesView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildServicesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+
+    m_servicesSummary = new QLabel(QStringLiteral("--"), view);
+    m_servicesSummary->setObjectName(QStringLiteral("ddServicesSummary"));
+    m_servicesSummary->setFont(monoFont(12, true));
+    layout->addWidget(makeCard(QStringLiteral("SYSTEMD"), m_servicesSummary, view));
+
+    m_services = new QLabel(QStringLiteral("--"), view);
+    m_services->setObjectName(QStringLiteral("ddServices"));
+    m_services->setFont(monoFont(10));
+    m_services->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("SERVICES"), m_services, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildDependenciesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_deps = new QLabel(QStringLiteral("--"), view);
+    m_deps->setObjectName(QStringLiteral("ddDeps"));
+    m_deps->setFont(monoFont(10));
+    m_deps->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("SHARED LIBRARIES (focused process)"), m_deps, view),
+        1);
+    return view;
+}
+
 QWidget *DashboardPanel::buildPlaceholderView(const QString &text) {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
@@ -584,6 +628,18 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     }
     m_openFiles->setText(files.isEmpty() ? QStringLiteral("--") : files);
 
+    QString deps;
+    int depCount = 0;
+    for (const QString &lib : snapshot.dependencies) {
+        if (depCount >= 60) {
+            deps += QStringLiteral("...\n");
+            break;
+        }
+        deps += lib + QLatin1Char('\n');
+        ++depCount;
+    }
+    m_deps->setText(deps.isEmpty() ? QStringLiteral("--") : deps);
+
     m_populating = true;
     m_procs->clear();
     QList<QTreeWidgetItem *> byDepth;
@@ -647,4 +703,32 @@ void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
         text += QStringLiteral("\n") + details;
     }
     m_kube->setText(text.isEmpty() ? QStringLiteral("--") : text);
+}
+
+void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {
+    m_servicesSummary->setText(servicesSummaryText(snapshot));
+
+    QString text;
+    int count = 0;
+    for (const UnitRow &row : snapshot.units) {
+        const bool failed = row.active == QStringLiteral("failed")
+                            || row.sub == QStringLiteral("failed");
+        const bool running = row.active == QStringLiteral("active")
+                             && row.sub == QStringLiteral("running");
+        if (!failed && !running) {
+            continue;
+        }
+        text += QStringLiteral("%1%2  %3/%4\n")
+                    .arg(failed ? QStringLiteral("! ") : QStringLiteral("  "),
+                         row.name, row.active, row.sub);
+        if (++count >= 40) {
+            text += QStringLiteral("...\n");
+            break;
+        }
+    }
+    if (text.isEmpty()) {
+        text = snapshot.available ? QStringLiteral("no services")
+                                  : QStringLiteral("--");
+    }
+    m_services->setText(text);
 }

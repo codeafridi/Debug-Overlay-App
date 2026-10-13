@@ -4,6 +4,7 @@
 #include "DockerStatus.h"
 #include "KubeStatus.h"
 #include "MetricStore.h"
+#include "ServicesStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -25,6 +26,7 @@ public:
     void setSnapshot(const DisplaySnapshot &snapshot);
     void setDockerSnapshot(const DockerSnapshot &snapshot);
     void setKubeSnapshot(const KubeSnapshot &snapshot);
+    void setServicesSnapshot(const ServicesSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -36,6 +38,8 @@ private:
     QWidget *buildNetworkView();
     QWidget *buildContainersView();
     QWidget *buildKubernetesView();
+    QWidget *buildServicesView();
+    QWidget *buildDependenciesView();
     QWidget *buildPlaceholderView(const QString &text);
 
     QLabel *m_appValue = nullptr;
@@ -61,6 +65,9 @@ private:
     QLabel *m_cgroup = nullptr;
     QLabel *m_docker = nullptr;
     QLabel *m_kube = nullptr;
+    QLabel *m_services = nullptr;
+    QLabel *m_servicesSummary = nullptr;
+    QLabel *m_deps = nullptr;
 
     Sparkline *m_cpuSpark = nullptr;
     Sparkline *m_memSpark = nullptr;

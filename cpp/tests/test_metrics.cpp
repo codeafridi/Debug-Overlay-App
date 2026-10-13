@@ -2,6 +2,7 @@
 #include "Sparkline.h"
 #include "IoRateTracker.h"
 #include "NetRateTracker.h"
+#include "ServicesStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -73,6 +74,41 @@ int main(int argc, char *argv[]) {
     const NetRateTracker::Rate n3 = netTracker.update(QStringLiteral("eth0"), 100, 100);
     check(n3.rxPerSec == 0.0 && n3.txPerSec == 0.0,
           "net tracker: counter reset -> 0");
+
+    QList<UnitRow> units;
+    check(parseSystemctlUnits(
+              "nginx.service loaded active running A high performance web server\n"
+              "db.service loaded failed failed Database\n"
+              "ssh.service loaded active exited OpenBSD Secure Shell server\n"
+              "19 loaded units listed. Pass --all to see inactive units.\n",
+              units)
+              && units.size() == 3
+              && units.at(0).name == QStringLiteral("nginx.service")
+              && units.at(0).active == QStringLiteral("active")
+              && units.at(0).sub == QStringLiteral("running")
+              && units.at(0).description
+                     == QStringLiteral("A high performance web server")
+              && units.at(1).active == QStringLiteral("failed"),
+          "parseSystemctlUnits: rows + description, footer skipped");
+    check(servicesRunningCount(units) == 1, "servicesRunningCount == 1");
+    check(servicesFailedCount(units) == 1, "servicesFailedCount == 1");
+
+    QList<UnitRow> bulletUnits;
+    check(parseSystemctlUnits(
+              "\xE2\x97\x8F boom.service loaded failed failed Boom\n",
+              bulletUnits)
+              && bulletUnits.size() == 1
+              && bulletUnits.at(0).name == QStringLiteral("boom.service")
+              && bulletUnits.at(0).active == QStringLiteral("failed"),
+          "parseSystemctlUnits: bullet-prefixed failed unit");
+
+    ServicesSnapshot services;
+    services.available = true;
+    services.runningCount = 3;
+    services.failedCount = 1;
+    check(servicesSummaryText(services).contains(QStringLiteral("3 running"))
+              && servicesSummaryText(services).contains(QStringLiteral("1 failed")),
+          "services summary text");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

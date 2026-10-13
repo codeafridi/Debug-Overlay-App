@@ -41,6 +41,10 @@ add_library(syspeek_core STATIC
     src/IoRateTracker.h
     src/NetRateTracker.cpp
     src/NetRateTracker.h
+    src/ServicesStatus.cpp
+    src/ServicesStatus.h
+    src/ServicesSource.cpp
+    src/ServicesSource.h
     src/MemoryFormat.cpp
     src/MemoryFormat.h
     src/MetricStore.cpp

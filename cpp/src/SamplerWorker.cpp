@@ -138,6 +138,7 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         snap.focusIoReadPerSec = rate.readPerSec;
         snap.focusIoWritePerSec = rate.writePerSec;
         snap.focusOpenFiles = linuxproc::fdTargets(rootPid);
+        linuxproc::sharedLibraries(rootPid, snap.dependencies);
     }
 
     snap.processes = rows;

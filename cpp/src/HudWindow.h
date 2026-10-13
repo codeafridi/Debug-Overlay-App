@@ -3,6 +3,7 @@
 #include "DisplaySnapshot.h"
 #include "DockerStatus.h"
 #include "KubeStatus.h"
+#include "ServicesStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -26,6 +27,8 @@ public:
     void setDockerSnapshot(const DockerSnapshot &snapshot);
 
     void setKubeSnapshot(const KubeSnapshot &snapshot);
+
+    void setServicesSnapshot(const ServicesSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSet>
 
 #include <unistd.h>
 
@@ -319,6 +320,36 @@ bool parseProcIo(const QByteArray &content, ProcDetail &out) {
         }
     }
     return found;
+}
+
+bool sharedLibraries(int pid, QList<QString> &out) {
+    out.clear();
+    QFile maps(procPath(pid, "maps"));
+    if (!maps.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    QSet<QString> seen;
+    const QList<QByteArray> lines = maps.readAll().split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> fields = line.simplified().split(' ');
+        if (fields.size() < 6) {
+            continue;
+        }
+        const QString path = QString::fromUtf8(fields.mid(5).join(' '));
+        if (!path.contains(QStringLiteral(".so"))) {
+            continue;
+        }
+        if (seen.contains(path)) {
+            continue;
+        }
+        seen.insert(path);
+        out.append(path);
+        if (out.size() >= 200) {
+            break;
+        }
+    }
+    return !out.isEmpty();
 }
 
 int countFds(int pid) {

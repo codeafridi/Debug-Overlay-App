@@ -163,6 +163,7 @@ int main(int argc, char *argv[]) {
     withProcs.focusOpenFiles = {QStringLiteral("/dev/null"),
                                 QStringLiteral("socket:[999]")};
     withProcs.listeningPorts = {QStringLiteral("tcp 0.0.0.0:631")};
+    withProcs.dependencies = {QStringLiteral("/usr/lib/libc.so.6")};
     withProcs.socketStateCounts = {qMakePair(QStringLiteral("ESTABLISHED"), 12)};
     InterfaceRow ifaceRow;
     ifaceRow.name = QStringLiteral("eth0");
@@ -230,6 +231,31 @@ int main(int argc, char *argv[]) {
     check(dashIfaces != nullptr
               && dashIfaces->text().contains(QStringLiteral("eth0")),
           "panel shows interfaces");
+
+    auto *dashDeps = hud.findChild<QLabel *>(QStringLiteral("ddDeps"));
+    check(dashDeps != nullptr
+              && dashDeps->text().contains(QStringLiteral("libc.so.6")),
+          "panel shows shared libraries");
+
+    ServicesSnapshot services;
+    services.available = true;
+    services.runningCount = 2;
+    services.failedCount = 1;
+    UnitRow unit;
+    unit.name = QStringLiteral("db.service");
+    unit.active = QStringLiteral("failed");
+    unit.sub = QStringLiteral("failed");
+    services.units = {unit};
+    hud.setServicesSnapshot(services);
+    auto *svcSummary =
+        hud.findChild<QLabel *>(QStringLiteral("ddServicesSummary"));
+    check(svcSummary != nullptr
+              && svcSummary->text().contains(QStringLiteral("1 failed")),
+          "panel shows services summary");
+    auto *svcList = hud.findChild<QLabel *>(QStringLiteral("ddServices"));
+    check(svcList != nullptr
+              && svcList->text().contains(QStringLiteral("db.service")),
+          "panel lists failed service");
 
     auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
     check(dashCgroup != nullptr

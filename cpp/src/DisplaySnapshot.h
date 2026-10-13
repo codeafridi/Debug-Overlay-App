@@ -75,5 +75,6 @@ struct DisplaySnapshot {
     double focusIoReadPerSec = 0.0;
     double focusIoWritePerSec = 0.0;
     QList<QString> focusOpenFiles;
+    QList<QString> dependencies;
     quint64 sequence = 0;
 };

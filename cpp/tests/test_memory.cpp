@@ -363,6 +363,12 @@ int main(int argc, char *argv[]) {
             }
         }
         check(sawSocket, "fdTargets includes the socketpair sockets");
+
+        QList<QString> libs;
+        check(linuxproc::sharedLibraries(self, libs) && !libs.isEmpty(),
+              "sharedLibraries(self) lists .so files");
+        check(!linuxproc::sharedLibraries(1 << 30, libs),
+              "sharedLibraries(bogus) -> false");
         if (sv[0] >= 0) {
             ::close(sv[0]);
         }
