@@ -149,8 +149,9 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_rail->setObjectName(QStringLiteral("ddRail"));
     m_rail->setFixedWidth(158);
     m_rail->setFocusPolicy(Qt::NoFocus);
-    m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Processes"),
-                      QStringLiteral("Memory"), QStringLiteral("Network"),
+    m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Alerts"),
+                      QStringLiteral("Processes"), QStringLiteral("Memory"),
+                      QStringLiteral("Network"),
                       QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
                       QStringLiteral("Services"), QStringLiteral("Logs"),
                       QStringLiteral("Errors"), QStringLiteral("Dependencies"),
@@ -164,6 +165,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views = new QStackedWidget(body);
     m_views->setObjectName(QStringLiteral("ddViews"));
     m_views->addWidget(buildOverviewView());
+    m_views->addWidget(buildAlertsView());
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
     m_views->addWidget(buildNetworkView());
@@ -221,6 +223,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
         "#ddEndpoints, #ddInstrumentation, #ddDatabases { color: #c4cad1; }"
+        "#ddAlerts { color: #c4cad1; }"
         "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
         "#ddKubeDiagnosis, #ddKubeTimeline { color: #c4cad1; }"
         "#ddPlaceholder { color: #5f6671; }"
@@ -312,6 +315,18 @@ QWidget *DashboardPanel::buildOverviewView() {
     hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, view), 1);
     layout->addLayout(hostRow);
     layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildAlertsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    m_alerts = new QLabel(QStringLiteral("no active alerts"), view);
+    m_alerts->setObjectName(QStringLiteral("ddAlerts"));
+    m_alerts->setFont(monoFont(11));
+    m_alerts->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("ACTIVE ALERTS"), m_alerts, view), 1);
     return view;
 }
 
@@ -957,4 +972,17 @@ void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     m_errors->setText(snapshot.available
                           ? journalErrorGroupsText(snapshot.errorGroups)
                           : QStringLiteral("--"));
+}
+
+void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
+    if (alerts.isEmpty()) {
+        m_alerts->setText(QStringLiteral("no active alerts"));
+        return;
+    }
+    QString text;
+    for (const Alert &alert : alerts) {
+        text += QStringLiteral("[%1] %2  %3\n")
+                    .arg(alert.severity.toUpper(), alert.title, alert.detail);
+    }
+    m_alerts->setText(text);
 }

@@ -6,6 +6,7 @@
 #include "KubeStatus.h"
 #include "MetricStore.h"
 #include "ServicesStatus.h"
+#include "AlertEngine.h"
 
 #include <QSet>
 #include <QWidget>
@@ -29,12 +30,14 @@ public:
     void setKubeSnapshot(const KubeSnapshot &snapshot);
     void setServicesSnapshot(const ServicesSnapshot &snapshot);
     void setJournalSnapshot(const JournalSnapshot &snapshot);
+    void setAlerts(const QList<Alert> &alerts);
 
 signals:
     void collapseRequested();
 
 private:
     QWidget *buildOverviewView();
+    QWidget *buildAlertsView();
     QWidget *buildProcessesView();
     QWidget *buildMemoryView();
     QWidget *buildNetworkView();
@@ -51,6 +54,7 @@ private:
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
+    QLabel *m_alerts = nullptr;
     QLabel *m_cpuValue = nullptr;
     QLabel *m_memValue = nullptr;
     QLabel *m_procCount = nullptr;

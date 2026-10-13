@@ -8,6 +8,22 @@
 #include <QTreeWidgetItem>
 
 #include <cstdio>
+#include <memory>
+
+namespace {
+
+class FakeNotifier : public Notifier {
+public:
+    int count = 0;
+    QList<Alert> alerts;
+    bool send(const Alert &alert) override {
+        ++count;
+        alerts.append(alert);
+        return true;
+    }
+};
+
+} // namespace
 
 static DisplaySnapshot makeSnapshot(const char *app,
                                     const char *pid,
@@ -27,6 +43,10 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     HudWindow hud;
+
+    auto fake = std::make_unique<FakeNotifier>();
+    FakeNotifier *fakePtr = fake.get();
+    hud.setNotifier(std::move(fake));
 
     int failures = 0;
     auto check = [&failures](bool condition, const char *message) {
@@ -413,6 +433,18 @@ int main(int argc, char *argv[]) {
     check(dashKubeTimeline != nullptr
               && dashKubeTimeline->text().contains(QStringLiteral("rollout")),
           "panel shows change timeline");
+
+    DisplaySnapshot hot = makeSnapshot("hot", "9", "95%", "10 MB", "WARN");
+    hot.cpuValid = true;
+    hot.cpuPercent = 95.0;
+    hud.setSnapshot(hot);
+    hud.setSnapshot(hot);
+    hud.setSnapshot(hot);
+    check(fakePtr->count >= 1, "notification fired for a breached rule");
+    auto *dashAlerts = hud.findChild<QLabel *>(QStringLiteral("ddAlerts"));
+    check(dashAlerts != nullptr
+              && dashAlerts->text().contains(QStringLiteral("CPU")),
+          "panel shows active alert");
 
     if (moreButton2 && panel) {
         moreButton2->click();

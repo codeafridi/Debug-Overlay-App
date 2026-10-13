@@ -1,0 +1,63 @@
+#pragma once
+
+#include <QHash>
+#include <QList>
+#include <QString>
+
+struct AlertRule {
+    QString id;
+    QString title;
+    QString severity; // "critical" | "warning"
+    double threshold = 0.0;
+    bool above = true; // breach when value > threshold (else <)
+    int sustained = 1; // consecutive breaches required
+    QString unit;
+};
+
+struct Alert {
+    QString id;
+    QString title;
+    QString detail;
+    QString severity;
+    double value = 0.0;
+    qint64 atMs = 0;
+};
+
+// Latest observed values, assembled from the app/host/services/journal snapshots.
+struct AlertInput {
+    bool appCpuValid = false;
+    double appCpu = 0.0;
+    bool hostCpuValid = false;
+    double hostCpu = 0.0;
+    bool hostMemValid = false;
+    double hostMemFreePct = 100.0;
+    bool diskValid = false;
+    double diskFreePct = 100.0;
+    bool servicesValid = false;
+    int servicesFailed = 0;
+    bool k8sValid = false;
+    int k8sIssues = 0;
+    bool journalValid = false;
+    int journalErrors = 0;
+};
+
+class AlertEngine {
+public:
+    AlertEngine();
+
+    // Returns alerts that just started firing (call once per cycle).
+    QList<Alert> update(const AlertInput &input, qint64 nowMs);
+
+    const QList<Alert> &active() const { return m_active; }
+    void reset();
+
+private:
+    struct State {
+        int streak = 0;
+        bool firing = false;
+    };
+
+    QList<AlertRule> m_rules;
+    QHash<QString, State> m_state;
+    QList<Alert> m_active;
+};

@@ -5,10 +5,14 @@
 #include "JournalStatus.h"
 #include "KubeStatus.h"
 #include "ServicesStatus.h"
+#include "AlertEngine.h"
+#include "Notifier.h"
 
 #include <QPoint>
 #include <QRect>
 #include <QWidget>
+
+#include <memory>
 
 class QLabel;
 class QKeyEvent;
@@ -32,6 +36,8 @@ public:
     void setServicesSnapshot(const ServicesSnapshot &snapshot);
 
     void setJournalSnapshot(const JournalSnapshot &snapshot);
+
+    void setNotifier(std::unique_ptr<Notifier> notifier);
 
     bool isExpanded() const { return m_detailsExpanded; }
 
@@ -74,6 +80,10 @@ private:
     QWidget *m_pages = nullptr;
     QWidget *m_compactPage = nullptr;
     QRect m_savedGeometry;
+    AlertEngine m_alerts;
+    AlertInput m_alertInput;
+    std::unique_ptr<Notifier> m_notifier;
+    void evaluateAlerts();
     QPushButton *m_moreButton = nullptr;
     QPushButton *m_showHideButton = nullptr;
     DisplaySnapshot m_lastSnapshot;

@@ -35,6 +35,10 @@ add_library(syspeek_core STATIC
     src/FocusSampler.h
     src/CpuSampler.cpp
     src/CpuSampler.h
+    src/AlertEngine.cpp
+    src/AlertEngine.h
+    src/Notifier.cpp
+    src/Notifier.h
     src/HostSampler.cpp
     src/HostSampler.h
     src/IoRateTracker.cpp

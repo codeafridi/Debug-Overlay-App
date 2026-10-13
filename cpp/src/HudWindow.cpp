@@ -3,6 +3,7 @@
 #include "DashboardPanel.h"
 
 #include <QApplication>
+#include <QDateTime>
 #include <QFont>
 #include <QFrame>
 #include <QGuiApplication>
@@ -59,6 +60,8 @@ HudWindow::HudWindow(QWidget *parent)
     setAttribute(Qt::WA_ShowWithoutActivating, true);
     setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
     setObjectName(QStringLiteral("hudRoot"));
+
+    m_notifier = std::make_unique<DesktopNotifier>();
 
     m_pages = new QWidget(this);
     auto *pagesLayout = new QVBoxLayout(m_pages);
@@ -280,6 +283,22 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     if (m_panel != nullptr) {
         m_panel->setSnapshot(snapshot);
     }
+
+    m_alertInput.appCpuValid = snapshot.cpuValid;
+    m_alertInput.appCpu = snapshot.cpuPercent;
+    m_alertInput.hostCpuValid = snapshot.hostAvailable && !snapshot.hostWarming;
+    m_alertInput.hostCpu = snapshot.hostCpuPercent;
+    if (snapshot.hostMemTotalKb > 0) {
+        m_alertInput.hostMemValid = true;
+        m_alertInput.hostMemFreePct =
+            100.0 * snapshot.hostMemAvailableKb / snapshot.hostMemTotalKb;
+    }
+    if (snapshot.hostDiskTotalBytes > 0) {
+        m_alertInput.diskValid = true;
+        m_alertInput.diskFreePct =
+            100.0 * snapshot.hostDiskFreeBytes / snapshot.hostDiskTotalBytes;
+    }
+    evaluateAlerts();
 }
 
 void HudWindow::setDockerSnapshot(const DockerSnapshot &snapshot) {
@@ -375,17 +394,44 @@ void HudWindow::setKubeSnapshot(const KubeSnapshot &snapshot) {
     if (m_panel != nullptr) {
         m_panel->setKubeSnapshot(snapshot);
     }
+    m_alertInput.k8sValid = snapshot.state == KubeState::Ok;
+    m_alertInput.k8sIssues = snapshot.issueCount + snapshot.eventCount;
+    evaluateAlerts();
 }
 
 void HudWindow::setServicesSnapshot(const ServicesSnapshot &snapshot) {
     if (m_panel != nullptr) {
         m_panel->setServicesSnapshot(snapshot);
     }
+    m_alertInput.servicesValid = snapshot.available;
+    m_alertInput.servicesFailed = snapshot.failedCount;
+    evaluateAlerts();
 }
 
 void HudWindow::setJournalSnapshot(const JournalSnapshot &snapshot) {
     if (m_panel != nullptr) {
         m_panel->setJournalSnapshot(snapshot);
+    }
+    m_alertInput.journalValid = snapshot.available;
+    m_alertInput.journalErrors = snapshot.errorCount;
+    evaluateAlerts();
+}
+
+void HudWindow::setNotifier(std::unique_ptr<Notifier> notifier) {
+    m_notifier = std::move(notifier);
+}
+
+void HudWindow::evaluateAlerts() {
+    if (m_notifier == nullptr) {
+        return;
+    }
+    const QList<Alert> fired =
+        m_alerts.update(m_alertInput, QDateTime::currentMSecsSinceEpoch());
+    for (const Alert &alert : fired) {
+        m_notifier->send(alert);
+    }
+    if (m_panel != nullptr) {
+        m_panel->setAlerts(m_alerts.active());
     }
 }
 

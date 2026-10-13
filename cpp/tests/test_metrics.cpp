@@ -4,6 +4,7 @@
 #include "NetRateTracker.h"
 #include "ServicesStatus.h"
 #include "JournalStatus.h"
+#include "AlertEngine.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -187,6 +188,37 @@ int main(int argc, char *argv[]) {
     check(sawFail && sawAppear, "service diff: failure + new unit");
     check(servicesChangesText(changes).contains(QStringLiteral("a.service")),
           "services changes text");
+
+    AlertEngine engine;
+    AlertInput input;
+    input.appCpuValid = true;
+    input.appCpu = 95.0;
+    check(engine.update(input, 1).isEmpty(), "alert: no fire before sustained");
+    check(engine.update(input, 2).isEmpty(), "alert: still not firing");
+    const QList<Alert> fired = engine.update(input, 3);
+    check(fired.size() == 1 && fired.at(0).id == QStringLiteral("app_cpu"),
+          "alert: fires at sustained count");
+    check(engine.active().size() == 1, "alert: active list has one");
+    input.appCpu = 10.0;
+    engine.update(input, 4);
+    check(engine.active().isEmpty(), "alert: resolves on recovery");
+
+    AlertInput servicesInput;
+    servicesInput.servicesValid = true;
+    servicesInput.servicesFailed = 1;
+    const QList<Alert> immediate = engine.update(servicesInput, 5);
+    check(immediate.size() == 1
+              && immediate.at(0).id == QStringLiteral("services_failed"),
+          "alert: service failure fires immediately");
+
+    engine.reset();
+    AlertInput memInput;
+    memInput.hostMemValid = true;
+    memInput.hostMemFreePct = 5.0;
+    engine.update(memInput, 6);
+    engine.update(memInput, 7);
+    check(engine.update(memInput, 8).size() == 1,
+          "alert: low memory fires after sustained");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
