@@ -1,5 +1,5 @@
 Name:           syspeek
-Version:        0.3.2
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Compact always-on-top HUD for focused-process and infra status
 
