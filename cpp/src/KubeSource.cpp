@@ -229,6 +229,21 @@ void KubeSource::emitSnapshot(KubeState state, const QString &message,
         snapshot.issueCount =
             kubeIssueCount(resources.pods, resources.deployments);
         snapshot.eventCount = kubeWarningCount(resources.events);
+        snapshot.diagnoses = kubeDiagnose(resources.pods, resources.events);
+
+        if (m_havePrev) {
+            const QList<KubeChange> changes =
+                kubeDiff(m_prevResources, resources, snapshot.sampledAtMs);
+            for (const KubeChange &change : changes) {
+                m_timeline.prepend(change);
+            }
+            while (m_timeline.size() > 200) {
+                m_timeline.removeLast();
+            }
+        }
+        snapshot.timeline = m_timeline;
+        m_prevResources = resources;
+        m_havePrev = true;
         snapshot.stale = false;
         snapshot.sampledAtMs = QDateTime::currentMSecsSinceEpoch();
         m_lastGood = snapshot;

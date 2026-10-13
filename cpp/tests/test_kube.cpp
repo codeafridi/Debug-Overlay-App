@@ -149,6 +149,104 @@ int main() {
               && ls.pods.at(0).lastReason == QStringLiteral("OOMKilled"),
           "parsed pod lastState terminated reason");
 
+    // ---- diagnosis ----
+    {
+        KubePod crash;
+        crash.ns = QStringLiteral("default");
+        crash.name = QStringLiteral("crash-1");
+        crash.phase = QStringLiteral("Running");
+        crash.reason = QStringLiteral("CrashLoopBackOff");
+        crash.lastReason = QStringLiteral("OOMKilled");
+        crash.restarts = 7;
+        KubePod pull;
+        pull.ns = QStringLiteral("default");
+        pull.name = QStringLiteral("pull-1");
+        pull.phase = QStringLiteral("Pending");
+        pull.reason = QStringLiteral("ImagePullBackOff");
+        KubePod healthy;
+        healthy.ns = QStringLiteral("default");
+        healthy.name = QStringLiteral("ok-1");
+        healthy.phase = QStringLiteral("Running");
+
+        KubeEvent ev;
+        ev.ns = QStringLiteral("default");
+        ev.involvedName = QStringLiteral("pull-1");
+        ev.type = QStringLiteral("Warning");
+        ev.reason = QStringLiteral("Failed");
+        ev.message = QStringLiteral("Failed to pull image: not found");
+        ev.count = 3;
+
+        const QList<KubeDiagnosis> diags =
+            kubeDiagnose({crash, pull, healthy}, {ev});
+        check(diags.size() == 2, "diagnose: two problems");
+        check(diags.at(0).title == QStringLiteral("crash loop")
+                  && diags.at(0).severity == QStringLiteral("critical")
+                  && diags.at(0).detail.contains(QStringLiteral("memory")),
+              "diagnose: crash loop -> OOM guidance");
+        check(diags.at(1).title == QStringLiteral("image pull failing")
+                  && diags.at(1).detail.contains(QStringLiteral("Failed to pull")),
+              "diagnose: image pull uses event message");
+        check(kubeDiagnosisText(diags).contains(QStringLiteral("crash-1")),
+              "diagnosis text lists pod");
+        check(kubeDiagnose({healthy}, {}).isEmpty(),
+              "diagnose: healthy pod -> none");
+    }
+
+    // ---- change timeline ----
+    {
+        KubeResources prev;
+        KubePod pod;
+        pod.ns = QStringLiteral("default");
+        pod.name = QStringLiteral("web-1");
+        pod.phase = QStringLiteral("Running");
+        prev.pods = {pod};
+        KubeDeployment dep;
+        dep.ns = QStringLiteral("default");
+        dep.name = QStringLiteral("nginx");
+        dep.desired = 3;
+        dep.available = 3;
+        dep.generation = 1;
+        prev.deployments = {dep};
+
+        KubeResources cur = prev;
+        cur.pods[0].restarts = 2;
+        KubePod created;
+        created.ns = QStringLiteral("default");
+        created.name = QStringLiteral("new-1");
+        created.phase = QStringLiteral("Pending");
+        cur.pods.append(created);
+        cur.deployments[0].generation = 2;
+        cur.deployments[0].available = 1;
+
+        const QList<KubeChange> changes = kubeDiff(prev, cur, 1000);
+        bool sawRestart = false;
+        bool sawCreated = false;
+        bool sawRollout = false;
+        bool sawReady = false;
+        for (const KubeChange &change : changes) {
+            if (change.object == QStringLiteral("web-1")
+                && change.summary.contains(QStringLiteral("restarted"))) {
+                sawRestart = true;
+            }
+            if (change.object == QStringLiteral("new-1")
+                && change.summary == QStringLiteral("created")) {
+                sawCreated = true;
+            }
+            if (change.object == QStringLiteral("nginx")
+                && change.summary.contains(QStringLiteral("rollout"))) {
+                sawRollout = true;
+            }
+            if (change.object == QStringLiteral("nginx")
+                && change.summary.contains(QStringLiteral("ready 1/3"))) {
+                sawReady = true;
+            }
+        }
+        check(sawRestart && sawCreated && sawRollout && sawReady,
+              "diff: restart, create, rollout, readiness captured");
+        check(kubeTimelineText(changes).contains(QStringLiteral("web-1")),
+              "timeline text lists change");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

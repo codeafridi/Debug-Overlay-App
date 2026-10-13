@@ -1,10 +1,12 @@
 #include "KubeStatus.h"
 
 #include <QDateTime>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QSet>
 #include <QStringList>
 
 #include <algorithm>
@@ -120,6 +122,7 @@ KubeDeployment parseDeployment(const QJsonObject &item) {
     KubeDeployment deployment;
     deployment.ns = metadata.value(QStringLiteral("namespace")).toString();
     deployment.name = metadata.value(QStringLiteral("name")).toString();
+    deployment.generation = metadata.value(QStringLiteral("generation")).toInt(0);
     deployment.desired = spec.value(QStringLiteral("replicas")).toInt(1);
     deployment.available =
         status.value(QStringLiteral("availableReplicas")).toInt(0);
@@ -383,4 +386,197 @@ QString kubeEventsText(const KubeSnapshot &snapshot) {
     }
     return lines.isEmpty() ? QStringLiteral("no warning events")
                            : lines.join('\n');
+}
+
+QList<KubeDiagnosis> kubeDiagnose(const QList<KubePod> &pods,
+                                  const QList<KubeEvent> &events) {
+    QList<KubeDiagnosis> out;
+
+    for (const KubePod &pod : pods) {
+        if (!kubePodIsIssue(pod) && pod.reason.isEmpty()) {
+            continue;
+        }
+
+        QString eventMessage;
+        for (const KubeEvent &event : events) {
+            if (event.ns == pod.ns && event.involvedName == pod.name
+                && kubeEventIsWarning(event)) {
+                eventMessage = event.message;
+            }
+        }
+
+        const QString reason =
+            !pod.reason.isEmpty() ? pod.reason : pod.lastReason;
+
+        KubeDiagnosis diag;
+        diag.ns = pod.ns;
+        diag.pod = pod.name;
+
+        if (reason == QStringLiteral("ImagePullBackOff")
+            || reason == QStringLiteral("ErrImagePull")
+            || reason == QStringLiteral("InvalidImageName")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("image pull failing");
+            diag.detail = eventMessage.isEmpty() ? reason : eventMessage;
+        } else if (reason == QStringLiteral("CrashLoopBackOff")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("crash loop");
+            diag.detail =
+                pod.lastReason == QStringLiteral("OOMKilled")
+                    ? QStringLiteral("container OOM-killed; raise its memory limit")
+                    : QStringLiteral("container exits repeatedly (r=%1)")
+                          .arg(pod.restarts);
+        } else if (reason == QStringLiteral("OOMKilled")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("OOMKilled");
+            diag.detail = QStringLiteral("container exceeded its memory limit");
+        } else if (reason == QStringLiteral("CreateContainerConfigError")
+                   || reason == QStringLiteral("CreateContainerError")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("container config error");
+            diag.detail =
+                eventMessage.isEmpty()
+                    ? QStringLiteral("missing ConfigMap/Secret?")
+                    : eventMessage;
+        } else if (reason == QStringLiteral("RunContainerError")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("container failed to start");
+            diag.detail = eventMessage;
+        } else if (pod.phase == QStringLiteral("Pending")) {
+            diag.severity = QStringLiteral("warning");
+            diag.title = QStringLiteral("pending / unschedulable");
+            diag.detail = eventMessage.isEmpty()
+                              ? QStringLiteral("not scheduled")
+                              : eventMessage;
+        } else if (pod.phase == QStringLiteral("Failed")) {
+            diag.severity = QStringLiteral("critical");
+            diag.title = QStringLiteral("pod failed");
+            diag.detail = reason;
+        } else if (pod.restarts >= 5) {
+            diag.severity = QStringLiteral("warning");
+            diag.title = QStringLiteral("frequent restarts");
+            diag.detail = QStringLiteral("r=%1").arg(pod.restarts);
+        } else {
+            continue;
+        }
+
+        out.append(diag);
+    }
+
+    return out;
+}
+
+QList<KubeChange> kubeDiff(const KubeResources &prev, const KubeResources &cur,
+                           qint64 nowMs) {
+    QList<KubeChange> changes;
+
+    auto podKey = [](const KubePod &pod) {
+        return pod.ns + QLatin1Char('/') + pod.name;
+    };
+
+    QHash<QString, KubePod> prevPods;
+    for (const KubePod &pod : prev.pods) {
+        prevPods.insert(podKey(pod), pod);
+    }
+    QSet<QString> curPodKeys;
+    for (const KubePod &pod : cur.pods) {
+        const QString key = podKey(pod);
+        curPodKeys.insert(key);
+        if (!prevPods.contains(key)) {
+            changes.append({nowMs, pod.ns, pod.name, QStringLiteral("Pod"),
+                            QStringLiteral("created")});
+            continue;
+        }
+        const KubePod before = prevPods.value(key);
+        if (pod.phase != before.phase) {
+            changes.append({nowMs, pod.ns, pod.name, QStringLiteral("Pod"),
+                            QStringLiteral("phase %1 -> %2")
+                                .arg(before.phase, pod.phase)});
+        }
+        if (pod.reason != before.reason && !pod.reason.isEmpty()) {
+            changes.append({nowMs, pod.ns, pod.name, QStringLiteral("Pod"),
+                            QStringLiteral("reason %1").arg(pod.reason)});
+        }
+        if (pod.restarts > before.restarts) {
+            changes.append({nowMs, pod.ns, pod.name, QStringLiteral("Pod"),
+                            QStringLiteral("restarted (r=%1)").arg(pod.restarts)});
+        }
+    }
+    for (const KubePod &pod : prev.pods) {
+        if (!curPodKeys.contains(podKey(pod))) {
+            changes.append({nowMs, pod.ns, pod.name, QStringLiteral("Pod"),
+                            QStringLiteral("deleted")});
+        }
+    }
+
+    QHash<QString, KubeDeployment> prevDeploys;
+    for (const KubeDeployment &dep : prev.deployments) {
+        prevDeploys.insert(dep.ns + QLatin1Char('/') + dep.name, dep);
+    }
+    QSet<QString> curDeployKeys;
+    for (const KubeDeployment &dep : cur.deployments) {
+        const QString key = dep.ns + QLatin1Char('/') + dep.name;
+        curDeployKeys.insert(key);
+        if (!prevDeploys.contains(key)) {
+            changes.append({nowMs, dep.ns, dep.name,
+                            QStringLiteral("Deployment"), QStringLiteral("created")});
+            continue;
+        }
+        const KubeDeployment before = prevDeploys.value(key);
+        if (dep.generation != 0 && dep.generation != before.generation) {
+            changes.append({nowMs, dep.ns, dep.name, QStringLiteral("Deployment"),
+                            QStringLiteral("rollout (gen %1)").arg(dep.generation)});
+        }
+        if (dep.available != before.available) {
+            changes.append({nowMs, dep.ns, dep.name, QStringLiteral("Deployment"),
+                            QStringLiteral("ready %1/%2")
+                                .arg(dep.available)
+                                .arg(dep.desired)});
+        }
+    }
+    for (const KubeDeployment &dep : prev.deployments) {
+        if (!curDeployKeys.contains(dep.ns + QLatin1Char('/') + dep.name)) {
+            changes.append({nowMs, dep.ns, dep.name,
+                            QStringLiteral("Deployment"), QStringLiteral("deleted")});
+        }
+    }
+
+    return changes;
+}
+
+QString kubeDiagnosisText(const QList<KubeDiagnosis> &diagnoses) {
+    if (diagnoses.isEmpty()) {
+        return QStringLiteral("no problems detected");
+    }
+    QStringList lines;
+    for (const KubeDiagnosis &diag : diagnoses) {
+        lines.append(QStringLiteral("[%1] %2/%3  %4 - %5")
+                         .arg(diag.severity.toUpper(), diag.ns, diag.pod,
+                              diag.title, diag.detail));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.join(QLatin1Char('\n'));
+}
+
+QString kubeTimelineText(const QList<KubeChange> &changes) {
+    if (changes.isEmpty()) {
+        return QStringLiteral("no changes");
+    }
+    QStringList lines;
+    for (const KubeChange &change : changes) {
+        const QString time =
+            QDateTime::fromMSecsSinceEpoch(change.atMs)
+                .toString(QStringLiteral("HH:mm:ss"));
+        lines.append(QStringLiteral("%1  %2 %3/%4: %5")
+                         .arg(time, change.kind, change.ns, change.object,
+                              change.summary));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.join(QLatin1Char('\n'));
 }

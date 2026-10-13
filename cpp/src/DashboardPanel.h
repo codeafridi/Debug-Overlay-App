@@ -75,6 +75,8 @@ private:
     QTreeWidget *m_kubePods = nullptr;
     QTreeWidget *m_kubeDeploys = nullptr;
     QLabel *m_kubeEvents = nullptr;
+    QLabel *m_kubeDiagnosis = nullptr;
+    QLabel *m_kubeTimeline = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_deps = nullptr;

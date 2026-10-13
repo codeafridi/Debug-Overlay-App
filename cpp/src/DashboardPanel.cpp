@@ -221,6 +221,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
         "#ddEndpoints, #ddInstrumentation, #ddDatabases { color: #c4cad1; }"
         "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
+        "#ddKubeDiagnosis, #ddKubeTimeline { color: #c4cad1; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
         "  color: #c4cad1; }"
@@ -481,6 +482,23 @@ QWidget *DashboardPanel::buildKubernetesView() {
     m_kubeEvents->setFont(monoFont(10));
     m_kubeEvents->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("EVENTS (warnings)"), m_kubeEvents, view), 1);
+
+    auto *insight = new QHBoxLayout();
+    insight->setSpacing(14);
+    m_kubeDiagnosis = new QLabel(QStringLiteral("--"), view);
+    m_kubeDiagnosis->setObjectName(QStringLiteral("ddKubeDiagnosis"));
+    m_kubeDiagnosis->setFont(monoFont(10));
+    m_kubeDiagnosis->setWordWrap(false);
+    insight->addWidget(
+        makeCard(QStringLiteral("DIAGNOSIS (why broken)"), m_kubeDiagnosis, view), 1);
+
+    m_kubeTimeline = new QLabel(QStringLiteral("--"), view);
+    m_kubeTimeline->setObjectName(QStringLiteral("ddKubeTimeline"));
+    m_kubeTimeline->setFont(monoFont(10));
+    m_kubeTimeline->setWordWrap(false);
+    insight->addWidget(
+        makeCard(QStringLiteral("CHANGE TIMELINE"), m_kubeTimeline, view), 1);
+    layout->addLayout(insight, 1);
     return view;
 }
 
@@ -886,6 +904,11 @@ void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
     const QString events =
         haveData ? kubeEventsText(snapshot) : kubeSummaryText(snapshot);
     m_kubeEvents->setText(events.isEmpty() ? QStringLiteral("--") : events);
+
+    m_kubeDiagnosis->setText(haveData ? kubeDiagnosisText(snapshot.diagnoses)
+                                      : QStringLiteral("--"));
+    m_kubeTimeline->setText(haveData ? kubeTimelineText(snapshot.timeline)
+                                     : QStringLiteral("--"));
 }
 
 void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {

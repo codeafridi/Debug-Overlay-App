@@ -355,6 +355,20 @@ int main(int argc, char *argv[]) {
     ke.message = QStringLiteral("Back-off restarting");
     ke.count = 4;
     kubeSnap.events = {ke};
+    KubeDiagnosis diag;
+    diag.ns = QStringLiteral("default");
+    diag.pod = QStringLiteral("web-1");
+    diag.severity = QStringLiteral("critical");
+    diag.title = QStringLiteral("crash loop");
+    diag.detail = QStringLiteral("container exits repeatedly");
+    kubeSnap.diagnoses = {diag};
+    KubeChange change;
+    change.atMs = 1791907430214LL;
+    change.ns = QStringLiteral("default");
+    change.object = QStringLiteral("nginx");
+    change.kind = QStringLiteral("Deployment");
+    change.summary = QStringLiteral("rollout (gen 2)");
+    kubeSnap.timeline = {change};
     hud.setKubeSnapshot(kubeSnap);
     auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("ddDocker"));
     auto *dashKubeSummary =
@@ -373,6 +387,16 @@ int main(int argc, char *argv[]) {
     check(dashKubeEvents != nullptr
               && dashKubeEvents->text().contains(QStringLiteral("Back-off")),
           "panel lists warning events");
+    auto *dashKubeDiagnosis =
+        hud.findChild<QLabel *>(QStringLiteral("ddKubeDiagnosis"));
+    check(dashKubeDiagnosis != nullptr
+              && dashKubeDiagnosis->text().contains(QStringLiteral("crash loop")),
+          "panel shows pod diagnosis");
+    auto *dashKubeTimeline =
+        hud.findChild<QLabel *>(QStringLiteral("ddKubeTimeline"));
+    check(dashKubeTimeline != nullptr
+              && dashKubeTimeline->text().contains(QStringLiteral("rollout")),
+          "panel shows change timeline");
 
     if (moreButton2 && panel) {
         moreButton2->click();

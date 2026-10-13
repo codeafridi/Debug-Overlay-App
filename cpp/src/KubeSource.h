@@ -59,4 +59,7 @@ private:
     QString m_abortMessage;
     int m_backoffMs = 15000;
     KubeSnapshot m_lastGood;
+    KubeResources m_prevResources;
+    bool m_havePrev = false;
+    QList<KubeChange> m_timeline;
 };
