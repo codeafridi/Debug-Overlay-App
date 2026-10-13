@@ -68,7 +68,10 @@ private:
     QLabel *m_ifaces = nullptr;
     QLabel *m_cgroup = nullptr;
     QLabel *m_docker = nullptr;
-    QLabel *m_kube = nullptr;
+    QLabel *m_kubeSummary = nullptr;
+    QTreeWidget *m_kubePods = nullptr;
+    QTreeWidget *m_kubeDeploys = nullptr;
+    QLabel *m_kubeEvents = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_deps = nullptr;

@@ -110,6 +110,45 @@ int main() {
           "parsed terminated reason (OOMKilled)");
     check(kubePodIsIssue(oom.pods.at(0)), "OOMKilled is an issue");
 
+    const QByteArray eventsJson = QByteArrayLiteral(
+        "{\"items\":["
+        "{\"kind\":\"Event\",\"metadata\":{\"namespace\":\"default\",\"name\":\"web.1\"},"
+        "\"involvedObject\":{\"name\":\"web-1\"},\"type\":\"Warning\",\"reason\":\"BackOff\","
+        "\"message\":\"Back-off restarting failed container\",\"count\":4,"
+        "\"lastTimestamp\":\"2026-10-13T22:00:00Z\"},"
+        "{\"kind\":\"Event\",\"metadata\":{\"namespace\":\"default\",\"name\":\"ok.1\"},"
+        "\"involvedObject\":{\"name\":\"web-1\"},\"type\":\"Normal\",\"reason\":\"Scheduled\","
+        "\"message\":\"Assigned to node\",\"count\":1}]}");
+    bool evOk = false;
+    const KubeResources ev = parseKubectlResources(eventsJson, &evOk);
+    check(evOk && ev.events.size() == 2, "parsed two events");
+    check(ev.events.at(0).type == QStringLiteral("Warning")
+              && ev.events.at(0).reason == QStringLiteral("BackOff")
+              && ev.events.at(0).involvedName == QStringLiteral("web-1")
+              && ev.events.at(0).count == 4
+              && ev.events.at(0).lastTimestampMs > 0,
+          "parsed warning event fields");
+    check(kubeWarningCount(ev.events) == 1, "warning event count = 1");
+
+    KubeSnapshot evSnap;
+    evSnap.state = KubeState::Ok;
+    evSnap.events = ev.events;
+    check(kubeEventsText(evSnap).contains(QStringLiteral("Back-off restarting")),
+          "events text lists warning");
+    check(!kubeEventsText(evSnap).contains(QStringLiteral("Assigned to node")),
+          "events text omits normal events");
+
+    const QByteArray lastStateJson = QByteArrayLiteral(
+        "{\"items\":[{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"d\",\"name\":\"restart-1\"},"
+        "\"status\":{\"phase\":\"Running\",\"containerStatuses\":["
+        "{\"restartCount\":3,\"state\":{\"running\":{}},"
+        "\"lastState\":{\"terminated\":{\"reason\":\"OOMKilled\"}}}]}}]}");
+    bool lsOk = false;
+    const KubeResources ls = parseKubectlResources(lastStateJson, &lsOk);
+    check(lsOk && ls.pods.size() == 1
+              && ls.pods.at(0).lastReason == QStringLiteral("OOMKilled"),
+          "parsed pod lastState terminated reason");
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

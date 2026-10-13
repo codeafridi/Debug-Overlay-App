@@ -309,14 +309,44 @@ int main(int argc, char *argv[]) {
     kubeSnap.state = KubeState::Ok;
     kubeSnap.totalPods = 3;
     kubeSnap.issueCount = 2;
+    KubePod kp;
+    kp.ns = QStringLiteral("default");
+    kp.name = QStringLiteral("web-1");
+    kp.phase = QStringLiteral("Running");
+    kp.restarts = 7;
+    kubeSnap.pods = {kp};
+    KubeDeployment kd;
+    kd.ns = QStringLiteral("default");
+    kd.name = QStringLiteral("nginx");
+    kd.desired = 3;
+    kd.available = 1;
+    kubeSnap.deployments = {kd};
+    KubeEvent ke;
+    ke.ns = QStringLiteral("default");
+    ke.involvedName = QStringLiteral("web-1");
+    ke.type = QStringLiteral("Warning");
+    ke.reason = QStringLiteral("BackOff");
+    ke.message = QStringLiteral("Back-off restarting");
+    ke.count = 4;
+    kubeSnap.events = {ke};
     hud.setKubeSnapshot(kubeSnap);
     auto *dashDocker = hud.findChild<QLabel *>(QStringLiteral("ddDocker"));
-    auto *dashKube = hud.findChild<QLabel *>(QStringLiteral("ddKube"));
+    auto *dashKubeSummary =
+        hud.findChild<QLabel *>(QStringLiteral("ddKubeSummary"));
+    auto *dashKubePods =
+        hud.findChild<QTreeWidget *>(QStringLiteral("ddKubePods"));
+    auto *dashKubeEvents =
+        hud.findChild<QLabel *>(QStringLiteral("ddKubeEvents"));
     check(dashDocker != nullptr
               && dashDocker->text().contains(QStringLiteral("docker:")),
           "panel shows docker");
-    check(dashKube != nullptr && dashKube->text().contains(QStringLiteral("k8s:")),
-          "panel shows kubernetes");
+    check(dashKubeSummary != nullptr && dashKubePods != nullptr
+              && dashKubePods->topLevelItemCount() == 1
+              && dashKubePods->topLevelItem(0)->text(0) == QStringLiteral("web-1"),
+          "panel lists kubernetes pod");
+    check(dashKubeEvents != nullptr
+              && dashKubeEvents->text().contains(QStringLiteral("Back-off")),
+          "panel lists warning events");
 
     if (moreButton2 && panel) {
         moreButton2->click();

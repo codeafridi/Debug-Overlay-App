@@ -3,6 +3,7 @@
 #include "MemoryFormat.h"
 #include "Sparkline.h"
 
+#include <QColor>
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -218,7 +219,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
-        "#ddKube { color: #b0a9c4; }"
+        "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
         "  color: #c4cad1; }"
@@ -434,13 +435,51 @@ QWidget *DashboardPanel::buildKubernetesView() {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
     layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
 
-    m_kube = new QLabel(QStringLiteral("--"), view);
-    m_kube->setObjectName(QStringLiteral("ddKube"));
-    m_kube->setFont(monoFont(11));
-    m_kube->setWordWrap(true);
-    layout->addWidget(makeCard(QStringLiteral("KUBERNETES"), m_kube, view));
-    layout->addStretch(1);
+    m_kubeSummary = new QLabel(QStringLiteral("--"), view);
+    m_kubeSummary->setObjectName(QStringLiteral("ddKubeSummary"));
+    m_kubeSummary->setFont(monoFont(12, true));
+    layout->addWidget(makeCard(QStringLiteral("KUBERNETES"), m_kubeSummary, view));
+
+    auto *tables = new QHBoxLayout();
+    tables->setSpacing(14);
+
+    m_kubePods = new QTreeWidget(view);
+    m_kubePods->setObjectName(QStringLiteral("ddKubePods"));
+    m_kubePods->setColumnCount(4);
+    m_kubePods->setHeaderLabels({QStringLiteral("Pod"), QStringLiteral("Namespace"),
+                                 QStringLiteral("Phase"), QStringLiteral("Restarts")});
+    m_kubePods->setRootIsDecorated(false);
+    m_kubePods->setSelectionMode(QAbstractItemView::NoSelection);
+    m_kubePods->setFocusPolicy(Qt::NoFocus);
+    m_kubePods->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int i = 1; i < 4; ++i) {
+        m_kubePods->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    tables->addWidget(makeCard(QStringLiteral("PODS"), m_kubePods, view), 1);
+
+    m_kubeDeploys = new QTreeWidget(view);
+    m_kubeDeploys->setObjectName(QStringLiteral("ddKubeDeploys"));
+    m_kubeDeploys->setColumnCount(3);
+    m_kubeDeploys->setHeaderLabels({QStringLiteral("Deployment"),
+                                    QStringLiteral("Namespace"),
+                                    QStringLiteral("Ready")});
+    m_kubeDeploys->setRootIsDecorated(false);
+    m_kubeDeploys->setSelectionMode(QAbstractItemView::NoSelection);
+    m_kubeDeploys->setFocusPolicy(Qt::NoFocus);
+    m_kubeDeploys->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int i = 1; i < 3; ++i) {
+        m_kubeDeploys->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    tables->addWidget(makeCard(QStringLiteral("DEPLOYMENTS"), m_kubeDeploys, view), 1);
+    layout->addLayout(tables, 1);
+
+    m_kubeEvents = new QLabel(QStringLiteral("--"), view);
+    m_kubeEvents->setObjectName(QStringLiteral("ddKubeEvents"));
+    m_kubeEvents->setFont(monoFont(10));
+    m_kubeEvents->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("EVENTS (warnings)"), m_kubeEvents, view), 1);
     return view;
 }
 
@@ -730,12 +769,42 @@ void DashboardPanel::setDockerSnapshot(const DockerSnapshot &snapshot) {
 
 void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
     const QString summary = kubeSummaryText(snapshot);
-    const QString details = kubeDetailText(snapshot);
-    QString text = summary;
-    if (!details.isEmpty() && details != QStringLiteral("no issues")) {
-        text += QStringLiteral("\n") + details;
+    m_kubeSummary->setText(summary.isEmpty() ? QStringLiteral("--") : summary);
+
+    m_kubePods->clear();
+    for (const KubePod &pod : snapshot.pods) {
+        auto *item = new QTreeWidgetItem();
+        item->setText(0, pod.name);
+        item->setText(1, pod.ns);
+        item->setText(2, pod.phase);
+        item->setText(3, QString::number(pod.restarts));
+        item->setTextAlignment(3, Qt::AlignRight | Qt::AlignVCenter);
+        if (kubePodIsIssue(pod)) {
+            item->setForeground(0, QColor(QStringLiteral("#d1685f")));
+        }
+        m_kubePods->addTopLevelItem(item);
     }
-    m_kube->setText(text.isEmpty() ? QStringLiteral("--") : text);
+
+    m_kubeDeploys->clear();
+    for (const KubeDeployment &deployment : snapshot.deployments) {
+        auto *item = new QTreeWidgetItem();
+        item->setText(0, deployment.name);
+        item->setText(1, deployment.ns);
+        item->setText(2, QStringLiteral("%1/%2")
+                            .arg(deployment.available)
+                            .arg(deployment.desired));
+        item->setTextAlignment(2, Qt::AlignRight | Qt::AlignVCenter);
+        if (kubeDeploymentIsIssue(deployment)) {
+            item->setForeground(0, QColor(QStringLiteral("#d1685f")));
+        }
+        m_kubeDeploys->addTopLevelItem(item);
+    }
+
+    const bool haveData =
+        snapshot.state == KubeState::Ok || snapshot.stale;
+    const QString events =
+        haveData ? kubeEventsText(snapshot) : kubeSummaryText(snapshot);
+    m_kubeEvents->setText(events.isEmpty() ? QStringLiteral("--") : events);
 }
 
 void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {

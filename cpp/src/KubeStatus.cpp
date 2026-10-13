@@ -1,10 +1,13 @@
 #include "KubeStatus.h"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QStringList>
+
+#include <algorithm>
 
 namespace {
 
@@ -61,9 +64,52 @@ KubePod parsePod(const QJsonObject &item) {
         if (!reason.isEmpty()) {
             pod.reason = reason;
         }
+
+        const QString lastTerminatedReason =
+            cs.value(QStringLiteral("lastState"))
+                .toObject()
+                .value(QStringLiteral("terminated"))
+                .toObject()
+                .value(QStringLiteral("reason"))
+                .toString();
+        if (!lastTerminatedReason.isEmpty()) {
+            pod.lastReason = lastTerminatedReason;
+        }
     }
 
     return pod;
+}
+
+KubeEvent parseEvent(const QJsonObject &item) {
+    const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
+    const QJsonObject involved =
+        item.value(QStringLiteral("involvedObject")).toObject();
+
+    KubeEvent event;
+    event.ns = metadata.value(QStringLiteral("namespace")).toString();
+    event.involvedName = involved.value(QStringLiteral("name")).toString();
+    event.type = item.value(QStringLiteral("type")).toString();
+    event.reason = item.value(QStringLiteral("reason")).toString();
+    event.message = item.value(QStringLiteral("message")).toString();
+    if (event.involvedName.isEmpty()) {
+        event.involvedName = metadata.value(QStringLiteral("name")).toString();
+    }
+    event.count = item.value(QStringLiteral("count")).toInt(1);
+
+    // Prefer eventTime, fall back to lastTimestamp. Both are RFC3339 strings;
+    // Kubernetes may include sub-millisecond precision, so try both parsers.
+    const QString eventTime =
+        item.value(QStringLiteral("eventTime")).toString();
+    const QString lastTimestamp =
+        item.value(QStringLiteral("lastTimestamp")).toString();
+    const QString stamp = !eventTime.isEmpty() ? eventTime : lastTimestamp;
+    QDateTime parsed = QDateTime::fromString(stamp, Qt::ISODateWithMs);
+    if (!parsed.isValid()) {
+        parsed = QDateTime::fromString(stamp, Qt::ISODate);
+    }
+    event.lastTimestampMs = parsed.isValid() ? parsed.toMSecsSinceEpoch() : 0;
+
+    return event;
 }
 
 KubeDeployment parseDeployment(const QJsonObject &item) {
@@ -118,7 +164,9 @@ KubeResources parseKubectlResources(const QByteArray &json, bool *ok) {
 
         if (kind == QStringLiteral("Deployment")) {
             resources.deployments.append(parseDeployment(item));
-        } else {
+        } else if (kind == QStringLiteral("Event")) {
+            resources.events.append(parseEvent(item));
+        } else if (kind == QStringLiteral("Pod")) {
             resources.pods.append(parsePod(item));
         }
     }
@@ -248,4 +296,91 @@ QString kubeDetailText(const KubeSnapshot &snapshot) {
     }
 
     return lines.join(QLatin1Char('\n'));
+}
+
+bool kubeEventIsWarning(const KubeEvent &event) {
+    return event.type == QStringLiteral("Warning");
+}
+
+int kubeWarningCount(const QList<KubeEvent> &events) {
+    int count = 0;
+    for (const KubeEvent &event : events) {
+        if (kubeEventIsWarning(event)) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+QString kubePodsText(const KubeSnapshot &snapshot) {
+    QStringList lines;
+    for (const KubePod &pod : snapshot.pods) {
+        QString line = QStringLiteral("%1 %2/%3  %4")
+                           .arg(kubePodIsIssue(pod) ? QStringLiteral("!")
+                                                    : QStringLiteral(" "),
+                                pod.ns, pod.name, pod.phase);
+        if (!pod.reason.isEmpty()) {
+            line += QStringLiteral("  %1").arg(pod.reason);
+        }
+        if (!pod.lastReason.isEmpty()) {
+            line += QStringLiteral("  last:%1").arg(pod.lastReason);
+        }
+        if (pod.restarts > 0) {
+            line += QStringLiteral("  r=%1").arg(pod.restarts);
+        }
+        lines.append(line);
+        if (lines.size() >= 60) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.isEmpty() ? QStringLiteral("no pods") : lines.join('\n');
+}
+
+QString kubeDeploymentsText(const KubeSnapshot &snapshot) {
+    QStringList lines;
+    for (const KubeDeployment &deployment : snapshot.deployments) {
+        lines.append(QStringLiteral("%1 %2/%3  %4/%5 ready")
+                         .arg(kubeDeploymentIsIssue(deployment)
+                                  ? QStringLiteral("!")
+                                  : QStringLiteral(" "),
+                              deployment.ns, deployment.name)
+                         .arg(deployment.available)
+                         .arg(deployment.desired));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.isEmpty() ? QStringLiteral("no deployments")
+                           : lines.join('\n');
+}
+
+QString kubeEventsText(const KubeSnapshot &snapshot) {
+    QList<KubeEvent> warnings;
+    for (const KubeEvent &event : snapshot.events) {
+        if (kubeEventIsWarning(event)) {
+            warnings.append(event);
+        }
+    }
+    std::sort(warnings.begin(), warnings.end(),
+              [](const KubeEvent &a, const KubeEvent &b) {
+                  return a.lastTimestampMs > b.lastTimestampMs;
+              });
+
+    QStringList lines;
+    for (const KubeEvent &event : warnings) {
+        lines.append(QStringLiteral("%1  %2/%3  x%4  %5")
+                         .arg(event.reason.isEmpty() ? QStringLiteral("Warning")
+                                                     : event.reason,
+                              event.ns, event.involvedName)
+                         .arg(event.count)
+                         .arg(event.message));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.isEmpty() ? QStringLiteral("no warning events")
+                           : lines.join('\n');
 }
