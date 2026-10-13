@@ -13,10 +13,20 @@ struct JournalEntry {
     QString message;
 };
 
+// A set of identical (normalized) error messages.
+struct ErrorGroup {
+    QString fingerprint;
+    QString comm;
+    QString sample;
+    int count = 0;
+    qint64 lastSeenUsec = 0;
+};
+
 struct JournalSnapshot {
     bool available = false;
     QString errorMessage;
     QList<JournalEntry> entries;
+    QList<ErrorGroup> errorGroups;
     int errorCount = 0;
     qint64 sampledAtMs = 0;
 };
@@ -29,3 +39,6 @@ int journalErrorCount(const QList<JournalEntry> &entries);
 QString journalSummaryText(const JournalSnapshot &snapshot);
 QString journalLogsText(const JournalSnapshot &snapshot, int maxLines = 40);
 QString journalErrorsText(const JournalSnapshot &snapshot);
+QString journalFingerprint(const JournalEntry &entry);
+QList<ErrorGroup> groupJournalErrors(const QList<JournalEntry> &entries);
+QString journalErrorGroupsText(const QList<ErrorGroup> &groups);

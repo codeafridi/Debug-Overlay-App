@@ -35,4 +35,7 @@ private:
     int m_intervalMs;
     bool m_running = false;
     bool m_stopping = false;
+    QList<UnitRow> m_prevUnits;
+    bool m_havePrev = false;
+    QList<ServiceChange> m_timeline;
 };

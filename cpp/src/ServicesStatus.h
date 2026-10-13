@@ -13,10 +13,17 @@ struct UnitRow {
     QString description;
 };
 
+struct ServiceChange {
+    qint64 atMs = 0;
+    QString unit;
+    QString summary;
+};
+
 struct ServicesSnapshot {
     bool available = false;
     QString errorMessage;
     QList<UnitRow> units;
+    QList<ServiceChange> changes;
     int runningCount = 0;
     int failedCount = 0;
     qint64 sampledAtMs = 0;
@@ -28,3 +35,6 @@ int servicesRunningCount(const QList<UnitRow> &units);
 
 QString servicesSummaryText(const ServicesSnapshot &snapshot);
 QString servicesDetailText(const ServicesSnapshot &snapshot);
+QList<ServiceChange> diffServices(const QList<UnitRow> &prev,
+                                  const QList<UnitRow> &cur, qint64 nowMs);
+QString servicesChangesText(const QList<ServiceChange> &changes);

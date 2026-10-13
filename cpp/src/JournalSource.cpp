@@ -79,6 +79,7 @@ void JournalSource::onFinished(int exitCode, QProcess::ExitStatus status) {
         snapshot.available = true;
         snapshot.entries = entries;
         snapshot.errorCount = journalErrorCount(entries);
+        snapshot.errorGroups = groupJournalErrors(entries);
     } else {
         snapshot.errorMessage = QStringLiteral("journalctl failed");
     }

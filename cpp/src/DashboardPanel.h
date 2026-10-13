@@ -79,6 +79,7 @@ private:
     QLabel *m_kubeTimeline = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
+    QLabel *m_servicesChanges = nullptr;
     QLabel *m_deps = nullptr;
     QLabel *m_logs = nullptr;
     QLabel *m_logsSummary = nullptr;

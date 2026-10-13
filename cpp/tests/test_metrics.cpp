@@ -136,6 +136,58 @@ int main(int argc, char *argv[]) {
     check(journalSummaryText(journal2).contains(QStringLiteral("2 errors")),
           "journal summary text");
 
+    JournalEntry errA;
+    errA.priority = 3;
+    errA.comm = QStringLiteral("nginx");
+    errA.message = QStringLiteral("connect() failed at 10.0.0.5:8080 attempt 1");
+    errA.timestampUsec = 100;
+    JournalEntry errB;
+    errB.priority = 3;
+    errB.comm = QStringLiteral("nginx");
+    errB.message = QStringLiteral("connect() failed at 10.0.0.9:9999 attempt 7");
+    errB.timestampUsec = 200;
+    JournalEntry info;
+    info.priority = 6;
+    info.comm = QStringLiteral("nginx");
+    info.message = QStringLiteral("started");
+    info.timestampUsec = 150;
+    const QList<ErrorGroup> groups = groupJournalErrors({errA, errB, info});
+    check(groups.size() == 1, "error grouping: templates collapse");
+    check(groups.at(0).count == 2 && groups.at(0).lastSeenUsec == 200,
+          "error group: count + lastSeen");
+    check(journalErrorGroupsText(groups).contains(QStringLiteral("x2")),
+          "error groups text");
+
+    UnitRow prevUnit;
+    prevUnit.name = QStringLiteral("a.service");
+    prevUnit.active = QStringLiteral("active");
+    prevUnit.sub = QStringLiteral("running");
+    UnitRow failedUnit;
+    failedUnit.name = QStringLiteral("a.service");
+    failedUnit.active = QStringLiteral("failed");
+    failedUnit.sub = QStringLiteral("failed");
+    UnitRow newUnit;
+    newUnit.name = QStringLiteral("b.service");
+    newUnit.active = QStringLiteral("active");
+    newUnit.sub = QStringLiteral("running");
+    const QList<ServiceChange> changes =
+        diffServices({prevUnit}, {failedUnit, newUnit}, 1000);
+    bool sawFail = false;
+    bool sawAppear = false;
+    for (const ServiceChange &change : changes) {
+        if (change.unit == QStringLiteral("a.service")
+            && change.summary.contains(QStringLiteral("failed"))) {
+            sawFail = true;
+        }
+        if (change.unit == QStringLiteral("b.service")
+            && change.summary.contains(QStringLiteral("appeared"))) {
+            sawAppear = true;
+        }
+    }
+    check(sawFail && sawAppear, "service diff: failure + new unit");
+    check(servicesChangesText(changes).contains(QStringLiteral("a.service")),
+          "services changes text");
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

@@ -272,6 +272,10 @@ int main(int argc, char *argv[]) {
     unit.active = QStringLiteral("failed");
     unit.sub = QStringLiteral("failed");
     services.units = {unit};
+    ServiceChange svcChange;
+    svcChange.unit = QStringLiteral("db.service");
+    svcChange.summary = QStringLiteral("appeared (active/running)");
+    services.changes = {svcChange};
     hud.setServicesSnapshot(services);
     auto *svcSummary =
         hud.findChild<QLabel *>(QStringLiteral("ddServicesSummary"));
@@ -292,6 +296,11 @@ int main(int argc, char *argv[]) {
     je.message = QStringLiteral("boom");
     journal.entries = {je};
     journal.errorCount = 1;
+    ErrorGroup group;
+    group.comm = QStringLiteral("nginx");
+    group.sample = QStringLiteral("boom");
+    group.count = 3;
+    journal.errorGroups = {group};
     hud.setJournalSnapshot(journal);
     auto *logsSummary =
         hud.findChild<QLabel *>(QStringLiteral("ddLogsSummary"));
@@ -299,8 +308,15 @@ int main(int argc, char *argv[]) {
               && logsSummary->text().contains(QStringLiteral("1 errors")),
           "panel shows journal summary");
     auto *errors = hud.findChild<QLabel *>(QStringLiteral("ddErrors"));
-    check(errors != nullptr && errors->text().contains(QStringLiteral("boom")),
-          "panel shows errors");
+    check(errors != nullptr && errors->text().contains(QStringLiteral("boom"))
+              && errors->text().contains(QStringLiteral("x3")),
+          "panel shows grouped errors");
+
+    auto *svcChanges =
+        hud.findChild<QLabel *>(QStringLiteral("ddServicesChanges"));
+    check(svcChanges != nullptr
+              && svcChanges->text().contains(QStringLiteral("db.service")),
+          "panel shows service changes");
 
     auto *dashCgroup = hud.findChild<QLabel *>(QStringLiteral("ddCgroup"));
     check(dashCgroup != nullptr

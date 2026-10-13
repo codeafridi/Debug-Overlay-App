@@ -1,5 +1,11 @@
 #include "ServicesStatus.h"
 
+#include <QDateTime>
+#include <QHash>
+#include <QSet>
+
+#include <algorithm>
+
 bool parseSystemctlUnits(const QByteArray &text, QList<UnitRow> &out) {
     const QList<QByteArray> lines = text.split('\n');
     bool any = false;
@@ -79,4 +85,58 @@ QString servicesDetailText(const ServicesSnapshot &snapshot) {
         }
     }
     return lines.isEmpty() ? QStringLiteral("no issues") : lines.join('\n');
+}
+
+QList<ServiceChange> diffServices(const QList<UnitRow> &prev,
+                                  const QList<UnitRow> &cur, qint64 nowMs) {
+    QList<ServiceChange> changes;
+
+    QHash<QString, UnitRow> prevMap;
+    for (const UnitRow &unit : prev) {
+        prevMap.insert(unit.name, unit);
+    }
+
+    QSet<QString> curNames;
+    for (const UnitRow &unit : cur) {
+        curNames.insert(unit.name);
+        const auto it = prevMap.constFind(unit.name);
+        if (it == prevMap.constEnd()) {
+            changes.append({nowMs, unit.name,
+                            QStringLiteral("appeared (%1/%2)")
+                                .arg(unit.active, unit.sub)});
+            continue;
+        }
+        if (it->active != unit.active || it->sub != unit.sub) {
+            changes.append({nowMs, unit.name,
+                            QStringLiteral("%1/%2 -> %3/%4")
+                                .arg(it->active, it->sub, unit.active, unit.sub)});
+        }
+    }
+
+    for (const UnitRow &unit : prev) {
+        if (!curNames.contains(unit.name)) {
+            changes.append({nowMs, unit.name, QStringLiteral("disappeared")});
+        }
+    }
+
+    return changes;
+}
+
+QString servicesChangesText(const QList<ServiceChange> &changes) {
+    if (changes.isEmpty()) {
+        return QStringLiteral("no recent changes");
+    }
+    QStringList lines;
+    for (const ServiceChange &change : changes) {
+        const QString time =
+            QDateTime::fromMSecsSinceEpoch(change.atMs)
+                .toString(QStringLiteral("HH:mm:ss"));
+        lines.append(QStringLiteral("%1  %2: %3")
+                         .arg(time, change.unit, change.summary));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.join(QLatin1Char('\n'));
 }

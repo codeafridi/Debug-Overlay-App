@@ -1,11 +1,15 @@
 #include "JournalStatus.h"
 
 #include <QDateTime>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QJsonValue>
+#include <QRegularExpression>
+
+#include <algorithm>
 
 namespace {
 
@@ -116,4 +120,72 @@ QString journalErrorsText(const JournalSnapshot &snapshot) {
         }
     }
     return lines.isEmpty() ? QStringLiteral("no errors") : lines.join('\n');
+}
+
+QString journalFingerprint(const JournalEntry &entry) {
+    QString text = entry.message.simplified();
+    text.replace(QRegularExpression(QStringLiteral("0x[0-9a-fA-F]+")),
+                 QStringLiteral("0x#"));
+    text.replace(QRegularExpression(QStringLiteral("\"[^\"]*\"")),
+                 QStringLiteral("\"...\""));
+    text.replace(QRegularExpression(QStringLiteral("\\S*/\\S*")),
+                 QStringLiteral("/path"));
+    text.replace(QRegularExpression(QStringLiteral("\\b\\d+\\b")),
+                 QStringLiteral("#"));
+    if (text.isEmpty()) {
+        text = QStringLiteral("(empty)");
+    }
+    return entry.comm + QStringLiteral("|") + text;
+}
+
+QList<ErrorGroup> groupJournalErrors(const QList<JournalEntry> &entries) {
+    QHash<QString, ErrorGroup> groups;
+    for (const JournalEntry &entry : entries) {
+        if (!journalEntryIsError(entry)) {
+            continue;
+        }
+        const QString fingerprint = journalFingerprint(entry);
+        auto it = groups.find(fingerprint);
+        if (it == groups.end()) {
+            ErrorGroup group;
+            group.fingerprint = fingerprint;
+            group.comm = entry.comm;
+            group.sample = entry.message;
+            group.count = 1;
+            group.lastSeenUsec = entry.timestampUsec;
+            groups.insert(fingerprint, group);
+        } else {
+            it->count += 1;
+            if (entry.timestampUsec > it->lastSeenUsec) {
+                it->lastSeenUsec = entry.timestampUsec;
+            }
+        }
+    }
+
+    QList<ErrorGroup> out = groups.values();
+    std::sort(out.begin(), out.end(),
+              [](const ErrorGroup &a, const ErrorGroup &b) {
+                  if (a.count != b.count) {
+                      return a.count > b.count;
+                  }
+                  return a.comm < b.comm;
+              });
+    return out;
+}
+
+QString journalErrorGroupsText(const QList<ErrorGroup> &groups) {
+    if (groups.isEmpty()) {
+        return QStringLiteral("no errors");
+    }
+    QStringList lines;
+    for (const ErrorGroup &group : groups) {
+        lines.append(QStringLiteral("x%1  %2: %3")
+                         .arg(group.count)
+                         .arg(group.comm, group.sample));
+        if (lines.size() >= 40) {
+            lines.append(QStringLiteral("..."));
+            break;
+        }
+    }
+    return lines.join(QLatin1Char('\n'));
 }

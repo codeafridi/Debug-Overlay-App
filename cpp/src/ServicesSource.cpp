@@ -80,6 +80,20 @@ void ServicesSource::onFinished(int exitCode, QProcess::ExitStatus status) {
         snapshot.units = units;
         snapshot.runningCount = servicesRunningCount(units);
         snapshot.failedCount = servicesFailedCount(units);
+
+        if (m_havePrev) {
+            const QList<ServiceChange> changes =
+                diffServices(m_prevUnits, units, snapshot.sampledAtMs);
+            for (const ServiceChange &change : changes) {
+                m_timeline.prepend(change);
+            }
+            while (m_timeline.size() > 200) {
+                m_timeline.removeLast();
+            }
+        }
+        snapshot.changes = m_timeline;
+        m_prevUnits = units;
+        m_havePrev = true;
     } else {
         snapshot.errorMessage = QStringLiteral("systemctl failed");
     }

@@ -218,6 +218,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDocker { color: #9fb0c4; }"
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
+        "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
         "#ddEndpoints, #ddInstrumentation, #ddDatabases { color: #c4cad1; }"
         "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
@@ -518,6 +519,12 @@ QWidget *DashboardPanel::buildServicesView() {
     m_services->setFont(monoFont(10));
     m_services->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("SERVICES"), m_services, view), 1);
+
+    m_servicesChanges = new QLabel(QStringLiteral("--"), view);
+    m_servicesChanges->setObjectName(QStringLiteral("ddServicesChanges"));
+    m_servicesChanges->setFont(monoFont(10));
+    m_servicesChanges->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("CHANGES (restarts)"), m_servicesChanges, view), 1);
     return view;
 }
 
@@ -937,12 +944,17 @@ void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {
                                   : QStringLiteral("--");
     }
     m_services->setText(text);
+
+    m_servicesChanges->setText(snapshot.available
+                                   ? servicesChangesText(snapshot.changes)
+                                   : QStringLiteral("--"));
 }
 
 void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     m_logsSummary->setText(journalSummaryText(snapshot));
     m_logs->setText(snapshot.available ? journalLogsText(snapshot, 40)
                                        : QStringLiteral("--"));
-    m_errors->setText(snapshot.available ? journalErrorsText(snapshot)
-                                         : QStringLiteral("--"));
+    m_errors->setText(snapshot.available
+                          ? journalErrorGroupsText(snapshot.errorGroups)
+                          : QStringLiteral("--"));
 }
