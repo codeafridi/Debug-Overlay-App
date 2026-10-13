@@ -44,6 +44,9 @@ private:
     QWidget *buildDependenciesView();
     QWidget *buildLogsView();
     QWidget *buildErrorsView();
+    QWidget *buildEndpointsView();
+    QWidget *buildInstrumentationView();
+    QWidget *buildDatabasesView();
     QWidget *buildPlaceholderView(const QString &text);
 
     QLabel *m_appValue = nullptr;
@@ -78,6 +81,9 @@ private:
     QLabel *m_logs = nullptr;
     QLabel *m_logsSummary = nullptr;
     QLabel *m_errors = nullptr;
+    QLabel *m_endpoints = nullptr;
+    QLabel *m_instrumentation = nullptr;
+    QLabel *m_databases = nullptr;
 
     Sparkline *m_cpuSpark = nullptr;
     Sparkline *m_memSpark = nullptr;

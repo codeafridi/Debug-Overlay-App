@@ -164,6 +164,18 @@ int main(int argc, char *argv[]) {
                                 QStringLiteral("socket:[999]")};
     withProcs.listeningPorts = {QStringLiteral("tcp 0.0.0.0:631")};
     withProcs.dependencies = {QStringLiteral("/usr/lib/libc.so.6")};
+    withProcs.instrumentation = {QStringLiteral("datadog"),
+                                 QStringLiteral("opentelemetry")};
+    EndpointRow endpoint;
+    endpoint.proto = QStringLiteral("tcp");
+    endpoint.addr = QStringLiteral("0.0.0.0");
+    endpoint.port = 5432;
+    endpoint.exposure = QStringLiteral("public");
+    endpoint.service = QStringLiteral("postgres");
+    endpoint.database = true;
+    withProcs.endpoints = {endpoint};
+    withProcs.dbConnections = {
+        QStringLiteral("127.0.0.1:5000 -> 127.0.0.1:5432 (postgres)")};
     withProcs.socketStateCounts = {qMakePair(QStringLiteral("ESTABLISHED"), 12)};
     InterfaceRow ifaceRow;
     ifaceRow.name = QStringLiteral("eth0");
@@ -236,6 +248,20 @@ int main(int argc, char *argv[]) {
     check(dashDeps != nullptr
               && dashDeps->text().contains(QStringLiteral("libc.so.6")),
           "panel shows shared libraries");
+
+    auto *dashEndpoints = hud.findChild<QLabel *>(QStringLiteral("ddEndpoints"));
+    check(dashEndpoints != nullptr
+              && dashEndpoints->text().contains(QStringLiteral("0.0.0.0:5432")),
+          "panel shows endpoints with exposure");
+    auto *dashInstr =
+        hud.findChild<QLabel *>(QStringLiteral("ddInstrumentation"));
+    check(dashInstr != nullptr
+              && dashInstr->text().contains(QStringLiteral("datadog")),
+          "panel shows instrumentation agents");
+    auto *dashDatabases = hud.findChild<QLabel *>(QStringLiteral("ddDatabases"));
+    check(dashDatabases != nullptr
+              && dashDatabases->text().contains(QStringLiteral("postgres")),
+          "panel shows databases");
 
     ServicesSnapshot services;
     services.available = true;

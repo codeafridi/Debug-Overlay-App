@@ -173,11 +173,11 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildLogsView());
     m_views->addWidget(buildErrorsView());
     m_views->addWidget(buildDependenciesView());
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Endpoints")));
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Instrumentation")));
+    m_views->addWidget(buildEndpointsView());
+    m_views->addWidget(buildInstrumentationView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Traces")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Databases")));
+    m_views->addWidget(buildDatabasesView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Security")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Cost")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Settings")));
@@ -219,6 +219,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
+        "#ddEndpoints, #ddInstrumentation, #ddDatabases { color: #c4cad1; }"
         "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
         "#ddPlaceholder { color: #5f6671; }"
         "QTreeWidget { background-color: transparent; border: none;"
@@ -517,6 +518,44 @@ QWidget *DashboardPanel::buildDependenciesView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildEndpointsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    m_endpoints = new QLabel(QStringLiteral("--"), view);
+    m_endpoints->setObjectName(QStringLiteral("ddEndpoints"));
+    m_endpoints->setFont(monoFont(10));
+    m_endpoints->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("LISTENING ENDPOINTS (host)"), m_endpoints, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildInstrumentationView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    m_instrumentation = new QLabel(QStringLiteral("--"), view);
+    m_instrumentation->setObjectName(QStringLiteral("ddInstrumentation"));
+    m_instrumentation->setFont(monoFont(11));
+    layout->addWidget(
+        makeCard(QStringLiteral("INSTRUMENTATION (focused app)"), m_instrumentation,
+                 view),
+        1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildDatabasesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    m_databases = new QLabel(QStringLiteral("--"), view);
+    m_databases->setObjectName(QStringLiteral("ddDatabases"));
+    m_databases->setFont(monoFont(10));
+    m_databases->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("DATABASES"), m_databases, view), 1);
+    return view;
+}
+
 QWidget *DashboardPanel::buildLogsView() {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
@@ -605,6 +644,48 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         ++shown;
     }
     m_net->setText(net.isEmpty() ? QStringLiteral("no connections") : net);
+
+    QString endpointText;
+    int epCount = 0;
+    for (const EndpointRow &entry : snapshot.endpoints) {
+        if (epCount >= 40) {
+            endpointText += QStringLiteral("...\n");
+            break;
+        }
+        QString line = QStringLiteral("%1 %2:%3  %4")
+                           .arg(entry.proto, entry.addr)
+                           .arg(entry.port)
+                           .arg(entry.exposure);
+        if (!entry.service.isEmpty()) {
+            line += QStringLiteral("  [%1]").arg(entry.service);
+        }
+        endpointText += line + QLatin1Char('\n');
+        ++epCount;
+    }
+    m_endpoints->setText(endpointText.isEmpty() ? QStringLiteral("none")
+                                                : endpointText);
+
+    m_instrumentation->setText(
+        snapshot.instrumentation.isEmpty()
+            ? QStringLiteral("no agent detected")
+            : snapshot.instrumentation.join(QStringLiteral(", ")));
+
+    QString dbText;
+    for (const EndpointRow &entry : snapshot.endpoints) {
+        if (!entry.database) {
+            continue;
+        }
+        dbText += QStringLiteral("listen %1 %2:%3 (%4)\n")
+                      .arg(entry.proto, entry.addr)
+                      .arg(entry.port)
+                      .arg(entry.service);
+    }
+    for (const QString &connection : snapshot.dbConnections) {
+        dbText += QStringLiteral("conn   %1\n").arg(connection);
+    }
+    m_databases->setText(dbText.isEmpty()
+                             ? QStringLiteral("no database activity")
+                             : dbText);
 
     QString listen;
     int listenCount = 0;

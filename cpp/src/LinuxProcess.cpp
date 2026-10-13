@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QSet>
 
+#include <algorithm>
+
 #include <unistd.h>
 
 #include <sys/statvfs.h>
@@ -977,6 +979,162 @@ double netRatePerSec(unsigned long long prev, unsigned long long cur,
         return 0.0;
     }
     return static_cast<double>(cur - prev) / seconds;
+}
+
+QString serviceForPort(quint16 port) {
+    switch (port) {
+    case 5432:
+    case 5433:
+        return QStringLiteral("postgres");
+    case 3306:
+        return QStringLiteral("mysql");
+    case 33060:
+        return QStringLiteral("mysqlx");
+    case 6379:
+        return QStringLiteral("redis");
+    case 27017:
+    case 27018:
+    case 27019:
+        return QStringLiteral("mongodb");
+    case 1521:
+        return QStringLiteral("oracle");
+    case 1433:
+        return QStringLiteral("mssql");
+    case 9042:
+        return QStringLiteral("cassandra");
+    case 9200:
+    case 9300:
+        return QStringLiteral("elasticsearch");
+    case 5672:
+    case 15672:
+        return QStringLiteral("rabbitmq");
+    case 9092:
+        return QStringLiteral("kafka");
+    case 11211:
+        return QStringLiteral("memcached");
+    case 26257:
+        return QStringLiteral("cockroachdb");
+    case 5984:
+        return QStringLiteral("couchdb");
+    case 8086:
+        return QStringLiteral("influxdb");
+    case 80:
+        return QStringLiteral("http");
+    case 443:
+        return QStringLiteral("https");
+    case 22:
+        return QStringLiteral("ssh");
+    case 25:
+        return QStringLiteral("smtp");
+    case 53:
+        return QStringLiteral("dns");
+    case 631:
+        return QStringLiteral("ipp");
+    case 5353:
+        return QStringLiteral("mdns");
+    case 8080:
+        return QStringLiteral("http-alt");
+    default:
+        return QString();
+    }
+}
+
+bool portIsDatabase(quint16 port) {
+    switch (port) {
+    case 5432:
+    case 5433:
+    case 3306:
+    case 33060:
+    case 6379:
+    case 27017:
+    case 27018:
+    case 27019:
+    case 1521:
+    case 1433:
+    case 9042:
+    case 9200:
+    case 9300:
+    case 5672:
+    case 11211:
+    case 26257:
+    case 5984:
+    case 8086:
+        return true;
+    default:
+        return false;
+    }
+}
+
+QString endpointExposure(const QString &addr) {
+    if (addr == QStringLiteral("::") || addr == QStringLiteral("0.0.0.0")) {
+        return QStringLiteral("public");
+    }
+    if (addr.startsWith(QStringLiteral("127.")) || addr == QStringLiteral("::1")
+        || addr == QStringLiteral("localhost")) {
+        return QStringLiteral("local");
+    }
+    return QStringLiteral("public");
+}
+
+bool parseInstrumentation(const QByteArray &environ, const QByteArray &maps,
+                          QList<QString> &agents) {
+    QSet<QString> found;
+
+    const QList<QByteArray> entries = environ.split('\0');
+    for (const QByteArray &entry : entries) {
+        const int equals = entry.indexOf('=');
+        if (equals <= 0) {
+            continue;
+        }
+        const QByteArray key = entry.left(equals);
+        if (key.startsWith("DD_TRACE") || key.startsWith("DD_SERVICE")
+            || key.startsWith("DD_ENV") || key.startsWith("DD_AGENT")
+            || key.startsWith("DD_PROFILING") || key.startsWith("DD_RUM")
+            || key.startsWith("DD_LOGS")) {
+            found.insert(QStringLiteral("datadog"));
+        } else if (key.startsWith("OTEL_")) {
+            found.insert(QStringLiteral("opentelemetry"));
+        } else if (key.startsWith("ELASTIC_APM_")) {
+            found.insert(QStringLiteral("elastic-apm"));
+        } else if (key.startsWith("NEW_RELIC_")) {
+            found.insert(QStringLiteral("newrelic"));
+        } else if (key == "SENTRY_DSN") {
+            found.insert(QStringLiteral("sentry"));
+        }
+    }
+
+    const QString libs = QString::fromLatin1(maps);
+    if (libs.contains(QStringLiteral("libdatadog"))
+        || libs.contains(QStringLiteral("libddtrace"))
+        || libs.contains(QStringLiteral("libdd_profiling"))) {
+        found.insert(QStringLiteral("datadog"));
+    }
+    if (libs.contains(QStringLiteral("libopentelemetry"))) {
+        found.insert(QStringLiteral("opentelemetry"));
+    }
+    if (libs.contains(QStringLiteral("libnewrelic"))) {
+        found.insert(QStringLiteral("newrelic"));
+    }
+    if (libs.contains(QStringLiteral("libelasticapm"))) {
+        found.insert(QStringLiteral("elastic-apm"));
+    }
+    if (libs.contains(QStringLiteral("libsentry"))) {
+        found.insert(QStringLiteral("sentry"));
+    }
+    if (libs.contains(QStringLiteral("libpyroscope"))) {
+        found.insert(QStringLiteral("pyroscope"));
+    }
+
+    agents = found.values();
+    std::sort(agents.begin(), agents.end());
+    return !agents.isEmpty();
+}
+
+bool processInstrumentation(int pid, QList<QString> &agents) {
+    agents.clear();
+    const QByteArray environ = readFileBytes(procPath(pid, "environ"));
+    const QByteArray maps = readFileBytes(procPath(pid, "maps"));
+    return parseInstrumentation(environ, maps, agents);
 }
 
 bool parseStatmShared(const QByteArray &statmContent, unsigned long long pageSize,

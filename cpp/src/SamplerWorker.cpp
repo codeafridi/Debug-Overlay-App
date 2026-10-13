@@ -157,6 +157,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
 
     QList<ConnectionRow> connections;
     QList<QString> listening;
+    QList<EndpointRow> endpoints;
+    QList<QString> dbConnections;
     QHash<QString, int> stateCounts;
     QSet<QString> listenSeen;
     const QList<linuxproc::SocketInfo> sockets = linuxproc::readNetSockets();
@@ -174,6 +176,15 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
             if (!listenSeen.contains(endpoint)) {
                 listenSeen.insert(endpoint);
                 listening.append(endpoint);
+
+                EndpointRow entry;
+                entry.proto = socket.proto;
+                entry.addr = socket.localAddr;
+                entry.port = socket.localPort;
+                entry.exposure = linuxproc::endpointExposure(socket.localAddr);
+                entry.service = linuxproc::serviceForPort(socket.localPort);
+                entry.database = linuxproc::portIsDatabase(socket.localPort);
+                endpoints.append(entry);
             }
         }
 
@@ -193,9 +204,23 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
                 : QStringLiteral("*");
         row.state = socket.state;
         connections.append(row);
+
+        if (linuxproc::portIsDatabase(socket.remotePort)) {
+            dbConnections.append(
+                QStringLiteral("%1:%2 -> %3:%4 (%5)")
+                    .arg(socket.localAddr)
+                    .arg(socket.localPort)
+                    .arg(socket.remoteAddr)
+                    .arg(socket.remotePort)
+                    .arg(linuxproc::serviceForPort(socket.remotePort)));
+        }
     }
     snap.connections = connections;
     snap.listeningPorts = listening;
+    snap.endpoints = endpoints;
+    snap.dbConnections = dbConnections;
+
+    linuxproc::processInstrumentation(focus.identity.pid, snap.instrumentation);
 
     QList<QPair<QString, int>> counts;
     for (auto it = stateCounts.constBegin(); it != stateCounts.constEnd(); ++it) {

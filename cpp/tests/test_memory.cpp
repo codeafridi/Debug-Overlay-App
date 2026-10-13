@@ -318,6 +318,52 @@ int main(int argc, char *argv[]) {
               "parseNetDevInterfaces: per-interface rows incl. lo");
     }
 
+    // ---- services / instrumentation helpers ----
+    {
+        check(linuxproc::serviceForPort(5432) == QStringLiteral("postgres"),
+              "serviceForPort: 5432 -> postgres");
+        check(linuxproc::serviceForPort(443) == QStringLiteral("https"),
+              "serviceForPort: 443 -> https");
+        check(linuxproc::serviceForPort(12345).isEmpty(),
+              "serviceForPort: unknown -> empty");
+        check(linuxproc::portIsDatabase(6379)
+                  && !linuxproc::portIsDatabase(443),
+              "portIsDatabase: redis yes, https no");
+        check(linuxproc::endpointExposure(QStringLiteral("0.0.0.0"))
+                      == QStringLiteral("public")
+                  && linuxproc::endpointExposure(QStringLiteral("127.0.0.1"))
+                         == QStringLiteral("local")
+                  && linuxproc::endpointExposure(QStringLiteral("::1"))
+                         == QStringLiteral("local")
+                  && linuxproc::endpointExposure(QStringLiteral("::"))
+                         == QStringLiteral("public"),
+              "endpointExposure: public vs local");
+    }
+    {
+        QByteArray environ;
+        environ.append("PATH=/usr/bin");
+        environ.append('\0');
+        environ.append("DD_TRACE_ENABLED=true");
+        environ.append('\0');
+        environ.append("HOME=/root");
+        environ.append('\0');
+
+        QList<QString> agents;
+        check(linuxproc::parseInstrumentation(
+                  environ, QByteArrayLiteral("/usr/lib/libopentelemetry_c.so.1\n"),
+                  agents)
+                  && agents.contains(QStringLiteral("datadog"))
+                  && agents.contains(QStringLiteral("opentelemetry")),
+              "parseInstrumentation: DD env + OTel lib");
+
+        QList<QString> none;
+        check(!linuxproc::parseInstrumentation(QByteArrayLiteral("PATH=/x\0"),
+                                               QByteArrayLiteral("/lib/libc.so.6\n"),
+                                               none)
+                  && none.isEmpty(),
+              "parseInstrumentation: clean process -> none");
+    }
+
     // ---- real /proc ----
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
@@ -380,6 +426,10 @@ int main(int argc, char *argv[]) {
         check(linuxproc::cgroupSample(self, cg) && cg.available
                   && !cg.version.isEmpty() && !cg.path.isEmpty(),
               "cgroupSample(self): available with version + path");
+
+        QList<QString> selfAgents;
+        linuxproc::processInstrumentation(self, selfAgents);
+        check(true, "processInstrumentation(self) does not crash");
 
         linuxproc::HostCpuTimes hostCpu;
         check(linuxproc::hostCpuTimes(hostCpu) && hostCpu.total > 0,

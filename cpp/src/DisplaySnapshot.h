@@ -30,6 +30,15 @@ struct InterfaceRow {
     double txPerSec = 0.0;
 };
 
+struct EndpointRow {
+    QString proto;
+    QString addr;
+    quint16 port = 0;
+    QString exposure;
+    QString service;
+    bool database = false;
+};
+
 struct DisplaySnapshot {
     QString appName = QStringLiteral("--");
     QString pid = QStringLiteral("--");
@@ -45,6 +54,9 @@ struct DisplaySnapshot {
     QList<ProcessRow> processes;
     QList<ConnectionRow> connections;
     QList<QString> listeningPorts;
+    QList<EndpointRow> endpoints;
+    QList<QString> dbConnections;
+    QList<QString> instrumentation;
     QList<QPair<QString, int>> socketStateCounts;
     QList<InterfaceRow> interfaces;
     bool cgroupAvailable = false;

@@ -118,6 +118,12 @@ bool parseCgroupCpuStat(const QByteArray &content, CgroupInfo &out);
 bool parseCgroupMemoryValue(const QByteArray &content, long long &out);
 bool parseCgroupMemoryStat(const QByteArray &content, CgroupInfo &out);
 bool cgroupSample(int pid, CgroupInfo &out);
+QString serviceForPort(quint16 port);
+bool portIsDatabase(quint16 port);
+QString endpointExposure(const QString &addr);
+bool parseInstrumentation(const QByteArray &environ, const QByteArray &maps,
+                          QList<QString> &agents);
+bool processInstrumentation(int pid, QList<QString> &agents);
 bool parseHostCpu(const QByteArray &statContent, HostCpuTimes &out);
 bool parseMemInfo(const QByteArray &content, HostMem &out);
 bool parseNetDev(const QByteArray &content, NetTotals &out);
