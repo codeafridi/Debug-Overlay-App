@@ -7,6 +7,7 @@
 #include "MetricStore.h"
 #include "ServicesStatus.h"
 #include "AlertEngine.h"
+#include "SyntheticStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -31,6 +32,7 @@ public:
     void setServicesSnapshot(const ServicesSnapshot &snapshot);
     void setJournalSnapshot(const JournalSnapshot &snapshot);
     void setAlerts(const QList<Alert> &alerts);
+    void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -48,6 +50,7 @@ private:
     QWidget *buildLogsView();
     QWidget *buildErrorsView();
     QWidget *buildEndpointsView();
+    QWidget *buildSyntheticView();
     QWidget *buildInstrumentationView();
     QWidget *buildDatabasesView();
     QWidget *buildPlaceholderView(const QString &text);
@@ -89,6 +92,8 @@ private:
     QLabel *m_logsSummary = nullptr;
     QLabel *m_errors = nullptr;
     QLabel *m_endpoints = nullptr;
+    QLabel *m_synthetic = nullptr;
+    QLabel *m_syntheticSummary = nullptr;
     QLabel *m_instrumentation = nullptr;
     QLabel *m_databases = nullptr;
 

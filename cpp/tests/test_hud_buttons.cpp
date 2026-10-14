@@ -446,6 +446,20 @@ int main(int argc, char *argv[]) {
               && dashAlerts->text().contains(QStringLiteral("CPU")),
           "panel shows active alert");
 
+    SyntheticSnapshot synthetic;
+    ProbeResult probe;
+    probe.url = QStringLiteral("https://example.com");
+    probe.success = true;
+    probe.status = 200;
+    probe.totalMs = 12.0;
+    synthetic.results = {probe};
+    synthetic.upCount = 1;
+    hud.setSyntheticSnapshot(synthetic);
+    auto *dashSynthetic = hud.findChild<QLabel *>(QStringLiteral("ddSynthetic"));
+    check(dashSynthetic != nullptr
+              && dashSynthetic->text().contains(QStringLiteral("example.com")),
+          "panel shows synthetic check");
+
     if (moreButton2 && panel) {
         moreButton2->click();
         check(hud.isExpanded() && !panel->isHidden(),

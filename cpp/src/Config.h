@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QtGlobal>
 
 struct HealthConfig {
@@ -30,10 +31,17 @@ struct KubeConfig {
     int killGraceMs = 500;
 };
 
+struct SyntheticConfig {
+    QStringList targets;
+    int intervalMs = 30000;
+    int timeoutMs = 5000;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
     KubeConfig kube;
+    SyntheticConfig synthetic;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

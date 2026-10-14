@@ -10,6 +10,7 @@
 #include "SamplerWorker.h"
 #include "ServicesSource.h"
 #include "JournalSource.h"
+#include "SyntheticSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<KubeSnapshot>("KubeSnapshot");
     qRegisterMetaType<ServicesSnapshot>("ServicesSnapshot");
     qRegisterMetaType<JournalSnapshot>("JournalSnapshot");
+    qRegisterMetaType<SyntheticSnapshot>("SyntheticSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -236,6 +238,19 @@ int main(int argc, char *argv[]) {
                          hud.setJournalSnapshot(snapshot);
                      });
     journalThread->start();
+
+    auto *syntheticThread = new QThread;
+    auto *synthetic = new SyntheticSource(config.synthetic);
+    synthetic->moveToThread(syntheticThread);
+    QObject::connect(syntheticThread, &QThread::started, synthetic,
+                     &SyntheticSource::start);
+    QObject::connect(syntheticThread, &QThread::finished, synthetic,
+                     &QObject::deleteLater);
+    QObject::connect(synthetic, &SyntheticSource::syntheticReady, &hud,
+                     [&hud](const SyntheticSnapshot &snapshot) {
+                         hud.setSyntheticSnapshot(snapshot);
+                     });
+    syntheticThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

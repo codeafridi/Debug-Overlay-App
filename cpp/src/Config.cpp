@@ -2,6 +2,7 @@
 
 #include <QFileInfo>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
 #include <QSettings>
 
 #include <algorithm>
@@ -59,6 +60,14 @@ void validate(Config &config) {
     config.kube.absentMs = clampInt(config.kube.absentMs, 1000, 3600000);
     config.kube.timeoutMs = clampInt(config.kube.timeoutMs, 100, 600000);
     config.kube.killGraceMs = clampInt(config.kube.killGraceMs, 50, 60000);
+
+    config.synthetic.intervalMs =
+        clampInt(config.synthetic.intervalMs, 5000, 3600000);
+    config.synthetic.timeoutMs =
+        clampInt(config.synthetic.timeoutMs, 500, 60000);
+    if (config.synthetic.targets.size() > 32) {
+        config.synthetic.targets = config.synthetic.targets.mid(0, 32);
+    }
 }
 
 } // namespace
@@ -185,6 +194,25 @@ Config loadConfig(const QString &path, QString *errorMessage) {
             settings.value(QStringLiteral("sample_interval_ms")).toInt();
         if (sample > 0) {
             config.sampleIntervalMs = sample;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("synthetic"));
+    {
+        const QString targets =
+            settings.value(QStringLiteral("targets")).toString();
+        config.synthetic.targets =
+            targets.split(QRegularExpression(QStringLiteral("[\\s,]+")),
+                          Qt::SkipEmptyParts);
+        const int interval =
+            settings.value(QStringLiteral("interval_ms")).toInt();
+        if (interval > 0) {
+            config.synthetic.intervalMs = interval;
+        }
+        const int timeout = settings.value(QStringLiteral("timeout_ms")).toInt();
+        if (timeout > 0) {
+            config.synthetic.timeoutMs = timeout;
         }
     }
     settings.endGroup();

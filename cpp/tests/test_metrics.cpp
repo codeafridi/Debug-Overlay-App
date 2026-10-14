@@ -5,11 +5,13 @@
 #include "ServicesStatus.h"
 #include "JournalStatus.h"
 #include "AlertEngine.h"
+#include "SyntheticStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
 #include <QThread>
 
+#include <cmath>
 #include <cstdio>
 
 int main(int argc, char *argv[]) {
@@ -219,6 +221,46 @@ int main(int argc, char *argv[]) {
     engine.update(memInput, 7);
     check(engine.update(memInput, 8).size() == 1,
           "alert: low memory fires after sustained");
+
+    int status = 0;
+    double total = 0;
+    double dns = 0;
+    double connect = 0;
+    double tls = 0;
+    double processing = 0;
+    double transfer = 0;
+    check(parseCurlWriteOut("200 0.175 0.354 0.500 0.830 0.831", status, total,
+                            dns, connect, tls, processing, transfer)
+              && status == 200
+              && std::fabs(dns - 175.0) < 1.0
+              && std::fabs(connect - (354.0 - 175.0)) < 1.0
+              && std::fabs(tls - (500.0 - 354.0)) < 1.0
+              && std::fabs(processing - (830.0 - 500.0)) < 1.0
+              && std::fabs(transfer - (831.0 - 830.0)) < 1.0
+              && std::fabs(total - 831.0) < 1.0,
+          "parseCurlWriteOut: phase decomposition");
+    int s2 = 0;
+    double a = 0, b = 0, c = 0, d = 0, e = 0, f = 0;
+    check(!parseCurlWriteOut(QByteArrayLiteral("garbage"), s2, a, b, c, d, e, f),
+          "parseCurlWriteOut: garbage -> false");
+
+    SyntheticSnapshot synthetic;
+    ProbeResult up;
+    up.url = QStringLiteral("https://x");
+    up.success = true;
+    up.status = 200;
+    up.totalMs = 12;
+    ProbeResult down;
+    down.url = QStringLiteral("https://y");
+    down.success = false;
+    down.error = QStringLiteral("connection refused");
+    synthetic.results = {up, down};
+    synthetic.upCount = 1;
+    synthetic.downCount = 1;
+    check(syntheticSummaryText(synthetic).contains(QStringLiteral("1 up")),
+          "synthetic summary");
+    check(syntheticDetailText(synthetic).contains(QStringLiteral("DOWN")),
+          "synthetic detail lists down target");
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

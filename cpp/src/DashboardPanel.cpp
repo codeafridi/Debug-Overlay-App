@@ -156,6 +156,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
                       QStringLiteral("Services"), QStringLiteral("Logs"),
                       QStringLiteral("Errors"), QStringLiteral("Dependencies"),
                       QStringLiteral("Endpoints"),
+                      QStringLiteral("Synthetic"),
                       QStringLiteral("Instrumentation"),
                       QStringLiteral("Traces"), QStringLiteral("Profiles"),
                       QStringLiteral("Databases"), QStringLiteral("Security"),
@@ -176,6 +177,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildErrorsView());
     m_views->addWidget(buildDependenciesView());
     m_views->addWidget(buildEndpointsView());
+    m_views->addWidget(buildSyntheticView());
     m_views->addWidget(buildInstrumentationView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Traces")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
@@ -224,6 +226,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
         "#ddEndpoints, #ddInstrumentation, #ddDatabases { color: #c4cad1; }"
         "#ddAlerts { color: #c4cad1; }"
+        "#ddSynthetic, #ddSyntheticSummary { color: #c4cad1; }"
         "#ddKubeSummary, #ddKubeEvents { color: #c4cad1; }"
         "#ddKubeDiagnosis, #ddKubeTimeline { color: #c4cad1; }"
         "#ddPlaceholder { color: #5f6671; }"
@@ -567,6 +570,24 @@ QWidget *DashboardPanel::buildEndpointsView() {
     m_endpoints->setFont(monoFont(10));
     m_endpoints->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("LISTENING ENDPOINTS (host)"), m_endpoints, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildSyntheticView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+
+    m_syntheticSummary = new QLabel(QStringLiteral("--"), view);
+    m_syntheticSummary->setObjectName(QStringLiteral("ddSyntheticSummary"));
+    m_syntheticSummary->setFont(monoFont(12, true));
+    layout->addWidget(makeCard(QStringLiteral("SYNTHETIC"), m_syntheticSummary, view));
+
+    m_synthetic = new QLabel(QStringLiteral("--"), view);
+    m_synthetic->setObjectName(QStringLiteral("ddSynthetic"));
+    m_synthetic->setFont(monoFont(10));
+    m_synthetic->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("HTTP CHECKS"), m_synthetic, view), 1);
     return view;
 }
 
@@ -985,4 +1006,9 @@ void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
                     .arg(alert.severity.toUpper(), alert.title, alert.detail);
     }
     m_alerts->setText(text);
+}
+
+void DashboardPanel::setSyntheticSnapshot(const SyntheticSnapshot &snapshot) {
+    m_syntheticSummary->setText(syntheticSummaryText(snapshot));
+    m_synthetic->setText(syntheticDetailText(snapshot));
 }

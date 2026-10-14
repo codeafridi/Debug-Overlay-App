@@ -421,6 +421,12 @@ void HudWindow::setNotifier(std::unique_ptr<Notifier> notifier) {
     m_notifier = std::move(notifier);
 }
 
+void HudWindow::setSyntheticSnapshot(const SyntheticSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setSyntheticSnapshot(snapshot);
+    }
+}
+
 void HudWindow::evaluateAlerts() {
     if (m_notifier == nullptr) {
         return;

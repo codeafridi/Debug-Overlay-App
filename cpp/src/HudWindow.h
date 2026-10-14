@@ -7,6 +7,7 @@
 #include "ServicesStatus.h"
 #include "AlertEngine.h"
 #include "Notifier.h"
+#include "SyntheticStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -38,6 +39,8 @@ public:
     void setJournalSnapshot(const JournalSnapshot &snapshot);
 
     void setNotifier(std::unique_ptr<Notifier> notifier);
+
+    void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 
