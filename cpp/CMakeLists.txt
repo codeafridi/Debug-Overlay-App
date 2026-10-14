@@ -109,6 +109,8 @@ add_library(syspeek_core STATIC
     src/TcpStatus.h
     src/SecurityStatus.cpp
     src/SecurityStatus.h
+    src/LogParser.cpp
+    src/LogParser.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

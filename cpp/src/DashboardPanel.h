@@ -104,6 +104,7 @@ private:
     QLabel *m_deps = nullptr;
     QLabel *m_logs = nullptr;
     QLabel *m_logsSummary = nullptr;
+    QLabel *m_logPipeline = nullptr;
     QLabel *m_errors = nullptr;
     QLabel *m_endpoints = nullptr;
     QLabel *m_synthetic = nullptr;

@@ -1,5 +1,6 @@
 #include "DashboardPanel.h"
 
+#include "LogParser.h"
 #include "MemoryFormat.h"
 #include "Sparkline.h"
 
@@ -648,6 +649,13 @@ QWidget *DashboardPanel::buildLogsView() {
     m_logsSummary->setFont(monoFont(12, true));
     layout->addWidget(makeCard(QStringLiteral("JOURNALD"), m_logsSummary, view));
 
+    m_logPipeline = new QLabel(QStringLiteral("--"), view);
+    m_logPipeline->setObjectName(QStringLiteral("ddLogPipeline"));
+    m_logPipeline->setFont(monoFont(10));
+    m_logPipeline->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("LOG PIPELINE (parsed fields)"), m_logPipeline, view), 1);
+
     m_logs = new QLabel(QStringLiteral("--"), view);
     m_logs->setObjectName(QStringLiteral("ddLogs"));
     m_logs->setFont(monoFont(10));
@@ -1216,6 +1224,15 @@ void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     m_errors->setText(snapshot.available
                           ? journalErrorGroupsText(snapshot.errorGroups)
                           : QStringLiteral("--"));
+
+    QStringList messages;
+    for (const JournalEntry &entry : snapshot.entries) {
+        messages.append(entry.message);
+    }
+    const LogFacets facets = computeLogFacets(messages);
+    m_logPipeline->setText(logPipelineSummaryText(facets)
+                           + QStringLiteral("\n")
+                           + logPipelineDetailText(facets));
 }
 
 void DashboardPanel::setAlerts(const QList<Alert> &alerts) {

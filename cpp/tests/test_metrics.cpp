@@ -9,6 +9,7 @@
 #include "DiskStatus.h"
 #include "TcpStatus.h"
 #include "SecurityStatus.h"
+#include "LogParser.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -427,6 +428,87 @@ int main(int argc, char *argv[]) {
               "security: summary text");
         check(securityDetailText(bad).contains(QStringLiteral("CAP_SYS_ADMIN")),
               "security: detail lists capability");
+    }
+
+    {
+        const LogFields nginx = parseLogLineAuto(QStringLiteral(
+            "1.2.3.4 example.com - [10/Oct/2026:13:55:36 +0000] "
+            "\"GET /api/v1/items HTTP/1.1\" 200 2326 \"-\" \"curl/8.0\""));
+        check(nginx.matched && nginx.parser == QStringLiteral("nginx"),
+              "logs: nginx parser matched");
+        check(nginx.fields.value(QStringLiteral("code")) == QStringLiteral("200")
+                  && nginx.fields.value(QStringLiteral("path"))
+                         == QStringLiteral("/api/v1/items"),
+              "logs: nginx extracted code/path");
+
+        const LogFields apache = parseLogLineAuto(QStringLiteral(
+            "127.0.0.1 - frank [10/Oct/2026:13:55:36 +0000] "
+            "\"GET /index.html HTTP/1.0\" 404 512"));
+        check(apache.matched
+                  && (apache.parser == QStringLiteral("apache")
+                      || apache.parser == QStringLiteral("apache2")),
+              "logs: apache parser matched");
+        check(apache.fields.value(QStringLiteral("code")) == QStringLiteral("404"),
+              "logs: apache extracted code");
+
+        const LogFields syslog = parseLogLineAuto(QStringLiteral(
+            "<34>1 2026-10-10T22:14:15.003Z host app 1234 ID47 - message body"));
+        check(syslog.matched
+                  && syslog.parser == QStringLiteral("syslog-rfc5424"),
+              "logs: rfc5424 parser matched");
+        check(syslog.fields.value(QStringLiteral("ident")) == QStringLiteral("app"),
+              "logs: rfc5424 extracted ident");
+
+        const LogFields cri = parseLogLineAuto(QStringLiteral(
+            "2026-10-10T22:14:15.003Z stdout F hello from container"));
+        check(cri.matched && cri.parser == QStringLiteral("cri"),
+              "logs: cri parser matched");
+        check(cri.fields.value(QStringLiteral("stream")) == QStringLiteral("stdout"),
+              "logs: cri extracted stream");
+
+        const LogFields json = parseLogLineAuto(QStringLiteral(
+            "{\"level\":\"error\",\"code\":500,\"path\":\"/x\",\"duration\":12.5}"));
+        check(json.matched && json.parser == QStringLiteral("json"),
+              "logs: json parser matched");
+        check(json.fields.value(QStringLiteral("level")) == QStringLiteral("error"),
+              "logs: json extracted level");
+
+        const LogFields logfmt = parseLogLineAuto(QStringLiteral(
+            "level=warn code=429 path=/rate msg=\"slow down\""));
+        check(logfmt.matched && logfmt.parser == QStringLiteral("logfmt"),
+              "logs: logfmt parser matched");
+        check(logfmt.fields.value(QStringLiteral("msg")) == QStringLiteral("slow down"),
+              "logs: logfmt extracted quoted value");
+
+        QStringList lines;
+        lines << QStringLiteral(
+                     "1.2.3.4 h - [10/Oct/2026:13:55:36 +0000] \"GET /a HTTP/1.1\" "
+                     "200 10 \"-\" \"curl/8.0\"")
+              << QStringLiteral(
+                     "1.2.3.4 h - [10/Oct/2026:13:55:37 +0000] \"GET /b HTTP/1.1\" "
+                     "200 20 \"-\" \"curl/8.0\"")
+              << QStringLiteral(
+                     "1.2.3.4 h - [10/Oct/2026:13:55:38 +0000] \"GET /a HTTP/1.1\" "
+                     "500 5 \"-\" \"curl/8.0\"")
+              << QStringLiteral("this line does not match any parser");
+        const LogFacets facets = computeLogFacets(lines);
+        check(facets.total == 4 && facets.parsed == 3,
+              "logs: facets parsed 3/4 lines");
+        check(facets.format == QStringLiteral("nginx"),
+              "logs: facets dominant format nginx");
+        bool saw500 = false;
+        bool saw200 = false;
+        for (const QPair<QString, int> &c : facets.codes) {
+            if (c.first == QStringLiteral("500") && c.second == 1) {
+                saw500 = true;
+            }
+            if (c.first == QStringLiteral("200") && c.second == 2) {
+                saw200 = true;
+            }
+        }
+        check(saw200 && saw500, "logs: facets aggregate http codes");
+        check(logPipelineSummaryText(facets).contains(QStringLiteral("format")),
+              "logs: pipeline summary text");
     }
 
     std::printf("%d failure(s)\n", failures);
