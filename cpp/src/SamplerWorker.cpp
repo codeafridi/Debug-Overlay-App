@@ -295,5 +295,9 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     snap.ioPressureAvailable = disk.pressure.available;
     snap.diskIntervalMs = disk.intervalMs;
 
+    const TcpHealth tcp = m_tcpSampler.sample();
+    snap.tcpHealth = tcp;
+    snap.tcpHealthAvailable = tcp.available;
+
     return snap;
 }

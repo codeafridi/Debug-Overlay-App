@@ -7,6 +7,7 @@
 #include "AlertEngine.h"
 #include "SyntheticStatus.h"
 #include "DiskStatus.h"
+#include "TcpStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -330,6 +331,57 @@ int main(int argc, char *argv[]) {
         warm.warming = true;
         check(diskSummaryText(warm).contains(QStringLiteral("warming")),
               "disk: warming summary");
+    }
+
+    {
+        auto near = [](double a, double b) { return std::fabs(a - b) < 1e-6; };
+
+        const QByteArray snmp = QByteArrayLiteral(
+            "Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens "
+            "AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs "
+            "InErrs OutRsts InCsumErrors\n"
+            "Tcp: 1 200 120000 -1 100 50 3 1 40 1000 900 9 0 2 0\n"
+            "Ip: InReceives\nIp: 55\n");
+        const QByteArray netstat = QByteArrayLiteral(
+            "TcpExt: TCPTimeouts TCPSynRetrans ListenDrops\n"
+            "TcpExt: 12 3 1\nIpExt: X\nIpExt: 7\n");
+
+        const TcpCounters counters = parseTcpCounters(snmp, netstat);
+        check(counters.tcp.value(QStringLiteral("OutSegs")) == 900
+                  && counters.tcp.value(QStringLiteral("RetransSegs")) == 9
+                  && counters.tcp.value(QStringLiteral("CurrEstab")) == 40,
+              "tcp: parsed Tcp section by header name");
+        check(counters.ext.value(QStringLiteral("TCPTimeouts")) == 12
+                  && counters.ext.value(QStringLiteral("ListenDrops")) == 1,
+              "tcp: parsed TcpExt section");
+
+        const TcpCounters prev = parseTcpCounters(
+            QByteArrayLiteral(
+                "Tcp: InSegs OutSegs RetransSegs InErrs OutRsts CurrEstab\n"
+                "Tcp: 900 800 6 0 1 40\n"),
+            QByteArrayLiteral("TcpExt: TCPTimeouts TCPSynRetrans ListenDrops\n"
+                              "TcpExt: 10 1 0\n"));
+        const TcpCounters cur = parseTcpCounters(
+            QByteArrayLiteral(
+                "Tcp: InSegs OutSegs RetransSegs InErrs OutRsts CurrEstab\n"
+                "Tcp: 1000 900 9 0 3 42\n"),
+            QByteArrayLiteral("TcpExt: TCPTimeouts TCPSynRetrans ListenDrops\n"
+                              "TcpExt: 12 3 1\n"));
+        const TcpHealth health = computeTcpHealth(prev, cur, 1000.0);
+        check(health.available, "tcp: health available");
+        check(near(health.inSegsPerSec, 100.0), "tcp: in segs/s");
+        check(near(health.outSegsPerSec, 100.0), "tcp: out segs/s");
+        check(near(health.retransPerSec, 3.0), "tcp: retrans/s");
+        check(near(health.retransPercent, 3.0), "tcp: retrans percent");
+        check(near(health.outRstsPerSec, 2.0), "tcp: rsts/s");
+        check(near(health.timeoutsPerSec, 2.0), "tcp: timeouts/s");
+        check(near(health.synRetransPerSec, 2.0), "tcp: syn retrans/s");
+        check(near(health.listenDropsPerSec, 1.0), "tcp: listen drops/s");
+        check(health.currEstab == 42, "tcp: current established");
+        check(tcpHealthSummaryText(health).contains(QStringLiteral("retrans")),
+              "tcp: summary mentions retrans");
+        check(tcpHealthDetailText(health).contains(QStringLiteral("syn-retr")),
+              "tcp: detail lists syn retrans");
     }
 
     std::printf("%d failure(s)\n", failures);

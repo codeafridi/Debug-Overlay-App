@@ -78,6 +78,8 @@ private:
     QLabel *m_listen = nullptr;
     QLabel *m_states = nullptr;
     QLabel *m_ifaces = nullptr;
+    QLabel *m_tcpSummary = nullptr;
+    QLabel *m_tcp = nullptr;
     QLabel *m_cgroup = nullptr;
     QLabel *m_docker = nullptr;
     QLabel *m_kubeSummary = nullptr;

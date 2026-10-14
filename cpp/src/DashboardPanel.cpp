@@ -223,6 +223,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddCgroup { color: #c4cad1; }"
         "#ddDocker { color: #9fb0c4; }"
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
+        "#ddTcpSummary { color: #c4cad1; }"
+        "#ddTcp { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -430,6 +432,21 @@ QWidget *DashboardPanel::buildNetworkView() {
     m_ifaces->setObjectName(QStringLiteral("ddIfaces"));
     m_ifaces->setFont(monoFont(10));
     layout->addWidget(makeCard(QStringLiteral("INTERFACES"), m_ifaces, view), 1);
+
+    auto *tcpBox = new QWidget(view);
+    auto *tcpLayout = new QVBoxLayout(tcpBox);
+    tcpLayout->setContentsMargins(0, 0, 0, 0);
+    tcpLayout->setSpacing(4);
+    m_tcpSummary = new QLabel(QStringLiteral("--"), tcpBox);
+    m_tcpSummary->setObjectName(QStringLiteral("ddTcpSummary"));
+    m_tcpSummary->setFont(monoFont(11, true));
+    m_tcp = new QLabel(QStringLiteral("--"), tcpBox);
+    m_tcp->setObjectName(QStringLiteral("ddTcp"));
+    m_tcp->setFont(monoFont(10));
+    m_tcp->setWordWrap(false);
+    tcpLayout->addWidget(m_tcpSummary);
+    tcpLayout->addWidget(m_tcp);
+    layout->addWidget(makeCard(QStringLiteral("TCP HEALTH"), tcpBox, view), 1);
     return view;
 }
 
@@ -865,6 +882,14 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                       .arg(formatRate(row.rxPerSec), formatRate(row.txPerSec));
     }
     m_ifaces->setText(ifaces.isEmpty() ? QStringLiteral("--") : ifaces);
+
+    if (snapshot.tcpHealthAvailable) {
+        m_tcpSummary->setText(tcpHealthSummaryText(snapshot.tcpHealth));
+        m_tcp->setText(tcpHealthDetailText(snapshot.tcpHealth));
+    } else {
+        m_tcpSummary->setText(QStringLiteral("warming up"));
+        m_tcp->setText(QStringLiteral("--"));
+    }
 
     if (snapshot.cgroupAvailable) {
         const QString leaf = snapshot.cgroupPath.section(QLatin1Char('/'), -1);

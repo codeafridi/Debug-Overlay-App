@@ -103,6 +103,10 @@ add_library(syspeek_core STATIC
     src/DiskSampler.h
     src/DiskStatus.cpp
     src/DiskStatus.h
+    src/TcpSampler.cpp
+    src/TcpSampler.h
+    src/TcpStatus.cpp
+    src/TcpStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

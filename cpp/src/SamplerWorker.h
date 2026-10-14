@@ -11,6 +11,7 @@
 #include "IoRateTracker.h"
 #include "NetRateTracker.h"
 #include "ProcessIdentity.h"
+#include "TcpSampler.h"
 
 #include <QObject>
 #include <QString>
@@ -42,6 +43,7 @@ private:
     CpuSampler m_cpuSampler;
     HostSampler m_hostSampler;
     DiskSampler m_diskSampler;
+    TcpSampler m_tcpSampler;
     IoRateTracker m_ioTracker;
     NetRateTracker m_netTracker;
     GroupCache m_groupCache;
