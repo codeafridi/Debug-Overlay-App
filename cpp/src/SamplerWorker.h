@@ -2,6 +2,7 @@
 
 #include "CpuSampler.h"
 #include "Config.h"
+#include "DiskSampler.h"
 #include "DisplaySnapshot.h"
 #include "FocusSampler.h"
 #include "GroupCache.h"
@@ -40,6 +41,7 @@ private:
     FocusSampler m_sampler;
     CpuSampler m_cpuSampler;
     HostSampler m_hostSampler;
+    DiskSampler m_diskSampler;
     IoRateTracker m_ioTracker;
     NetRateTracker m_netTracker;
     GroupCache m_groupCache;

@@ -287,5 +287,13 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         snap.hostLoad1 = host.load1;
     }
 
+    const DiskSnapshot disk = m_diskSampler.sample();
+    snap.disksAvailable = disk.available;
+    snap.disksWarming = disk.warming;
+    snap.disks = disk.disks;
+    snap.ioPressure = disk.pressure;
+    snap.ioPressureAvailable = disk.pressure.available;
+    snap.diskIntervalMs = disk.intervalMs;
+
     return snap;
 }

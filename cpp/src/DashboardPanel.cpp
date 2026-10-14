@@ -151,6 +151,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_rail->setFocusPolicy(Qt::NoFocus);
     m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Alerts"),
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
+                      QStringLiteral("Disks"),
                       QStringLiteral("Network"),
                       QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
                       QStringLiteral("Services"), QStringLiteral("Logs"),
@@ -169,6 +170,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildAlertsView());
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
+    m_views->addWidget(buildDisksView());
     m_views->addWidget(buildNetworkView());
     m_views->addWidget(buildContainersView());
     m_views->addWidget(buildKubernetesView());
@@ -715,6 +717,42 @@ QWidget *DashboardPanel::buildCostView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildDisksView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_diskSummary = new QLabel(QStringLiteral("--"), view);
+    m_diskSummary->setObjectName(QStringLiteral("ddDiskSummary"));
+    m_diskSummary->setFont(monoFont(13, true));
+    layout->addWidget(makeCard(QStringLiteral("DISK I/O"), m_diskSummary, view));
+
+    m_diskPressure = new QLabel(QStringLiteral("--"), view);
+    m_diskPressure->setObjectName(QStringLiteral("ddDiskPressure"));
+    m_diskPressure->setFont(monoFont(10));
+    m_diskPressure->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("I/O PRESSURE (PSI)"), m_diskPressure, view));
+
+    m_disks = new QTreeWidget(view);
+    m_disks->setObjectName(QStringLiteral("ddDisks"));
+    m_disks->setColumnCount(7);
+    m_disks->setHeaderLabels({QStringLiteral("Device"), QStringLiteral("r/s"),
+                              QStringLiteral("w/s"), QStringLiteral("rkB/s"),
+                              QStringLiteral("wkB/s"), QStringLiteral("await"),
+                              QStringLiteral("%util")});
+    m_disks->setRootIsDecorated(false);
+    m_disks->setSelectionMode(QAbstractItemView::NoSelection);
+    m_disks->setFocusPolicy(Qt::NoFocus);
+    m_disks->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int i = 1; i < 7; ++i) {
+        m_disks->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    layout->addWidget(makeCard(QStringLiteral("DEVICES"), m_disks, view), 1);
+
+    return view;
+}
+
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_appValue->setText(snapshot.appName);
     m_pidValue->setText(QStringLiteral("pid %1").arg(snapshot.pid));
@@ -871,6 +909,48 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
              {m_hostCpu, m_hostMem, m_hostDisk, m_hostNet, m_hostLoad}) {
             label->setText(QStringLiteral("--"));
         }
+    }
+
+    DiskSnapshot disk;
+    disk.disks = snapshot.disks;
+    disk.pressure = snapshot.ioPressure;
+    disk.intervalMs = snapshot.diskIntervalMs;
+    disk.available = snapshot.disksAvailable;
+    disk.warming = snapshot.disksWarming;
+    m_diskSummary->setText(diskSummaryText(disk));
+
+    if (snapshot.ioPressureAvailable) {
+        m_diskPressure->setText(
+            QStringLiteral("io some %1 / %2 / %3   full %4 / %5 / %6")
+                .arg(snapshot.ioPressure.someAvg10, 0, 'f', 2)
+                .arg(snapshot.ioPressure.someAvg60, 0, 'f', 2)
+                .arg(snapshot.ioPressure.someAvg300, 0, 'f', 2)
+                .arg(snapshot.ioPressure.fullAvg10, 0, 'f', 2)
+                .arg(snapshot.ioPressure.fullAvg60, 0, 'f', 2)
+                .arg(snapshot.ioPressure.fullAvg300, 0, 'f', 2));
+    } else {
+        m_diskPressure->setText(QStringLiteral("not available"));
+    }
+
+    m_disks->clear();
+    for (const DiskRow &row : snapshot.disks) {
+        auto *item = new QTreeWidgetItem();
+        item->setText(0, row.name);
+        item->setText(1, QString::number(row.readPerSec, 'f', 1));
+        item->setText(2, QString::number(row.writePerSec, 'f', 1));
+        item->setText(3, QString::number(row.readKbPerSec, 'f', 0));
+        item->setText(4, QString::number(row.writeKbPerSec, 'f', 0));
+        item->setText(5, QString::number(row.readAwaitMs, 'f', 1));
+        item->setText(6, QString::number(row.utilPercent, 'f', 1));
+        for (int col = 1; col < 7; ++col) {
+            item->setTextAlignment(col, Qt::AlignRight | Qt::AlignVCenter);
+        }
+        if (row.utilPercent >= 80.0) {
+            item->setForeground(0, QColor(QStringLiteral("#d1685f")));
+        } else if (row.utilPercent >= 50.0) {
+            item->setForeground(0, QColor(QStringLiteral("#d8b25f")));
+        }
+        m_disks->addTopLevelItem(item);
     }
 
     m_focusDetail->setText(

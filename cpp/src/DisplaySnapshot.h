@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DiskStatus.h"
+
 #include <QList>
 #include <QPair>
 #include <QString>
@@ -80,6 +82,12 @@ struct DisplaySnapshot {
     double hostNetRxPerSec = 0.0;
     double hostNetTxPerSec = 0.0;
     double hostLoad1 = 0.0;
+    QList<DiskRow> disks;
+    IoPressure ioPressure;
+    bool ioPressureAvailable = false;
+    bool disksAvailable = false;
+    bool disksWarming = false;
+    double diskIntervalMs = 0.0;
     int focusThreads = 0;
     int focusFds = -1;
     unsigned long long focusVolCtx = 0;

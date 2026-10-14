@@ -6,6 +6,7 @@
 #include "JournalStatus.h"
 #include "AlertEngine.h"
 #include "SyntheticStatus.h"
+#include "DiskStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -261,6 +262,75 @@ int main(int argc, char *argv[]) {
           "synthetic summary");
     check(syntheticDetailText(synthetic).contains(QStringLiteral("DOWN")),
           "synthetic detail lists down target");
+
+    {
+        auto near = [](double a, double b) { return std::fabs(a - b) < 1e-6; };
+
+        check(diskIsPhysical(QStringLiteral("sda")), "disk: sda physical");
+        check(diskIsPhysical(QStringLiteral("nvme0n1")), "disk: nvme0n1 physical");
+        check(!diskIsPhysical(QStringLiteral("sda1")), "disk: sda1 partition skipped");
+        check(!diskIsPhysical(QStringLiteral("nvme0n1p1")),
+              "disk: nvme partition skipped");
+        check(!diskIsPhysical(QStringLiteral("loop0")), "disk: loop skipped");
+        check(!diskIsPhysical(QStringLiteral("dm-0")), "disk: dm skipped");
+
+        const QByteArray stats = QByteArrayLiteral(
+            "   8       0 sda 1000 20 50000 300 2000 40 80000 500 3 800 900\n"
+            "   8       1 sda1 900 10 40000 250 1900 30 70000 450 2 700 800\n"
+            "   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0\n");
+        const QList<DiskCounters> parsed = parseDiskstats(stats);
+        check(parsed.size() == 3, "disk: parsed three entries");
+        check(parsed.at(0).name == QStringLiteral("sda")
+                  && parsed.at(0).reads == 1000
+                  && parsed.at(0).sectorsRead == 50000
+                  && parsed.at(0).msReading == 300
+                  && parsed.at(0).writes == 2000
+                  && parsed.at(0).sectorsWritten == 80000
+                  && parsed.at(0).msDoingIo == 800
+                  && parsed.at(0).weightedMsDoingIo == 900,
+              "disk: parsed sda counters");
+
+        const QList<DiskCounters> prev = parseDiskstats(QByteArrayLiteral(
+            "   8       0 sda 0 0 0 0 0 0 0 0 0 0 0\n"));
+        const QList<DiskCounters> cur = parseDiskstats(QByteArrayLiteral(
+            "   8       0 sda 100 0 2000 100 200 0 4000 200 4 500 600\n"));
+        const QList<DiskRow> rows = computeDiskRates(prev, cur, 1000.0);
+        check(rows.size() == 1 && rows.at(0).name == QStringLiteral("sda"),
+              "disk: rate row for physical device only");
+        const DiskRow &r = rows.at(0);
+        check(near(r.readPerSec, 100.0), "disk: read iops");
+        check(near(r.writePerSec, 200.0), "disk: write iops");
+        check(near(r.readKbPerSec, 1000.0), "disk: read kB/s");
+        check(near(r.writeKbPerSec, 2000.0), "disk: write kB/s");
+        check(near(r.readAwaitMs, 1.0), "disk: read await");
+        check(near(r.writeAwaitMs, 1.0), "disk: write await");
+        check(near(r.aquSz, 0.6), "disk: aqu-sz");
+        check(near(r.utilPercent, 50.0), "disk: %util");
+
+        const IoPressure pressure = parsePressureIo(QByteArrayLiteral(
+            "some avg10=1.20 avg60=0.50 avg300=0.10 total=1000\n"
+            "full avg10=0.30 avg60=0.20 avg300=0.05 total=500\n"));
+        check(pressure.available, "disk: pressure available");
+        check(near(pressure.someAvg10, 1.20) && near(pressure.someAvg300, 0.10),
+              "disk: pressure some fields");
+        check(near(pressure.fullAvg300, 0.05), "disk: pressure full field");
+
+        DiskSnapshot snap;
+        snap.available = true;
+        snap.disks = rows;
+        snap.pressure = pressure;
+        check(diskSummaryText(snap).contains(QStringLiteral("sda")),
+              "disk: summary names busiest device");
+        check(diskSummaryText(snap).contains(QStringLiteral("io-pressure")),
+              "disk: summary includes io pressure");
+        check(diskDetailText(snap).contains(QStringLiteral("sda")),
+              "disk: detail lists device");
+        DiskSnapshot warm;
+        warm.available = true;
+        warm.warming = true;
+        check(diskSummaryText(warm).contains(QStringLiteral("warming")),
+              "disk: warming summary");
+    }
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

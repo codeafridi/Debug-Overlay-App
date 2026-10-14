@@ -55,6 +55,7 @@ private:
     QWidget *buildDatabasesView();
     QWidget *buildPlaceholderView(const QString &text);
     QWidget *buildCostView();
+    QWidget *buildDisksView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -89,6 +90,9 @@ private:
     QLabel *m_costWarnings = nullptr;
     QTreeWidget *m_costNamespaces = nullptr;
     QTreeWidget *m_costWorkloads = nullptr;
+    QLabel *m_diskSummary = nullptr;
+    QLabel *m_diskPressure = nullptr;
+    QTreeWidget *m_disks = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

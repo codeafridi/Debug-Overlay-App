@@ -99,6 +99,10 @@ add_library(syspeek_core STATIC
     src/Config.h
     src/CostModel.cpp
     src/CostModel.h
+    src/DiskSampler.cpp
+    src/DiskSampler.h
+    src/DiskStatus.cpp
+    src/DiskStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp
