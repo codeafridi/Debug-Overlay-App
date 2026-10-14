@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QPair>
 #include <QString>
 #include <QtGlobal>
 
@@ -12,6 +13,12 @@ struct KubePod {
     QString reason;
     QString lastReason;
     int restarts = 0;
+    double cpuRequestCores = 0.0;
+    double memRequestBytes = 0.0;
+    double cpuLimitCores = 0.0;
+    double memLimitBytes = 0.0;
+    int containersWithoutCpuRequest = 0;
+    int containersWithoutMemRequest = 0;
 };
 
 struct KubeDeployment {
@@ -75,12 +82,20 @@ struct KubeSnapshot {
     int totalPods = 0;
     int issueCount = 0;
     int eventCount = 0;
+    double costMonthly = 0.0;
+    int costMissingRequests = 0;
+    int costPods = 0;
+    QList<QPair<QString, double>> costByNamespace;
+    QList<QPair<QString, double>> costTopWorkloads;
     bool stale = false;
     QString errorMessage;
     qint64 sampledAtMs = 0;
 };
 
 KubeResources parseKubectlResources(const QByteArray &json, bool *ok);
+
+double kubeParseCpuCores(const QString &quantity);
+double kubeParseMemoryBytes(const QString &quantity);
 
 QList<KubeDiagnosis> kubeDiagnose(const QList<KubePod> &pods,
                                   const QList<KubeEvent> &events);

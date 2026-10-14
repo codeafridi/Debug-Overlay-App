@@ -183,7 +183,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
     m_views->addWidget(buildDatabasesView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Security")));
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Cost")));
+    m_views->addWidget(buildCostView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Settings")));
 
     connect(m_rail, &QListWidget::currentRowChanged, m_views,
@@ -661,6 +661,60 @@ QWidget *DashboardPanel::buildPlaceholderView(const QString &text) {
     return view;
 }
 
+QWidget *DashboardPanel::buildCostView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_costSummary = new QLabel(QStringLiteral("--"), view);
+    m_costSummary->setObjectName(QStringLiteral("ddCostSummary"));
+    m_costSummary->setFont(monoFont(14, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("MONTHLY ESTIMATE"), m_costSummary, view));
+
+    m_costWarnings = new QLabel(QStringLiteral("--"), view);
+    m_costWarnings->setObjectName(QStringLiteral("ddCostWarnings"));
+    m_costWarnings->setFont(monoFont(10));
+    m_costWarnings->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("RIGHT-SIZING"), m_costWarnings, view));
+
+    auto *tables = new QHBoxLayout;
+    tables->setSpacing(10);
+
+    m_costNamespaces = new QTreeWidget(view);
+    m_costNamespaces->setObjectName(QStringLiteral("ddCostNamespaces"));
+    m_costNamespaces->setColumnCount(2);
+    m_costNamespaces->setHeaderLabels(
+        {QStringLiteral("Namespace"), QStringLiteral("$/month")});
+    m_costNamespaces->setRootIsDecorated(false);
+    m_costNamespaces->setSelectionMode(QAbstractItemView::NoSelection);
+    m_costNamespaces->setFocusPolicy(Qt::NoFocus);
+    m_costNamespaces->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_costNamespaces->header()->setSectionResizeMode(1,
+                                                      QHeaderView::ResizeToContents);
+    tables->addWidget(
+        makeCard(QStringLiteral("BY NAMESPACE"), m_costNamespaces, view), 1);
+
+    m_costWorkloads = new QTreeWidget(view);
+    m_costWorkloads->setObjectName(QStringLiteral("ddCostWorkloads"));
+    m_costWorkloads->setColumnCount(2);
+    m_costWorkloads->setHeaderLabels(
+        {QStringLiteral("Workload"), QStringLiteral("$/month")});
+    m_costWorkloads->setRootIsDecorated(false);
+    m_costWorkloads->setSelectionMode(QAbstractItemView::NoSelection);
+    m_costWorkloads->setFocusPolicy(Qt::NoFocus);
+    m_costWorkloads->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_costWorkloads->header()->setSectionResizeMode(1,
+                                                    QHeaderView::ResizeToContents);
+    tables->addWidget(
+        makeCard(QStringLiteral("TOP WORKLOADS"), m_costWorkloads, view), 1);
+
+    layout->addLayout(tables, 1);
+    return view;
+}
+
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_appValue->setText(snapshot.appName);
     m_pidValue->setText(QStringLiteral("pid %1").arg(snapshot.pid));
@@ -952,6 +1006,39 @@ void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
                                       : QStringLiteral("--"));
     m_kubeTimeline->setText(haveData ? kubeTimelineText(snapshot.timeline)
                                      : QStringLiteral("--"));
+
+    if (haveData) {
+        m_costSummary->setText(
+            QStringLiteral("$%1/month  (%2 pods)")
+                .arg(snapshot.costMonthly, 0, 'f', 2)
+                .arg(snapshot.costPods));
+        m_costWarnings->setText(
+            snapshot.costMissingRequests > 0
+                ? QStringLiteral("warn: %1 container(s) without cpu/memory request")
+                      .arg(snapshot.costMissingRequests)
+                : QStringLiteral("all containers declare requests"));
+        m_costNamespaces->clear();
+        for (const QPair<QString, double> &entry : snapshot.costByNamespace) {
+            auto *item = new QTreeWidgetItem();
+            item->setText(0, entry.first);
+            item->setText(1, QStringLiteral("$%1").arg(entry.second, 0, 'f', 2));
+            item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+            m_costNamespaces->addTopLevelItem(item);
+        }
+        m_costWorkloads->clear();
+        for (const QPair<QString, double> &entry : snapshot.costTopWorkloads) {
+            auto *item = new QTreeWidgetItem();
+            item->setText(0, entry.first);
+            item->setText(1, QStringLiteral("$%1").arg(entry.second, 0, 'f', 2));
+            item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+            m_costWorkloads->addTopLevelItem(item);
+        }
+    } else {
+        m_costSummary->setText(QStringLiteral("--"));
+        m_costWarnings->setText(QStringLiteral("--"));
+        m_costNamespaces->clear();
+        m_costWorkloads->clear();
+    }
 }
 
 void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {

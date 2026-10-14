@@ -10,6 +10,7 @@
 #include <QStringList>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -28,14 +29,102 @@ QString badReason(const KubePod &pod) {
     return bad.contains(pod.reason) ? pod.reason : QString();
 }
 
+} // namespace
+
+double kubeParseCpuCores(const QString &quantity) {
+    const QString q = quantity.trimmed();
+    if (q.isEmpty()) {
+        return 0.0;
+    }
+    const QChar last = q.at(q.size() - 1);
+    bool ok = false;
+    if (last == QLatin1Char('m')) {
+        const double v = q.left(q.size() - 1).toDouble(&ok);
+        return ok ? v / 1000.0 : 0.0;
+    }
+    if (last == QLatin1Char('n')) {
+        const double v = q.left(q.size() - 1).toDouble(&ok);
+        return ok ? v / 1e9 : 0.0;
+    }
+    if (last == QLatin1Char('u')) {
+        const double v = q.left(q.size() - 1).toDouble(&ok);
+        return ok ? v / 1e6 : 0.0;
+    }
+    const double v = q.toDouble(&ok);
+    return ok ? v : 0.0;
+}
+
+double kubeParseMemoryBytes(const QString &quantity) {
+    const QString q = quantity.trimmed();
+    if (q.isEmpty()) {
+        return 0.0;
+    }
+
+    static const char *const binary[] = {"Ki", "Mi", "Gi", "Ti", "Pi", "Ei"};
+    for (int i = 6; i >= 1; --i) {
+        if (q.endsWith(QLatin1String(binary[i - 1]))) {
+            bool ok = false;
+            const double v = q.left(q.size() - 2).toDouble(&ok);
+            return ok ? v * std::pow(1024.0, i) : 0.0;
+        }
+    }
+
+    struct DecimalSuffix {
+        const char *s;
+        int power;
+    };
+    static const DecimalSuffix decimal[] = {{"E", 18}, {"P", 15}, {"T", 12},
+                                            {"G", 9},  {"M", 6},  {"K", 3},
+                                            {"k", 3}};
+    for (const DecimalSuffix &entry : decimal) {
+        if (q.endsWith(QLatin1String(entry.s))) {
+            bool ok = false;
+            const double v = q.left(q.size() - 1).toDouble(&ok);
+            return ok ? v * std::pow(10.0, entry.power) : 0.0;
+        }
+    }
+
+    bool ok = false;
+    const double v = q.toDouble(&ok);
+    return ok ? v : 0.0;
+}
+
+namespace {
+
 KubePod parsePod(const QJsonObject &item) {
     const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
+    const QJsonObject spec = item.value(QStringLiteral("spec")).toObject();
     const QJsonObject status = item.value(QStringLiteral("status")).toObject();
 
     KubePod pod;
     pod.ns = metadata.value(QStringLiteral("namespace")).toString();
     pod.name = metadata.value(QStringLiteral("name")).toString();
     pod.phase = status.value(QStringLiteral("phase")).toString();
+
+    const QJsonArray containers = spec.value(QStringLiteral("containers")).toArray();
+    for (const QJsonValue &containerValue : containers) {
+        const QJsonObject resources =
+            containerValue.toObject().value(QStringLiteral("resources")).toObject();
+        const QJsonObject requests =
+            resources.value(QStringLiteral("requests")).toObject();
+        const QJsonObject limits =
+            resources.value(QStringLiteral("limits")).toObject();
+        const QString cpuRequest = requests.value(QStringLiteral("cpu")).toString();
+        const QString memRequest =
+            requests.value(QStringLiteral("memory")).toString();
+        pod.cpuRequestCores += kubeParseCpuCores(cpuRequest);
+        pod.memRequestBytes += kubeParseMemoryBytes(memRequest);
+        pod.cpuLimitCores +=
+            kubeParseCpuCores(limits.value(QStringLiteral("cpu")).toString());
+        pod.memLimitBytes +=
+            kubeParseMemoryBytes(limits.value(QStringLiteral("memory")).toString());
+        if (cpuRequest.isEmpty()) {
+            ++pod.containersWithoutCpuRequest;
+        }
+        if (memRequest.isEmpty()) {
+            ++pod.containersWithoutMemRequest;
+        }
+    }
 
     const QJsonArray containerStatuses =
         status.value(QStringLiteral("containerStatuses")).toArray();

@@ -68,6 +68,11 @@ void validate(Config &config) {
     if (config.synthetic.targets.size() > 32) {
         config.synthetic.targets = config.synthetic.targets.mid(0, 32);
     }
+
+    config.cost.cpuPerCoreHour =
+        clampDouble(config.cost.cpuPerCoreHour, 0.0, 1000.0);
+    config.cost.memPerGbHour =
+        clampDouble(config.cost.memPerGbHour, 0.0, 1000.0);
 }
 
 } // namespace
@@ -213,6 +218,21 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int timeout = settings.value(QStringLiteral("timeout_ms")).toInt();
         if (timeout > 0) {
             config.synthetic.timeoutMs = timeout;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("cost"));
+    {
+        const double cpu =
+            settings.value(QStringLiteral("cpu_per_core_hour")).toDouble();
+        if (cpu > 0.0) {
+            config.cost.cpuPerCoreHour = cpu;
+        }
+        const double mem =
+            settings.value(QStringLiteral("mem_per_gb_hour")).toDouble();
+        if (mem > 0.0) {
+            config.cost.memPerGbHour = mem;
         }
     }
     settings.endGroup();

@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
     dockerThread->start();
 
     auto *kubeThread = new QThread;
-    auto *kube = new KubeSource(config.kube);
+    auto *kube = new KubeSource(config.kube, config.cost);
     kube->moveToThread(kubeThread);
     QObject::connect(kubeThread, &QThread::started, kube, &KubeSource::start);
     QObject::connect(kubeThread, &QThread::finished, kube,

@@ -97,6 +97,8 @@ add_library(syspeek_core STATIC
     src/DockerSource.h
     src/Config.cpp
     src/Config.h
+    src/CostModel.cpp
+    src/CostModel.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

@@ -54,6 +54,7 @@ private:
     QWidget *buildInstrumentationView();
     QWidget *buildDatabasesView();
     QWidget *buildPlaceholderView(const QString &text);
+    QWidget *buildCostView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -84,6 +85,10 @@ private:
     QLabel *m_kubeEvents = nullptr;
     QLabel *m_kubeDiagnosis = nullptr;
     QLabel *m_kubeTimeline = nullptr;
+    QLabel *m_costSummary = nullptr;
+    QLabel *m_costWarnings = nullptr;
+    QTreeWidget *m_costNamespaces = nullptr;
+    QTreeWidget *m_costWorkloads = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

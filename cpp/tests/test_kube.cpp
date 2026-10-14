@@ -1,5 +1,8 @@
+#include "CostModel.h"
 #include "KubeStatus.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -245,6 +248,77 @@ int main() {
               "diff: restart, create, rollout, readiness captured");
         check(kubeTimelineText(changes).contains(QStringLiteral("web-1")),
               "timeline text lists change");
+    }
+
+    {
+        auto approxEq = [](double a, double b) {
+            const double scale = std::max(1.0, std::max(std::fabs(a), std::fabs(b)));
+            return std::fabs(a - b) <= 1e-6 * scale;
+        };
+
+        check(approxEq(kubeParseCpuCores(QStringLiteral("100m")), 0.1),
+              "cpu: 100m -> 0.1 cores");
+        check(approxEq(kubeParseCpuCores(QStringLiteral("1500m")), 1.5),
+              "cpu: 1500m -> 1.5 cores");
+        check(approxEq(kubeParseCpuCores(QStringLiteral("2")), 2.0),
+              "cpu: 2 -> 2 cores");
+        check(approxEq(kubeParseCpuCores(QString()), 0.0),
+              "cpu: empty -> 0");
+
+        check(approxEq(kubeParseMemoryBytes(QStringLiteral("256Mi")),
+                       268435456.0),
+              "mem: 256Mi -> bytes");
+        check(approxEq(kubeParseMemoryBytes(QStringLiteral("1Gi")), 1073741824.0),
+              "mem: 1Gi -> bytes");
+        check(approxEq(kubeParseMemoryBytes(QStringLiteral("500M")), 5e8),
+              "mem: 500M -> bytes (decimal)");
+        check(approxEq(kubeParseMemoryBytes(QStringLiteral("128974848")),
+                       128974848.0),
+              "mem: plain bytes");
+
+        const QByteArray costJson = QByteArrayLiteral(
+            "{\"items\":["
+            "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"prod\",\"name\":\"api-1\"},"
+            "\"spec\":{\"containers\":["
+            "{\"resources\":{\"requests\":{\"cpu\":\"500m\",\"memory\":\"512Mi\"},"
+            "\"limits\":{\"cpu\":\"1\",\"memory\":\"1Gi\"}}},"
+            "{\"resources\":{\"requests\":{\"memory\":\"256Mi\"}}}]},"
+            "\"status\":{\"phase\":\"Running\"}},"
+            "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"dev\",\"name\":\"job-1\"},"
+            "\"spec\":{\"containers\":["
+            "{\"resources\":{\"requests\":{\"cpu\":\"1000m\",\"memory\":\"2Gi\"}}}]},"
+            "\"status\":{\"phase\":\"Running\"}}"
+            "]}");
+
+        bool costOk = false;
+        const KubeResources costRes = parseKubectlResources(costJson, &costOk);
+        check(costOk && costRes.pods.size() == 2, "cost json parses two pods");
+
+        const KubePod &api = costRes.pods.at(0);
+        check(approxEq(api.cpuRequestCores, 0.5), "pod: summed cpu request");
+        check(approxEq(api.memRequestBytes, 805306368.0), "pod: summed mem request");
+        check(approxEq(api.cpuLimitCores, 1.0), "pod: summed cpu limit");
+        check(approxEq(api.memLimitBytes, 1073741824.0), "pod: summed mem limit");
+        check(api.containersWithoutCpuRequest == 1,
+              "pod: counted container without cpu request");
+        check(api.containersWithoutMemRequest == 0,
+              "pod: counted container with mem request");
+
+        const double cpuPrice = 0.03;
+        const double memPrice = 0.004;
+        const CostSummary cost =
+            computeClusterCost(costRes.pods, cpuPrice, memPrice);
+        // prod: (0.5*0.03 + 0.75*0.004)*730 = 13.14
+        // dev:  (1.0*0.03 + 2.0*0.004)*730  = 27.74
+        check(approxEq(cost.totalMonthly, 40.88), "cost: total monthly");
+        check(cost.podsPriced == 2, "cost: priced two pods");
+        check(cost.missingRequestContainers == 1, "cost: missing request count");
+        check(cost.byNamespace.size() == 2
+                  && cost.byNamespace.at(0).first == QStringLiteral("dev"),
+              "cost: namespaces sorted desc by cost");
+        check(cost.topWorkloads.size() == 2
+                  && cost.topWorkloads.at(0).pod == QStringLiteral("job-1"),
+              "cost: top workload first is the largest");
     }
 
     std::printf("%d failure(s)\n", failures);

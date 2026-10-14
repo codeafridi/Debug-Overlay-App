@@ -1,5 +1,7 @@
 #include "KubeSource.h"
 
+#include "CostModel.h"
+
 #include <QDateTime>
 #include <QStandardPaths>
 #include <QTimer>
@@ -10,9 +12,11 @@ namespace {
 constexpr qint64 kMaxOutputBytes = 1LL << 20;
 } // namespace
 
-KubeSource::KubeSource(const KubeConfig &config, QObject *parent)
+KubeSource::KubeSource(const KubeConfig &config, const CostConfig &costConfig,
+                       QObject *parent)
     : QObject(parent)
-    , m_config(config) {
+    , m_config(config)
+    , m_costConfig(costConfig) {
     m_backoffMs = m_config.backoffStartMs;
 }
 
@@ -230,6 +234,20 @@ void KubeSource::emitSnapshot(KubeState state, const QString &message,
             kubeIssueCount(resources.pods, resources.deployments);
         snapshot.eventCount = kubeWarningCount(resources.events);
         snapshot.diagnoses = kubeDiagnose(resources.pods, resources.events);
+
+        const CostSummary cost =
+            computeClusterCost(resources.pods, m_costConfig.cpuPerCoreHour,
+                               m_costConfig.memPerGbHour);
+        snapshot.costMonthly = cost.totalMonthly;
+        snapshot.costMissingRequests = cost.missingRequestContainers;
+        snapshot.costPods = cost.podsPriced;
+        snapshot.costByNamespace = cost.byNamespace;
+        snapshot.costTopWorkloads.clear();
+        for (const WorkloadCost &workload : cost.topWorkloads) {
+            snapshot.costTopWorkloads.append(qMakePair(
+                workload.ns + QStringLiteral("/") + workload.pod,
+                workload.monthly));
+        }
 
         if (m_havePrev) {
             const QList<KubeChange> changes =

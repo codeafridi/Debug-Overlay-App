@@ -14,6 +14,7 @@ class KubeSource : public QObject {
 
 public:
     explicit KubeSource(const KubeConfig &config = KubeConfig{},
+                        const CostConfig &costConfig = CostConfig{},
                         QObject *parent = nullptr);
 
 public slots:
@@ -46,6 +47,7 @@ private:
     QTimer *m_killTimer = nullptr;
 
     KubeConfig m_config;
+    CostConfig m_costConfig;
     QString m_kubectlPath;
     QByteArray m_stdout;
     QByteArray m_stderr;

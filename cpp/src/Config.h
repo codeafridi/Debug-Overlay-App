@@ -37,11 +37,17 @@ struct SyntheticConfig {
     int timeoutMs = 5000;
 };
 
+struct CostConfig {
+    double cpuPerCoreHour = 0.031611;
+    double memPerGbHour = 0.004237;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
     KubeConfig kube;
     SyntheticConfig synthetic;
+    CostConfig cost;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };
