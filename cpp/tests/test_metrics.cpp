@@ -10,6 +10,7 @@
 #include "TcpStatus.h"
 #include "SecurityStatus.h"
 #include "LogParser.h"
+#include "TraceStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -509,6 +510,54 @@ int main(int argc, char *argv[]) {
         check(saw200 && saw500, "logs: facets aggregate http codes");
         check(logPipelineSummaryText(facets).contains(QStringLiteral("format")),
               "logs: pipeline summary text");
+    }
+
+    {
+        const QByteArray otlp = QByteArrayLiteral(
+            "{\"resourceSpans\":["
+            "{\"resource\":{\"attributes\":[{\"key\":\"service.name\","
+            "\"value\":{\"stringValue\":\"frontend\"}}]},"
+            "\"scopeSpans\":[{\"spans\":["
+            "{\"traceId\":\"t1\",\"spanId\":\"s1\",\"name\":\"GET /checkout\","
+            "\"kind\":2,\"startTimeUnixNano\":\"1000000000\","
+            "\"endTimeUnixNano\":\"1050000000\",\"status\":{\"code\":1}},"
+            "{\"traceId\":\"t1\",\"spanId\":\"s2\",\"parentSpanId\":\"s1\","
+            "\"name\":\"GET /pay\",\"kind\":3,\"startTimeUnixNano\":\"1010000000\","
+            "\"endTimeUnixNano\":\"1030000000\",\"status\":{\"code\":2}}]}]},"
+            "{\"resource\":{\"attributes\":[{\"key\":\"service.name\","
+            "\"value\":{\"stringValue\":\"payments\"}}]},"
+            "\"scopeSpans\":[{\"spans\":["
+            "{\"traceId\":\"t1\",\"spanId\":\"s3\",\"parentSpanId\":\"s2\","
+            "\"name\":\"POST /charge\",\"kind\":2,\"startTimeUnixNano\":\"1015000000\","
+            "\"endTimeUnixNano\":\"1025000000\",\"status\":{\"code\":1}}]}]}]}");
+
+        bool ok = false;
+        const QList<Span> spans = parseOtlpTraces(otlp, &ok);
+        check(ok && spans.size() == 3, "traces: parsed three OTLP spans");
+        check(spans.at(0).service == QStringLiteral("frontend"),
+              "traces: resource service.name applied");
+        check(spans.at(1).status == QStringLiteral("error"),
+              "traces: error status decoded");
+
+        const TraceSnapshot snapshot = summarizeTraces(spans);
+        check(snapshot.spanCount == 3 && snapshot.traceCount == 1,
+              "traces: span/trace counts");
+        check(snapshot.errorCount == 1, "traces: error count");
+        check(snapshot.services.size() == 2, "traces: two services");
+        check(snapshot.edges.size() == 1
+                  && snapshot.edges.at(0).from == QStringLiteral("frontend")
+                  && snapshot.edges.at(0).to == QStringLiteral("payments"),
+              "traces: cross-service edge frontend->payments");
+        check(snapshot.recent.size() == 1
+                  && snapshot.recent.at(0).rootService == QStringLiteral("frontend"),
+              "traces: recent trace root service");
+        check(std::fabs(snapshot.recent.at(0).durationMs - 50.0) < 1e-6,
+              "traces: trace duration 50ms");
+        check(snapshot.recent.at(0).hasError, "traces: trace flagged error");
+        check(traceSummaryText(snapshot).contains(QStringLiteral("traces")),
+              "traces: summary text");
+        check(traceServiceMapText(snapshot).contains(QStringLiteral("->")),
+              "traces: service map text");
     }
 
     std::printf("%d failure(s)\n", failures);

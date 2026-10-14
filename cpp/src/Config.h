@@ -42,12 +42,20 @@ struct CostConfig {
     double memPerGbHour = 0.004237;
 };
 
+struct TraceConfig {
+    bool enabled = true;
+    int port = 4318;
+    int maxSpans = 5000;
+    int emitIntervalMs = 1000;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
     KubeConfig kube;
     SyntheticConfig synthetic;
     CostConfig cost;
+    TraceConfig traces;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

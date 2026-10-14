@@ -8,6 +8,7 @@
 #include "ServicesStatus.h"
 #include "AlertEngine.h"
 #include "SyntheticStatus.h"
+#include "TraceStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -33,6 +34,7 @@ public:
     void setJournalSnapshot(const JournalSnapshot &snapshot);
     void setAlerts(const QList<Alert> &alerts);
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
+    void setTraceSnapshot(const TraceSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -57,6 +59,7 @@ private:
     QWidget *buildCostView();
     QWidget *buildDisksView();
     QWidget *buildSecurityView();
+    QWidget *buildTracesView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -98,6 +101,10 @@ private:
     QTreeWidget *m_disks = nullptr;
     QLabel *m_securitySummary = nullptr;
     QLabel *m_security = nullptr;
+    QLabel *m_traceSummary = nullptr;
+    QLabel *m_traceMap = nullptr;
+    QLabel *m_traceServices = nullptr;
+    QLabel *m_traceRecent = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

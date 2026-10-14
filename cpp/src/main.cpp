@@ -11,6 +11,7 @@
 #include "ServicesSource.h"
 #include "JournalSource.h"
 #include "SyntheticSource.h"
+#include "TraceSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -96,6 +97,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<ServicesSnapshot>("ServicesSnapshot");
     qRegisterMetaType<JournalSnapshot>("JournalSnapshot");
     qRegisterMetaType<SyntheticSnapshot>("SyntheticSnapshot");
+    qRegisterMetaType<TraceSnapshot>("TraceSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -251,6 +253,19 @@ int main(int argc, char *argv[]) {
                          hud.setSyntheticSnapshot(snapshot);
                      });
     syntheticThread->start();
+
+    auto *traceThread = new QThread;
+    auto *trace = new TraceSource(config.traces);
+    trace->moveToThread(traceThread);
+    QObject::connect(traceThread, &QThread::started, trace,
+                     &TraceSource::start);
+    QObject::connect(traceThread, &QThread::finished, trace,
+                     &QObject::deleteLater);
+    QObject::connect(trace, &TraceSource::tracesReady, &hud,
+                     [&hud](const TraceSnapshot &snapshot) {
+                         hud.setTraceSnapshot(snapshot);
+                     });
+    traceThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

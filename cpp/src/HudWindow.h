@@ -8,6 +8,7 @@
 #include "AlertEngine.h"
 #include "Notifier.h"
 #include "SyntheticStatus.h"
+#include "TraceStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -41,6 +42,8 @@ public:
     void setNotifier(std::unique_ptr<Notifier> notifier);
 
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
+
+    void setTraceSnapshot(const TraceSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

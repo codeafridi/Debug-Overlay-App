@@ -427,6 +427,12 @@ void HudWindow::setSyntheticSnapshot(const SyntheticSnapshot &snapshot) {
     }
 }
 
+void HudWindow::setTraceSnapshot(const TraceSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setTraceSnapshot(snapshot);
+    }
+}
+
 void HudWindow::evaluateAlerts() {
     if (m_notifier == nullptr) {
         return;

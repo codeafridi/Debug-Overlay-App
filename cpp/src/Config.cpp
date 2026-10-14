@@ -73,6 +73,11 @@ void validate(Config &config) {
         clampDouble(config.cost.cpuPerCoreHour, 0.0, 1000.0);
     config.cost.memPerGbHour =
         clampDouble(config.cost.memPerGbHour, 0.0, 1000.0);
+
+    config.traces.port = clampInt(config.traces.port, 1, 65535);
+    config.traces.maxSpans = clampInt(config.traces.maxSpans, 100, 100000);
+    config.traces.emitIntervalMs =
+        clampInt(config.traces.emitIntervalMs, 200, 60000);
 }
 
 } // namespace
@@ -233,6 +238,19 @@ Config loadConfig(const QString &path, QString *errorMessage) {
             settings.value(QStringLiteral("mem_per_gb_hour")).toDouble();
         if (mem > 0.0) {
             config.cost.memPerGbHour = mem;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("traces"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.traces.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        const int port = settings.value(QStringLiteral("port")).toInt();
+        if (port > 0) {
+            config.traces.port = port;
         }
     }
     settings.endGroup();

@@ -17,7 +17,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
+find_package(Qt6 REQUIRED COMPONENTS Widgets DBus Network)
 
 add_library(syspeek_core STATIC
     src/HudWindow.cpp
@@ -111,13 +111,17 @@ add_library(syspeek_core STATIC
     src/SecurityStatus.h
     src/LogParser.cpp
     src/LogParser.h
+    src/TraceSource.cpp
+    src/TraceSource.h
+    src/TraceStatus.cpp
+    src/TraceStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp
     src/KubeSource.h)
 
 target_include_directories(syspeek_core PUBLIC src)
-target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::DBus)
+target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::DBus Qt6::Network)
 target_compile_options(syspeek_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra>)
 

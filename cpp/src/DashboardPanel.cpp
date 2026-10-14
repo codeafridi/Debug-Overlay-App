@@ -182,7 +182,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildEndpointsView());
     m_views->addWidget(buildSyntheticView());
     m_views->addWidget(buildInstrumentationView());
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Traces")));
+    m_views->addWidget(buildTracesView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
     m_views->addWidget(buildDatabasesView());
     m_views->addWidget(buildSecurityView());    m_views->addWidget(buildCostView());
@@ -801,6 +801,42 @@ QWidget *DashboardPanel::buildSecurityView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildTracesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_traceSummary = new QLabel(QStringLiteral("--"), view);
+    m_traceSummary->setObjectName(QStringLiteral("ddTraceSummary"));
+    m_traceSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("APM (OTLP :4318)"), m_traceSummary, view));
+
+    auto *row = new QHBoxLayout;
+    row->setSpacing(10);
+    m_traceMap = new QLabel(QStringLiteral("--"), view);
+    m_traceMap->setObjectName(QStringLiteral("ddTraceMap"));
+    m_traceMap->setFont(monoFont(10));
+    m_traceMap->setWordWrap(false);
+    row->addWidget(makeCard(QStringLiteral("SERVICE MAP"), m_traceMap, view), 1);
+
+    m_traceServices = new QLabel(QStringLiteral("--"), view);
+    m_traceServices->setObjectName(QStringLiteral("ddTraceServices"));
+    m_traceServices->setFont(monoFont(10));
+    m_traceServices->setWordWrap(false);
+    row->addWidget(makeCard(QStringLiteral("SERVICE LATENCY"), m_traceServices, view), 1);
+    layout->addLayout(row, 1);
+
+    m_traceRecent = new QLabel(QStringLiteral("--"), view);
+    m_traceRecent->setObjectName(QStringLiteral("ddTraceRecent"));
+    m_traceRecent->setFont(monoFont(10));
+    m_traceRecent->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("RECENT TRACES"), m_traceRecent, view), 1);
+
+    return view;
+}
+
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_appValue->setText(snapshot.appName);
     m_pidValue->setText(QStringLiteral("pid %1").arg(snapshot.pid));
@@ -1251,4 +1287,11 @@ void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
 void DashboardPanel::setSyntheticSnapshot(const SyntheticSnapshot &snapshot) {
     m_syntheticSummary->setText(syntheticSummaryText(snapshot));
     m_synthetic->setText(syntheticDetailText(snapshot));
+}
+
+void DashboardPanel::setTraceSnapshot(const TraceSnapshot &snapshot) {
+    m_traceSummary->setText(traceSummaryText(snapshot));
+    m_traceMap->setText(traceServiceMapText(snapshot));
+    m_traceServices->setText(traceServicesText(snapshot));
+    m_traceRecent->setText(traceRecentText(snapshot));
 }
