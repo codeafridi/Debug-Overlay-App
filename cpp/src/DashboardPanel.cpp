@@ -184,8 +184,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Traces")));
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
     m_views->addWidget(buildDatabasesView());
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Security")));
-    m_views->addWidget(buildCostView());
+    m_views->addWidget(buildSecurityView());    m_views->addWidget(buildCostView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Settings")));
 
     connect(m_rail, &QListWidget::currentRowChanged, m_views,
@@ -225,6 +224,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddListen, #ddStates, #ddIfaces { color: #c4cad1; }"
         "#ddTcpSummary { color: #c4cad1; }"
         "#ddTcp { color: #9aa2ac; }"
+        "#ddSecuritySummary { color: #c4cad1; }"
+        "#ddSecurity { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -770,6 +771,28 @@ QWidget *DashboardPanel::buildDisksView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildSecurityView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_securitySummary = new QLabel(QStringLiteral("--"), view);
+    m_securitySummary->setObjectName(QStringLiteral("ddSecuritySummary"));
+    m_securitySummary->setFont(monoFont(14, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("SANDBOX EXPOSURE"), m_securitySummary, view));
+
+    m_security = new QLabel(QStringLiteral("--"), view);
+    m_security->setObjectName(QStringLiteral("ddSecurity"));
+    m_security->setFont(monoFont(10));
+    m_security->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("HARDENING FINDINGS"), m_security, view), 1);
+
+    return view;
+}
+
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_appValue->setText(snapshot.appName);
     m_pidValue->setText(QStringLiteral("pid %1").arg(snapshot.pid));
@@ -976,6 +999,14 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
             item->setForeground(0, QColor(QStringLiteral("#d8b25f")));
         }
         m_disks->addTopLevelItem(item);
+    }
+
+    if (snapshot.security.available) {
+        m_securitySummary->setText(securitySummaryText(snapshot.security));
+        m_security->setText(securityDetailText(snapshot.security));
+    } else {
+        m_securitySummary->setText(QStringLiteral("--"));
+        m_security->setText(QStringLiteral("--"));
     }
 
     m_focusDetail->setText(

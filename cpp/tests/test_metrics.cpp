@@ -8,6 +8,7 @@
 #include "SyntheticStatus.h"
 #include "DiskStatus.h"
 #include "TcpStatus.h"
+#include "SecurityStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -382,6 +383,50 @@ int main(int argc, char *argv[]) {
               "tcp: summary mentions retrans");
         check(tcpHealthDetailText(health).contains(QStringLiteral("syn-retr")),
               "tcp: detail lists syn retrans");
+    }
+
+    {
+        const QStringList caps =
+            decodeCapabilities((1ULL << 21) | (1ULL << 16) | (1ULL << 12));
+        check(caps.contains(QStringLiteral("CAP_SYS_ADMIN"))
+                  && caps.contains(QStringLiteral("CAP_SYS_MODULE"))
+                  && caps.contains(QStringLiteral("CAP_NET_ADMIN")),
+              "security: capability decode");
+
+        SecurityInput hardened;
+        hardened.capKnown = true;
+        hardened.capEff = 0;
+        hardened.seccomp = 2;
+        hardened.noNewPrivs = true;
+        hardened.macConfined = true;
+        hardened.macLabel = QStringLiteral("unconfined-userns");
+        hardened.isolatedNamespaces = 7;
+        hardened.totalNamespaces = 7;
+        const SecurityPosture ok = evaluateSecurity(hardened);
+        check(ok.available && std::fabs(ok.exposure - 0.2) < 1e-6,
+              "security: hardened exposure is low");
+        check(ok.grade == QStringLiteral("low"), "security: hardened grade low");
+
+        SecurityInput exposed;
+        exposed.capKnown = true;
+        exposed.capEff = (1ULL << 21) | (1ULL << 16);
+        exposed.seccomp = 0;
+        exposed.noNewPrivs = false;
+        exposed.macConfined = false;
+        exposed.rootUser = true;
+        exposed.deletedExe = true;
+        exposed.isolatedNamespaces = 0;
+        exposed.totalNamespaces = 7;
+        const SecurityPosture bad = evaluateSecurity(exposed);
+        check(std::fabs(bad.exposure - 4.8) < 1e-6,
+              "security: exposed exposure sums correctly");
+        check(bad.grade == QStringLiteral("medium"),
+              "security: exposed grade medium");
+        check(bad.exposedCount >= 6, "security: counts exposed findings");
+        check(securitySummaryText(bad).contains(QStringLiteral("exposure")),
+              "security: summary text");
+        check(securityDetailText(bad).contains(QStringLiteral("CAP_SYS_ADMIN")),
+              "security: detail lists capability");
     }
 
     std::printf("%d failure(s)\n", failures);

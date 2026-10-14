@@ -222,6 +222,11 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
 
     linuxproc::processInstrumentation(focus.identity.pid, snap.instrumentation);
 
+    SecurityInput securityInput;
+    if (readSecurityInput(focus.identity.pid, securityInput)) {
+        snap.security = evaluateSecurity(securityInput);
+    }
+
     QList<QPair<QString, int>> counts;
     for (auto it = stateCounts.constBegin(); it != stateCounts.constEnd(); ++it) {
         counts.append(qMakePair(it.key(), it.value()));

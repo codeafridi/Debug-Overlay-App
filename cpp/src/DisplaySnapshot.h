@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DiskStatus.h"
+#include "SecurityStatus.h"
 #include "TcpStatus.h"
 
 #include <QList>
@@ -91,6 +92,7 @@ struct DisplaySnapshot {
     double diskIntervalMs = 0.0;
     TcpHealth tcpHealth;
     bool tcpHealthAvailable = false;
+    SecurityPosture security;
     int focusThreads = 0;
     int focusFds = -1;
     unsigned long long focusVolCtx = 0;
