@@ -11,6 +11,7 @@
 #include "IoRateTracker.h"
 #include "NetRateTracker.h"
 #include "ProcessIdentity.h"
+#include "SbomSource.h"
 #include "TcpSampler.h"
 
 #include <QObject>
@@ -44,6 +45,7 @@ private:
     HostSampler m_hostSampler;
     DiskSampler m_diskSampler;
     TcpSampler m_tcpSampler;
+    SbomSource m_sbomSource;
     IoRateTracker m_ioTracker;
     NetRateTracker m_netTracker;
     GroupCache m_groupCache;

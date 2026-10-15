@@ -60,6 +60,7 @@ private:
     QWidget *buildDisksView();
     QWidget *buildSecurityView();
     QWidget *buildTracesView();
+    QWidget *buildSoftwareView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -105,6 +106,8 @@ private:
     QLabel *m_traceMap = nullptr;
     QLabel *m_traceServices = nullptr;
     QLabel *m_traceRecent = nullptr;
+    QLabel *m_softwareSummary = nullptr;
+    QLabel *m_software = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

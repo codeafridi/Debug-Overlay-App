@@ -115,6 +115,10 @@ add_library(syspeek_core STATIC
     src/TraceSource.h
     src/TraceStatus.cpp
     src/TraceStatus.h
+    src/SbomSource.cpp
+    src/SbomSource.h
+    src/SbomStatus.cpp
+    src/SbomStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

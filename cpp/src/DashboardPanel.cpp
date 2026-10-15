@@ -157,6 +157,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
                       QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
                       QStringLiteral("Services"), QStringLiteral("Logs"),
                       QStringLiteral("Errors"), QStringLiteral("Dependencies"),
+                      QStringLiteral("Software"),
                       QStringLiteral("Endpoints"),
                       QStringLiteral("Synthetic"),
                       QStringLiteral("Instrumentation"),
@@ -179,6 +180,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildLogsView());
     m_views->addWidget(buildErrorsView());
     m_views->addWidget(buildDependenciesView());
+    m_views->addWidget(buildSoftwareView());
     m_views->addWidget(buildEndpointsView());
     m_views->addWidget(buildSyntheticView());
     m_views->addWidget(buildInstrumentationView());
@@ -227,6 +229,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddTcp { color: #9aa2ac; }"
         "#ddSecuritySummary { color: #c4cad1; }"
         "#ddSecurity { color: #9aa2ac; }"
+        "#ddSoftwareSummary { color: #c4cad1; }"
+        "#ddSoftware { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -837,6 +841,28 @@ QWidget *DashboardPanel::buildTracesView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildSoftwareView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_softwareSummary = new QLabel(QStringLiteral("--"), view);
+    m_softwareSummary->setObjectName(QStringLiteral("ddSoftwareSummary"));
+    m_softwareSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("SBOM (focused app)"), m_softwareSummary, view));
+
+    m_software = new QLabel(QStringLiteral("--"), view);
+    m_software->setObjectName(QStringLiteral("ddSoftware"));
+    m_software->setFont(monoFont(10));
+    m_software->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("PACKAGES"), m_software, view), 1);
+
+    return view;
+}
+
 void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_appValue->setText(snapshot.appName);
     m_pidValue->setText(QStringLiteral("pid %1").arg(snapshot.pid));
@@ -1052,6 +1078,10 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         m_securitySummary->setText(QStringLiteral("--"));
         m_security->setText(QStringLiteral("--"));
     }
+
+    m_softwareSummary->setText(sbomSummaryText(snapshot.sbom));
+    m_software->setText(snapshot.sbom.available ? sbomDetailText(snapshot.sbom)
+                                                : QStringLiteral("--"));
 
     m_focusDetail->setText(
         QStringLiteral("threads  %1\nfds      %2\nctx sw   %3 vol / %4 invol\n"

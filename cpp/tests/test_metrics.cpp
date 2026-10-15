@@ -11,6 +11,7 @@
 #include "SecurityStatus.h"
 #include "LogParser.h"
 #include "TraceStatus.h"
+#include "SbomStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -558,6 +559,52 @@ int main(int argc, char *argv[]) {
               "traces: summary text");
         check(traceServiceMapText(snapshot).contains(QStringLiteral("->")),
               "traces: service map text");
+    }
+
+    {
+        const QByteArray status = QByteArrayLiteral(
+            "Package: libc6\nStatus: install ok installed\nArchitecture: amd64\n"
+            "Source: glibc\nVersion: 2.43-2ubuntu2.4\n\n"
+            "Package: zlib1g\nArchitecture: amd64\nVersion: 1:1.3\n\n");
+        const QList<DpkgPackage> pkgs = parseDpkgStatus(status);
+        check(pkgs.size() == 2, "sbom: parsed two packages");
+        QHash<QString, DpkgPackage> byName;
+        for (const DpkgPackage &pkg : pkgs) {
+            byName.insert(pkg.name, pkg);
+        }
+        check(byName.value(QStringLiteral("libc6")).version
+                      == QStringLiteral("2.43-2ubuntu2.4")
+                  && byName.value(QStringLiteral("libc6")).arch
+                         == QStringLiteral("amd64")
+                  && byName.value(QStringLiteral("libc6")).source
+                         == QStringLiteral("glibc"),
+              "sbom: package metadata");
+        check(makePurl(byName.value(QStringLiteral("libc6")))
+                  == QStringLiteral(
+                      "pkg:deb/ubuntu/libc6@2.43-2ubuntu2.4?arch=amd64"),
+              "sbom: purl");
+
+        QHash<QString, QString> fileOwner;
+        fileOwner.insert(QStringLiteral("/usr/lib/x86_64-linux-gnu/libc.so.6"),
+                         QStringLiteral("libc6"));
+        fileOwner.insert(QStringLiteral("/usr/lib/x86_64-linux-gnu/libz.so.1"),
+                         QStringLiteral("zlib1g"));
+        const QStringList paths = {
+            QStringLiteral("/usr/lib/x86_64-linux-gnu/libc.so.6"),
+            QStringLiteral("/usr/lib/x86_64-linux-gnu/libz.so.1"),
+            QStringLiteral("/usr/lib/x86_64-linux-gnu/libc.so.6"),
+            QStringLiteral("/opt/app/app")};
+        const SbomReport report = buildSbom(paths, byName, fileOwner);
+        check(report.available && report.libraryCount == 4,
+              "sbom: library count");
+        check(report.resolvedCount == 2, "sbom: two owning packages");
+        check(report.entries.at(0).package == QStringLiteral("libc6")
+                  && report.entries.at(0).files.size() == 1,
+              "sbom: dedup + sorted, libc6 first");
+        check(sbomSummaryText(report).contains(QStringLiteral("2 packages")),
+              "sbom: summary text");
+        check(sbomDetailText(report).contains(QStringLiteral("libc6@")),
+              "sbom: detail text");
     }
 
     std::printf("%d failure(s)\n", failures);

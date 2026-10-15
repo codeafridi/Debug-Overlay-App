@@ -5,6 +5,7 @@
 #include "MemoryFormat.h"
 #include "ProcessGrouper.h"
 
+#include <QFile>
 #include <QSet>
 #include <QTimer>
 
@@ -139,6 +140,14 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         snap.focusIoWritePerSec = rate.writePerSec;
         snap.focusOpenFiles = linuxproc::fdTargets(rootPid);
         linuxproc::sharedLibraries(rootPid, snap.dependencies);
+
+        QStringList sbomPaths = snap.dependencies;
+        const QString exe =
+            QFile::symLinkTarget(QStringLiteral("/proc/%1/exe").arg(rootPid));
+        if (!exe.isEmpty()) {
+            sbomPaths.append(exe);
+        }
+        snap.sbom = m_sbomSource.resolve(sbomPaths);
     }
 
     snap.processes = rows;

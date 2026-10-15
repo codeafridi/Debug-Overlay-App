@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DiskStatus.h"
+#include "SbomStatus.h"
 #include "SecurityStatus.h"
 #include "TcpStatus.h"
 
@@ -93,6 +94,7 @@ struct DisplaySnapshot {
     TcpHealth tcpHealth;
     bool tcpHealthAvailable = false;
     SecurityPosture security;
+    SbomReport sbom;
     int focusThreads = 0;
     int focusFds = -1;
     unsigned long long focusVolCtx = 0;
