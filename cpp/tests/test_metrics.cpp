@@ -14,6 +14,7 @@
 #include "SbomStatus.h"
 #include "PathStatus.h"
 #include "StatsdStatus.h"
+#include "SensitiveStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -689,6 +690,50 @@ int main(int argc, char *argv[]) {
         check(checkedSet, "statsd: set unique count");
         check(statsdSummaryText(snap).contains(QStringLiteral("metrics")),
               "statsd: summary text");
+    }
+
+    {
+        const QList<SensitiveFinding> aws = scanSensitiveLine(
+            QStringLiteral("export AWS_KEY=AKIAIOSFODNN7EXAMPLE done"));
+        check(!aws.isEmpty() && aws.first().id == QStringLiteral("aws-access-token"),
+              "sensitive: detects AWS access key");
+        check(!aws.first().sample.contains(QStringLiteral("IOSFODNN7EXAMPLE")),
+              "sensitive: redacts the secret value");
+
+        check(!scanSensitiveLine(
+                   QStringLiteral("token: ghp_0123456789abcdefghijklmnopqrstuvwxyz"))
+                   .isEmpty(),
+              "sensitive: detects GitHub PAT");
+        check(!scanSensitiveLine(
+                   QStringLiteral("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+                                  "abcdefghij"))
+                   .isEmpty(),
+              "sensitive: detects JWT");
+        check(!scanSensitiveLine(
+                   QStringLiteral("sk_live_abcdefghijklmnop12345"))
+                   .isEmpty(),
+              "sensitive: detects Stripe key");
+        check(!scanSensitiveLine(QStringLiteral("contact alice@example.com now"))
+                   .isEmpty(),
+              "sensitive: detects email");
+        check(!scanSensitiveLine(QStringLiteral("card 4242 4242 4242 4242 on file"))
+                   .isEmpty(),
+              "sensitive: detects Luhn-valid card");
+        check(scanSensitiveLine(QStringLiteral("plain log line with no secrets"))
+                  .isEmpty(),
+              "sensitive: clean line has no findings");
+
+        QStringList lines;
+        lines << QStringLiteral("user AKIAIOSFODNN7EXAMPLE logged in")
+              << QStringLiteral("mail bob@example.org")
+              << QStringLiteral("nothing here");
+        const SensitiveReport report = scanSensitiveLines(lines);
+        check(report.scannedLines == 3 && report.findings >= 2,
+              "sensitive: report aggregates findings");
+        check(sensitiveSummaryText(report).contains(QStringLiteral("finding")),
+              "sensitive: summary text");
+        check(sensitiveDetailText(report).contains(QStringLiteral("aws-access-token")),
+              "sensitive: detail names the rule");
     }
 
     std::printf("%d failure(s)\n", failures);

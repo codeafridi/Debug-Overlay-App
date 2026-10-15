@@ -126,6 +126,8 @@ private:
     QLabel *m_logs = nullptr;
     QLabel *m_logsSummary = nullptr;
     QLabel *m_logPipeline = nullptr;
+    QLabel *m_sensitiveSummary = nullptr;
+    QLabel *m_sensitive = nullptr;
     QLabel *m_errors = nullptr;
     QLabel *m_endpoints = nullptr;
     QLabel *m_synthetic = nullptr;

@@ -2,6 +2,7 @@
 
 #include "LogParser.h"
 #include "MemoryFormat.h"
+#include "SensitiveStatus.h"
 #include "Sparkline.h"
 
 #include <QColor>
@@ -239,6 +240,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddPathTargets { color: #9aa2ac; }"
         "#ddStatsdSummary { color: #c4cad1; }"
         "#ddStatsd { color: #9aa2ac; }"
+        "#ddSensitiveSummary { color: #c4cad1; }"
+        "#ddSensitive { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -727,6 +730,22 @@ QWidget *DashboardPanel::buildLogsView() {
     m_logPipeline->setWordWrap(false);
     layout->addWidget(
         makeCard(QStringLiteral("LOG PIPELINE (parsed fields)"), m_logPipeline, view), 1);
+
+    auto *sensBox = new QWidget(view);
+    auto *sensLayout = new QVBoxLayout(sensBox);
+    sensLayout->setContentsMargins(0, 0, 0, 0);
+    sensLayout->setSpacing(4);
+    m_sensitiveSummary = new QLabel(QStringLiteral("--"), sensBox);
+    m_sensitiveSummary->setObjectName(QStringLiteral("ddSensitiveSummary"));
+    m_sensitiveSummary->setFont(monoFont(11, true));
+    m_sensitive = new QLabel(QStringLiteral("--"), sensBox);
+    m_sensitive->setObjectName(QStringLiteral("ddSensitive"));
+    m_sensitive->setFont(monoFont(10));
+    m_sensitive->setWordWrap(false);
+    sensLayout->addWidget(m_sensitiveSummary);
+    sensLayout->addWidget(m_sensitive);
+    layout->addWidget(
+        makeCard(QStringLiteral("SENSITIVE DATA"), sensBox, view), 1);
 
     m_logs = new QLabel(QStringLiteral("--"), view);
     m_logs->setObjectName(QStringLiteral("ddLogs"));
@@ -1367,6 +1386,10 @@ void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     m_logPipeline->setText(logPipelineSummaryText(facets)
                            + QStringLiteral("\n")
                            + logPipelineDetailText(facets));
+
+    const SensitiveReport sensitive = scanSensitiveLines(messages);
+    m_sensitiveSummary->setText(sensitiveSummaryText(sensitive));
+    m_sensitive->setText(sensitiveDetailText(sensitive));
 }
 
 void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
