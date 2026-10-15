@@ -88,6 +88,9 @@ void validate(Config &config) {
     config.dogstatsd.port = clampInt(config.dogstatsd.port, 1, 65535);
     config.dogstatsd.emitIntervalMs =
         clampInt(config.dogstatsd.emitIntervalMs, 200, 60000);
+
+    config.slo.objective = clampDouble(config.slo.objective, 0.5, 0.999999);
+    config.slo.windowHours = clampDouble(config.slo.windowHours, 1.0, 8760.0);
 }
 
 } // namespace
@@ -296,6 +299,24 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int port = settings.value(QStringLiteral("port")).toInt();
         if (port > 0) {
             config.dogstatsd.port = port;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("slo"));
+    {
+        const QString name = settings.value(QStringLiteral("name")).toString();
+        if (!name.isEmpty()) {
+            config.slo.name = name;
+        }
+        const double objective =
+            settings.value(QStringLiteral("objective")).toDouble();
+        if (objective > 0.0) {
+            config.slo.objective = objective;
+        }
+        const double window = settings.value(QStringLiteral("window_hours")).toDouble();
+        if (window > 0.0) {
+            config.slo.windowHours = window;
         }
     }
     settings.endGroup();

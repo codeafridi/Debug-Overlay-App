@@ -129,6 +129,8 @@ add_library(syspeek_core STATIC
     src/StatsdStatus.h
     src/SensitiveStatus.cpp
     src/SensitiveStatus.h
+    src/SloStatus.cpp
+    src/SloStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

@@ -62,6 +62,12 @@ struct StatsdConfig {
     int emitIntervalMs = 1000;
 };
 
+struct SloConfig {
+    QString name = QStringLiteral("focused-app availability");
+    double objective = 0.999;
+    double windowHours = 720.0;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -71,6 +77,7 @@ struct Config {
     TraceConfig traces;
     PathConfig path;
     StatsdConfig dogstatsd;
+    SloConfig slo;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

@@ -5,6 +5,7 @@
 #include "MemoryFormat.h"
 #include "ProcessGrouper.h"
 
+#include <QDateTime>
 #include <QFile>
 #include <QSet>
 #include <QTimer>
@@ -19,6 +20,10 @@ SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
     , m_sampler(provider)
     , m_health(config.health) {
     m_intervalMs = config.sampleIntervalMs;
+    m_sloSpec.name = config.slo.name;
+    m_sloSpec.objective = config.slo.objective;
+    m_sloSpec.windowHours = config.slo.windowHours;
+    m_slo = SloTracker(config.slo.windowHours);
 }
 
 void SamplerWorker::start() {
@@ -54,6 +59,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         m_cpuIdentity = ProcessIdentity{};
         m_healthIdentity = ProcessIdentity{};
         m_health.reset();
+        m_slo.record(false, QDateTime::currentMSecsSinceEpoch());
+        snap.slo = m_slo.report(m_sloSpec);
         return snap;
     }
 
@@ -286,6 +293,10 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     snap.cpuPercent = cpuValid ? cpu.percent : 0.0;
     snap.status = HealthEvaluator::text(
         m_health.update(cpuValid, cpuValid ? cpu.percent : 0.0, rssValid, rss));
+
+    m_slo.record(snap.status == QStringLiteral("OK"),
+                 QDateTime::currentMSecsSinceEpoch());
+    snap.slo = m_slo.report(m_sloSpec);
 
     const HostSample host = m_hostSampler.sample();
     if (host.available) {

@@ -15,6 +15,7 @@
 #include "PathStatus.h"
 #include "StatsdStatus.h"
 #include "SensitiveStatus.h"
+#include "SloStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -734,6 +735,38 @@ int main(int argc, char *argv[]) {
               "sensitive: summary text");
         check(sensitiveDetailText(report).contains(QStringLiteral("aws-access-token")),
               "sensitive: detail names the rule");
+    }
+
+    {
+        SloSpec spec;
+        spec.objective = 0.99;
+        spec.windowHours = 1.0;
+        const qint64 base = 1000000;
+        QList<SloSample> samples;
+        for (int i = 0; i < 100; ++i) {
+            SloSample s;
+            s.atMs = base + i * 1000;
+            s.good = (i != 50); // one bad in 100
+            samples.append(s);
+        }
+        const SloReport report = evaluateSlo(spec, samples);
+        check(report.total == 100 && report.bad == 1, "slo: counts samples");
+        check(std::fabs(report.sli - 0.99) < 1e-9, "slo: SLI computed");
+        // allowed error = 1%; consumed = 1%; budget ~ 0% left.
+        check(std::fabs(report.budgetRemaining) < 1e-6,
+              "slo: budget consumed exactly");
+        check(report.windows.size() == 3, "slo: three burn windows");
+        check(sloSummaryText(report).contains(QStringLiteral("objective")),
+              "slo: summary text");
+
+        SloSpec tight;
+        tight.objective = 0.999; // 0.1% allowed; 1% consumed -> breached
+        const SloReport breached = evaluateSlo(tight, samples);
+        check(breached.breached, "slo: budget exhausted flagged");
+        check(sloDetailText(breached).contains(QStringLiteral("BUDGET")),
+              "slo: detail shows budget state");
+        check(breached.windows.at(0).burnRate > 1.0,
+              "slo: burn rate exceeds 1 when over budget");
     }
 
     std::printf("%d failure(s)\n", failures);

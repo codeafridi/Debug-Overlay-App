@@ -3,6 +3,7 @@
 #include "DiskStatus.h"
 #include "SbomStatus.h"
 #include "SecurityStatus.h"
+#include "SloStatus.h"
 #include "TcpStatus.h"
 
 #include <QList>
@@ -95,6 +96,7 @@ struct DisplaySnapshot {
     bool tcpHealthAvailable = false;
     SecurityPosture security;
     SbomReport sbom;
+    SloReport slo;
     int focusThreads = 0;
     int focusFds = -1;
     unsigned long long focusVolCtx = 0;

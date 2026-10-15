@@ -67,6 +67,7 @@ private:
     QWidget *buildSoftwareView();
     QWidget *buildNetworkPathView();
     QWidget *buildMetricsView();
+    QWidget *buildSloView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -119,6 +120,8 @@ private:
     QTreeWidget *m_pathHops = nullptr;
     QLabel *m_statsdSummary = nullptr;
     QLabel *m_statsd = nullptr;
+    QLabel *m_sloSummary = nullptr;
+    QLabel *m_slo = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

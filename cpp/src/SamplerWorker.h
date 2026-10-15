@@ -46,6 +46,8 @@ private:
     DiskSampler m_diskSampler;
     TcpSampler m_tcpSampler;
     SbomSource m_sbomSource;
+    SloTracker m_slo;
+    SloSpec m_sloSpec;
     IoRateTracker m_ioTracker;
     NetRateTracker m_netTracker;
     GroupCache m_groupCache;

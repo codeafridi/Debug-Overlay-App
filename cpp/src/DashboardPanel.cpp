@@ -152,7 +152,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_rail->setFixedWidth(158);
     m_rail->setFocusPolicy(Qt::NoFocus);
     m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Metrics"),
-                      QStringLiteral("Alerts"),
+                      QStringLiteral("Alerts"), QStringLiteral("SLO"),
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
                       QStringLiteral("Disks"),
                       QStringLiteral("Network"),
@@ -174,6 +174,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildOverviewView());
     m_views->addWidget(buildMetricsView());
     m_views->addWidget(buildAlertsView());
+    m_views->addWidget(buildSloView());
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
     m_views->addWidget(buildDisksView());
@@ -242,6 +243,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddStatsd { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
         "#ddSensitive { color: #9aa2ac; }"
+        "#ddSloSummary { color: #c4cad1; }"
+        "#ddSlo { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -359,6 +362,28 @@ QWidget *DashboardPanel::buildMetricsView() {
     m_statsd->setFont(monoFont(10));
     m_statsd->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("METRICS"), m_statsd, view), 1);
+
+    return view;
+}
+
+QWidget *DashboardPanel::buildSloView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+
+    m_sloSummary = new QLabel(QStringLiteral("--"), view);
+    m_sloSummary->setObjectName(QStringLiteral("ddSloSummary"));
+    m_sloSummary->setFont(monoFont(14, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("SERVICE LEVEL OBJECTIVE"), m_sloSummary, view));
+
+    m_slo = new QLabel(QStringLiteral("--"), view);
+    m_slo->setObjectName(QStringLiteral("ddSlo"));
+    m_slo->setFont(monoFont(11));
+    m_slo->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("ERROR BUDGET / BURN RATE"), m_slo, view), 1);
 
     return view;
 }
@@ -1169,6 +1194,9 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_softwareSummary->setText(sbomSummaryText(snapshot.sbom));
     m_software->setText(snapshot.sbom.available ? sbomDetailText(snapshot.sbom)
                                                 : QStringLiteral("--"));
+
+    m_sloSummary->setText(sloSummaryText(snapshot.slo));
+    m_slo->setText(sloDetailText(snapshot.slo));
 
     m_focusDetail->setText(
         QStringLiteral("threads  %1\nfds      %2\nctx sw   %3 vol / %4 invol\n"
