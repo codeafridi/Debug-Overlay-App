@@ -13,6 +13,7 @@
 #include "SyntheticSource.h"
 #include "TraceSource.h"
 #include "PathSource.h"
+#include "StatsdSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -100,6 +101,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<SyntheticSnapshot>("SyntheticSnapshot");
     qRegisterMetaType<TraceSnapshot>("TraceSnapshot");
     qRegisterMetaType<PathSnapshot>("PathSnapshot");
+    qRegisterMetaType<StatsdSnapshot>("StatsdSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -281,6 +283,19 @@ int main(int argc, char *argv[]) {
                          hud.setPathSnapshot(snapshot);
                      });
     pathThread->start();
+
+    auto *statsdThread = new QThread;
+    auto *statsd = new StatsdSource(config.dogstatsd);
+    statsd->moveToThread(statsdThread);
+    QObject::connect(statsdThread, &QThread::started, statsd,
+                     &StatsdSource::start);
+    QObject::connect(statsdThread, &QThread::finished, statsd,
+                     &QObject::deleteLater);
+    QObject::connect(statsd, &StatsdSource::statsdReady, &hud,
+                     [&hud](const StatsdSnapshot &snapshot) {
+                         hud.setStatsdSnapshot(snapshot);
+                     });
+    statsdThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

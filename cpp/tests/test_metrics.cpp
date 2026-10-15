@@ -13,6 +13,7 @@
 #include "TraceStatus.h"
 #include "SbomStatus.h"
 #include "PathStatus.h"
+#include "StatsdStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -633,6 +634,61 @@ int main(int argc, char *argv[]) {
               "path: worst loss");
         check(pathHopsText(report).contains(QStringLiteral("10.0.0.1")),
               "path: hops text");
+    }
+
+    {
+        StatsdPoint point;
+        check(parseStatsdMetric(
+                  QStringLiteral("requests:3|c|@0.5|#env:prod,svc:api"), point)
+                  && point.name == QStringLiteral("requests")
+                  && point.type == QStringLiteral("counter")
+                  && std::fabs(point.sampleRate - 0.5) < 1e-9
+                  && point.tags == QStringLiteral("env:prod,svc:api"),
+              "statsd: parse counter with sample rate + tags");
+        check(parseStatsdMetric(QStringLiteral("lat:1:2:3|h"), point)
+                  && point.type == QStringLiteral("histogram")
+                  && point.values.size() == 3,
+              "statsd: parse multi-value histogram");
+        check(parseStatsdMetric(QStringLiteral("gauge:42|g"), point)
+                  && point.type == QStringLiteral("gauge"),
+              "statsd: parse gauge");
+
+        StatsdAggregator agg;
+        agg.ingest(QByteArrayLiteral(
+            "requests:2|c|#svc:api\nrequests:3|c|#svc:api\n"
+            "mem:100|g|#svc:api\nmem:120|g|#svc:api\n"
+            "lat:5|h|#svc:api\nlat:15|h|#svc:api\n"
+            "users:1|s\nusers:1|s\nusers:2|s\n"
+            "_e{5,4}:title|text\n_sc|web|0"));
+        const StatsdSnapshot snap = agg.snapshot();
+        check(snap.metrics == 9, "statsd: counted 9 metrics");
+        check(snap.events == 1 && snap.serviceChecks == 1,
+              "statsd: counted events + service checks");
+
+        bool checkedCounter = false;
+        bool checkedGauge = false;
+        bool checkedHist = false;
+        bool checkedSet = false;
+        for (const StatsdSeries &series : snap.series) {
+            if (series.name == QStringLiteral("requests")) {
+                checkedCounter = std::fabs(series.sum - 5.0) < 1e-9;
+            } else if (series.name == QStringLiteral("mem")) {
+                checkedGauge = std::fabs(series.last - 120.0) < 1e-9;
+            } else if (series.name == QStringLiteral("lat")) {
+                checkedHist = std::fabs(series.avg - 10.0) < 1e-9
+                              && std::fabs(series.max - 15.0) < 1e-9
+                              && series.count == 2;
+            } else if (series.name == QStringLiteral("users")) {
+                checkedSet = series.type == QStringLiteral("set")
+                             && series.unique == 2;
+            }
+        }
+        check(checkedCounter, "statsd: counter sums");
+        check(checkedGauge, "statsd: gauge keeps last");
+        check(checkedHist, "statsd: histogram avg/max/count");
+        check(checkedSet, "statsd: set unique count");
+        check(statsdSummaryText(snap).contains(QStringLiteral("metrics")),
+              "statsd: summary text");
     }
 
     std::printf("%d failure(s)\n", failures);

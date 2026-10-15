@@ -84,6 +84,10 @@ void validate(Config &config) {
     if (config.path.targets.size() > 16) {
         config.path.targets = config.path.targets.mid(0, 16);
     }
+
+    config.dogstatsd.port = clampInt(config.dogstatsd.port, 1, 65535);
+    config.dogstatsd.emitIntervalMs =
+        clampInt(config.dogstatsd.emitIntervalMs, 200, 60000);
 }
 
 } // namespace
@@ -279,6 +283,19 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int cycles = settings.value(QStringLiteral("cycles")).toInt();
         if (cycles > 0) {
             config.path.cycles = cycles;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("dogstatsd"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.dogstatsd.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        const int port = settings.value(QStringLiteral("port")).toInt();
+        if (port > 0) {
+            config.dogstatsd.port = port;
         }
     }
     settings.endGroup();

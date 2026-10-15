@@ -10,6 +10,7 @@
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
 #include "PathStatus.h"
+#include "StatsdStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -37,6 +38,7 @@ public:
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
     void setTraceSnapshot(const TraceSnapshot &snapshot);
     void setPathSnapshot(const PathSnapshot &snapshot);
+    void setStatsdSnapshot(const StatsdSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -64,6 +66,7 @@ private:
     QWidget *buildTracesView();
     QWidget *buildSoftwareView();
     QWidget *buildNetworkPathView();
+    QWidget *buildMetricsView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -114,6 +117,8 @@ private:
     QLabel *m_pathSummary = nullptr;
     QLabel *m_pathTargets = nullptr;
     QTreeWidget *m_pathHops = nullptr;
+    QLabel *m_statsdSummary = nullptr;
+    QLabel *m_statsd = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;

@@ -10,6 +10,7 @@
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
 #include "PathStatus.h"
+#include "StatsdStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -47,6 +48,8 @@ public:
     void setTraceSnapshot(const TraceSnapshot &snapshot);
 
     void setPathSnapshot(const PathSnapshot &snapshot);
+
+    void setStatsdSnapshot(const StatsdSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

@@ -439,6 +439,12 @@ void HudWindow::setPathSnapshot(const PathSnapshot &snapshot) {
     }
 }
 
+void HudWindow::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setStatsdSnapshot(snapshot);
+    }
+}
+
 void HudWindow::evaluateAlerts() {
     if (m_notifier == nullptr) {
         return;

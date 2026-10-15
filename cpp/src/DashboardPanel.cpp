@@ -150,7 +150,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_rail->setObjectName(QStringLiteral("ddRail"));
     m_rail->setFixedWidth(158);
     m_rail->setFocusPolicy(Qt::NoFocus);
-    m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Alerts"),
+    m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Metrics"),
+                      QStringLiteral("Alerts"),
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
                       QStringLiteral("Disks"),
                       QStringLiteral("Network"),
@@ -170,6 +171,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views = new QStackedWidget(body);
     m_views->setObjectName(QStringLiteral("ddViews"));
     m_views->addWidget(buildOverviewView());
+    m_views->addWidget(buildMetricsView());
     m_views->addWidget(buildAlertsView());
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
@@ -235,6 +237,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddSoftware { color: #9aa2ac; }"
         "#ddPathSummary { color: #c4cad1; }"
         "#ddPathTargets { color: #9aa2ac; }"
+        "#ddStatsdSummary { color: #c4cad1; }"
+        "#ddStatsd { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -332,6 +336,27 @@ QWidget *DashboardPanel::buildOverviewView() {
     hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, view), 1);
     layout->addLayout(hostRow);
     layout->addStretch(1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildMetricsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+
+    m_statsdSummary = new QLabel(QStringLiteral("--"), view);
+    m_statsdSummary->setObjectName(QStringLiteral("ddStatsdSummary"));
+    m_statsdSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("DOGSTATSD (127.0.0.1:8125)"), m_statsdSummary, view));
+
+    m_statsd = new QLabel(QStringLiteral("--"), view);
+    m_statsd->setObjectName(QStringLiteral("ddStatsd"));
+    m_statsd->setFont(monoFont(10));
+    m_statsd->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("METRICS"), m_statsd, view), 1);
+
     return view;
 }
 
@@ -1395,4 +1420,10 @@ void DashboardPanel::setPathSnapshot(const PathSnapshot &snapshot) {
         }
         m_pathHops->addTopLevelItem(item);
     }
+}
+
+void DashboardPanel::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
+    m_statsdSummary->setText(statsdSummaryText(snapshot));
+    m_statsd->setText(snapshot.available ? statsdDetailText(snapshot)
+                                         : QStringLiteral("--"));
 }

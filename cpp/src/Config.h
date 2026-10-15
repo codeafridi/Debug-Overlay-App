@@ -56,6 +56,12 @@ struct PathConfig {
     int cycles = 10;
 };
 
+struct StatsdConfig {
+    bool enabled = true;
+    int port = 8125;
+    int emitIntervalMs = 1000;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -64,6 +70,7 @@ struct Config {
     CostConfig cost;
     TraceConfig traces;
     PathConfig path;
+    StatsdConfig dogstatsd;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

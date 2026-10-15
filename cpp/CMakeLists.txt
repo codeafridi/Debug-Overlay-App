@@ -123,6 +123,10 @@ add_library(syspeek_core STATIC
     src/PathSource.h
     src/PathStatus.cpp
     src/PathStatus.h
+    src/StatsdSource.cpp
+    src/StatsdSource.h
+    src/StatsdStatus.cpp
+    src/StatsdStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp
