@@ -445,6 +445,12 @@ void HudWindow::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
     }
 }
 
+void HudWindow::setDbmSnapshot(const DbmSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setDbmSnapshot(snapshot);
+    }
+}
+
 void HudWindow::evaluateAlerts() {
     if (m_notifier == nullptr) {
         return;

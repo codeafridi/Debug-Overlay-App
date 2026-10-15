@@ -91,6 +91,10 @@ void validate(Config &config) {
 
     config.slo.objective = clampDouble(config.slo.objective, 0.5, 0.999999);
     config.slo.windowHours = clampDouble(config.slo.windowHours, 1.0, 8760.0);
+
+    config.database.port = clampInt(config.database.port, 1, 65535);
+    config.database.intervalMs =
+        clampInt(config.database.intervalMs, 1000, 300000);
 }
 
 } // namespace
@@ -317,6 +321,35 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const double window = settings.value(QStringLiteral("window_hours")).toDouble();
         if (window > 0.0) {
             config.slo.windowHours = window;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("database"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.database.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        const QString host = settings.value(QStringLiteral("host")).toString();
+        if (!host.isEmpty()) {
+            config.database.host = host;
+        }
+        const int port = settings.value(QStringLiteral("port")).toInt();
+        if (port > 0) {
+            config.database.port = port;
+        }
+        const QString user = settings.value(QStringLiteral("user")).toString();
+        if (!user.isEmpty()) {
+            config.database.user = user;
+        }
+        const QString name = settings.value(QStringLiteral("name")).toString();
+        if (!name.isEmpty()) {
+            config.database.database = name;
+        }
+        const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
+        if (interval > 0) {
+            config.database.intervalMs = interval;
         }
     }
     settings.endGroup();

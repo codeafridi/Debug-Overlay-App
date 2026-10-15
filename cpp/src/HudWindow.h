@@ -11,6 +11,7 @@
 #include "TraceStatus.h"
 #include "PathStatus.h"
 #include "StatsdStatus.h"
+#include "DbmStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -50,6 +51,8 @@ public:
     void setPathSnapshot(const PathSnapshot &snapshot);
 
     void setStatsdSnapshot(const StatsdSnapshot &snapshot);
+
+    void setDbmSnapshot(const DbmSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

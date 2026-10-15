@@ -242,6 +242,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddPathTargets { color: #9aa2ac; }"
         "#ddStatsdSummary { color: #c4cad1; }"
         "#ddStatsd { color: #9aa2ac; }"
+        "#ddDbmSummary { color: #c4cad1; }"
+        "#ddDbm { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
         "#ddSensitive { color: #9aa2ac; }"
         "#ddSloSummary { color: #c4cad1; }"
@@ -739,11 +741,25 @@ QWidget *DashboardPanel::buildDatabasesView() {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
     layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_dbmSummary = new QLabel(QStringLiteral("--"), view);
+    m_dbmSummary->setObjectName(QStringLiteral("ddDbmSummary"));
+    m_dbmSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("DATABASE MONITORING (PostgreSQL)"), m_dbmSummary, view));
+
+    m_dbm = new QLabel(QStringLiteral("--"), view);
+    m_dbm->setObjectName(QStringLiteral("ddDbm"));
+    m_dbm->setFont(monoFont(10));
+    m_dbm->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("DBM"), m_dbm, view), 1);
+
     m_databases = new QLabel(QStringLiteral("--"), view);
     m_databases->setObjectName(QStringLiteral("ddDatabases"));
     m_databases->setFont(monoFont(10));
     m_databases->setWordWrap(false);
-    layout->addWidget(makeCard(QStringLiteral("DATABASES"), m_databases, view), 1);
+    layout->addWidget(makeCard(QStringLiteral("APP DATABASE CONNECTIONS"), m_databases, view), 1);
     return view;
 }
 
@@ -1510,4 +1526,9 @@ void DashboardPanel::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
     m_statsdSummary->setText(statsdSummaryText(snapshot));
     m_statsd->setText(snapshot.available ? statsdDetailText(snapshot)
                                          : QStringLiteral("--"));
+}
+
+void DashboardPanel::setDbmSnapshot(const DbmSnapshot &snapshot) {
+    m_dbmSummary->setText(dbmSummaryText(snapshot));
+    m_dbm->setText(dbmDetailText(snapshot));
 }

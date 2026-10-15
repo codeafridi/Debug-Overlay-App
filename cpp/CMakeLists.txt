@@ -135,6 +135,12 @@ add_library(syspeek_core STATIC
     src/DeprecationStatus.h
     src/ThreatStatus.cpp
     src/ThreatStatus.h
+    src/PgClient.cpp
+    src/PgClient.h
+    src/DbmStatus.cpp
+    src/DbmStatus.h
+    src/DbmSource.cpp
+    src/DbmSource.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

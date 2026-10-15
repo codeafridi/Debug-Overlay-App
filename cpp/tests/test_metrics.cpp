@@ -17,6 +17,7 @@
 #include "SensitiveStatus.h"
 #include "SloStatus.h"
 #include "ThreatStatus.h"
+#include "DbmStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -812,6 +813,44 @@ int main(int argc, char *argv[]) {
               "threat: slow attempts do not overflow");
         check(threatDetailText(report).contains(QStringLiteral("SSH")),
               "threat: detail text");
+    }
+
+    {
+        // pg_stat_database row: numbackends, xact_commit, xact_rollback,
+        // blks_read, blks_hit, deadlocks, temp_bytes, blk_read_time,
+        // blk_write_time, size.
+        const QStringList row = {QStringLiteral("7"),
+                                 QStringLiteral("1000"),
+                                 QStringLiteral("3"),
+                                 QStringLiteral("50"),
+                                 QStringLiteral("9950"),
+                                 QStringLiteral("1"),
+                                 QStringLiteral("0"),
+                                 QStringLiteral("12.5"),
+                                 QStringLiteral("4.0"),
+                                 QStringLiteral("1048576")};
+        DbmSnapshot snapshot;
+        snapshot.database = QStringLiteral("syspeek");
+        check(parseDatabaseStat(row, snapshot), "dbm: parse database stat");
+        check(snapshot.connections == 7 && snapshot.xactCommit == 1000
+                  && snapshot.deadlocks == 1,
+              "dbm: counters");
+        check(std::fabs(snapshot.cacheHitPercent - 99.5) < 1e-6,
+              "dbm: cache hit ratio");
+        check(snapshot.sizeBytes == 1048576, "dbm: database size");
+
+        QList<QStringList> states;
+        states.append({QStringLiteral("active"), QStringLiteral("3")});
+        states.append({QStringLiteral("idle"), QStringLiteral("16")});
+        parseActivityStates(states, snapshot);
+        check(snapshot.states.size() == 2
+                  && snapshot.states.at(0).first == QStringLiteral("active"),
+              "dbm: activity states");
+
+        check(dbmSummaryText(snapshot).contains(QStringLiteral("cache")),
+              "dbm: summary text");
+        check(dbmDetailText(snapshot).contains(QStringLiteral("deadlocks")),
+              "dbm: detail text");
     }
 
     std::printf("%d failure(s)\n", failures);

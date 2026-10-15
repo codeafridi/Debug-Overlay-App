@@ -68,6 +68,15 @@ struct SloConfig {
     double windowHours = 720.0;
 };
 
+struct DbmConfig {
+    bool enabled = false;
+    QString host = QStringLiteral("127.0.0.1");
+    int port = 5432;
+    QString user = QStringLiteral("postgres");
+    QString database = QStringLiteral("postgres");
+    int intervalMs = 5000;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -78,6 +87,7 @@ struct Config {
     PathConfig path;
     StatsdConfig dogstatsd;
     SloConfig slo;
+    DbmConfig database;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

@@ -14,6 +14,7 @@
 #include "TraceSource.h"
 #include "PathSource.h"
 #include "StatsdSource.h"
+#include "DbmSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -102,6 +103,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<TraceSnapshot>("TraceSnapshot");
     qRegisterMetaType<PathSnapshot>("PathSnapshot");
     qRegisterMetaType<StatsdSnapshot>("StatsdSnapshot");
+    qRegisterMetaType<DbmSnapshot>("DbmSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -296,6 +298,18 @@ int main(int argc, char *argv[]) {
                          hud.setStatsdSnapshot(snapshot);
                      });
     statsdThread->start();
+
+    auto *dbmThread = new QThread;
+    auto *dbm = new DbmSource(config.database);
+    dbm->moveToThread(dbmThread);
+    QObject::connect(dbmThread, &QThread::started, dbm, &DbmSource::start);
+    QObject::connect(dbmThread, &QThread::finished, dbm,
+                     &QObject::deleteLater);
+    QObject::connect(dbm, &DbmSource::dbmReady, &hud,
+                     [&hud](const DbmSnapshot &snapshot) {
+                         hud.setDbmSnapshot(snapshot);
+                     });
+    dbmThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;
