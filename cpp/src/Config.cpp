@@ -78,6 +78,12 @@ void validate(Config &config) {
     config.traces.maxSpans = clampInt(config.traces.maxSpans, 100, 100000);
     config.traces.emitIntervalMs =
         clampInt(config.traces.emitIntervalMs, 200, 60000);
+
+    config.path.intervalMs = clampInt(config.path.intervalMs, 10000, 3600000);
+    config.path.cycles = clampInt(config.path.cycles, 1, 100);
+    if (config.path.targets.size() > 16) {
+        config.path.targets = config.path.targets.mid(0, 16);
+    }
 }
 
 } // namespace
@@ -251,6 +257,28 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int port = settings.value(QStringLiteral("port")).toInt();
         if (port > 0) {
             config.traces.port = port;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("path"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.path.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        const QString targets =
+            settings.value(QStringLiteral("targets")).toString();
+        config.path.targets =
+            targets.split(QRegularExpression(QStringLiteral("[\\s,]+")),
+                          Qt::SkipEmptyParts);
+        const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
+        if (interval > 0) {
+            config.path.intervalMs = interval;
+        }
+        const int cycles = settings.value(QStringLiteral("cycles")).toInt();
+        if (cycles > 0) {
+            config.path.cycles = cycles;
         }
     }
     settings.endGroup();

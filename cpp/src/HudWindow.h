@@ -9,6 +9,7 @@
 #include "Notifier.h"
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
+#include "PathStatus.h"
 
 #include <QPoint>
 #include <QRect>
@@ -44,6 +45,8 @@ public:
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
 
     void setTraceSnapshot(const TraceSnapshot &snapshot);
+
+    void setPathSnapshot(const PathSnapshot &snapshot);
 
     bool isExpanded() const { return m_detailsExpanded; }
 

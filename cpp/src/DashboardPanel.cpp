@@ -154,6 +154,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
                       QStringLiteral("Disks"),
                       QStringLiteral("Network"),
+                      QStringLiteral("Network Path"),
                       QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
                       QStringLiteral("Services"), QStringLiteral("Logs"),
                       QStringLiteral("Errors"), QStringLiteral("Dependencies"),
@@ -174,6 +175,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildMemoryView());
     m_views->addWidget(buildDisksView());
     m_views->addWidget(buildNetworkView());
+    m_views->addWidget(buildNetworkPathView());
     m_views->addWidget(buildContainersView());
     m_views->addWidget(buildKubernetesView());
     m_views->addWidget(buildServicesView());
@@ -231,6 +233,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddSecurity { color: #9aa2ac; }"
         "#ddSoftwareSummary { color: #c4cad1; }"
         "#ddSoftware { color: #9aa2ac; }"
+        "#ddPathSummary { color: #c4cad1; }"
+        "#ddPathTargets { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -453,6 +457,45 @@ QWidget *DashboardPanel::buildNetworkView() {
     tcpLayout->addWidget(m_tcpSummary);
     tcpLayout->addWidget(m_tcp);
     layout->addWidget(makeCard(QStringLiteral("TCP HEALTH"), tcpBox, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildNetworkPathView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_pathSummary = new QLabel(QStringLiteral("--"), view);
+    m_pathSummary->setObjectName(QStringLiteral("ddPathSummary"));
+    m_pathSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("NETWORK PATH (mtr)"), m_pathSummary, view));
+
+    m_pathTargets = new QLabel(QStringLiteral("--"), view);
+    m_pathTargets->setObjectName(QStringLiteral("ddPathTargets"));
+    m_pathTargets->setFont(monoFont(10));
+    m_pathTargets->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("TARGETS"), m_pathTargets, view), 1);
+
+    m_pathHops = new QTreeWidget(view);
+    m_pathHops->setObjectName(QStringLiteral("ddPathHops"));
+    m_pathHops->setColumnCount(9);
+    m_pathHops->setHeaderLabels(
+        {QStringLiteral("#"), QStringLiteral("Host"), QStringLiteral("Loss%"),
+         QStringLiteral("Snt"), QStringLiteral("Last"), QStringLiteral("Avg"),
+         QStringLiteral("Best"), QStringLiteral("Wrst"), QStringLiteral("StDev")});
+    m_pathHops->setRootIsDecorated(false);
+    m_pathHops->setSelectionMode(QAbstractItemView::NoSelection);
+    m_pathHops->setFocusPolicy(Qt::NoFocus);
+    m_pathHops->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+    for (int i = 0; i < 9; ++i) {
+        if (i != 1) {
+            m_pathHops->header()->setSectionResizeMode(i,
+                                                       QHeaderView::ResizeToContents);
+        }
+    }
+    layout->addWidget(makeCard(QStringLiteral("HOPS"), m_pathHops, view), 1);
     return view;
 }
 
@@ -1324,4 +1367,32 @@ void DashboardPanel::setTraceSnapshot(const TraceSnapshot &snapshot) {
     m_traceMap->setText(traceServiceMapText(snapshot));
     m_traceServices->setText(traceServicesText(snapshot));
     m_traceRecent->setText(traceRecentText(snapshot));
+}
+
+void DashboardPanel::setPathSnapshot(const PathSnapshot &snapshot) {
+    m_pathSummary->setText(pathSummaryText(snapshot));
+    m_pathTargets->setText(pathTargetsText(snapshot));
+    m_pathHops->clear();
+    if (snapshot.reports.isEmpty()) {
+        return;
+    }
+    for (const PathHop &hop : snapshot.reports.first().hops) {
+        auto *item = new QTreeWidgetItem();
+        item->setText(0, QString::number(hop.index));
+        item->setText(1, hop.host);
+        item->setText(2, QString::number(hop.lossPercent, 'f', 1));
+        item->setText(3, QString::number(hop.sent));
+        item->setText(4, QString::number(hop.lastMs, 'f', 1));
+        item->setText(5, QString::number(hop.avgMs, 'f', 1));
+        item->setText(6, QString::number(hop.bestMs, 'f', 1));
+        item->setText(7, QString::number(hop.worstMs, 'f', 1));
+        item->setText(8, QString::number(hop.stdevMs, 'f', 1));
+        for (int col = 0; col < 9; ++col) {
+            item->setTextAlignment(col, Qt::AlignRight | Qt::AlignVCenter);
+        }
+        if (hop.lossPercent > 0.0) {
+            item->setForeground(1, QColor(QStringLiteral("#d1685f")));
+        }
+        m_pathHops->addTopLevelItem(item);
+    }
 }

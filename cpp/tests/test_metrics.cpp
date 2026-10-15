@@ -12,6 +12,7 @@
 #include "LogParser.h"
 #include "TraceStatus.h"
 #include "SbomStatus.h"
+#include "PathStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -605,6 +606,33 @@ int main(int argc, char *argv[]) {
               "sbom: summary text");
         check(sbomDetailText(report).contains(QStringLiteral("libc6@")),
               "sbom: detail text");
+    }
+
+    {
+        const QByteArray json = QByteArrayLiteral(
+            "{\"report\":{\"mtr\":{\"src\":\"host\",\"dst\":\"1.1.1.1\","
+            "\"tos\":0,\"tests\":3,\"psize\":\"64\",\"bitpattern\":\"0x00\"},"
+            "\"hubs\":[{\"count\":1,\"host\":\"10.0.0.1\",\"Loss%\":0.0,"
+            "\"Snt\":3,\"Last\":2.1,\"Avg\":2.5,\"Best\":2.0,\"Wrst\":3.0,"
+            "\"StDev\":0.4},{\"count\":2,\"host\":\"???.\",\"Loss%\":33.3,"
+            "\"Snt\":3,\"Last\":10.0,\"Avg\":11.0,\"Best\":10.0,\"Wrst\":12.0,"
+            "\"StDev\":0.9}]}}");
+        bool ok = false;
+        const QList<PathReport> reports = parseMtrJson(json, &ok);
+        check(ok && reports.size() == 1, "path: parsed one mtr report");
+        const PathReport &report = reports.first();
+        check(report.dst == QStringLiteral("1.1.1.1") && report.tests == 3,
+              "path: target + tests");
+        check(report.hops.size() == 2, "path: two hops");
+        check(report.hops.at(0).host == QStringLiteral("10.0.0.1")
+                  && std::fabs(report.hops.at(0).avgMs - 2.5) < 1e-6,
+              "path: hop host + avg rtt");
+        check(std::fabs(report.hops.at(1).lossPercent - 33.3) < 1e-6,
+              "path: hop loss percent");
+        check(std::fabs(report.worstLoss() - 33.3) < 1e-6,
+              "path: worst loss");
+        check(pathHopsText(report).contains(QStringLiteral("10.0.0.1")),
+              "path: hops text");
     }
 
     std::printf("%d failure(s)\n", failures);

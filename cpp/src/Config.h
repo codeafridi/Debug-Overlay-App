@@ -49,6 +49,13 @@ struct TraceConfig {
     int emitIntervalMs = 1000;
 };
 
+struct PathConfig {
+    bool enabled = true;
+    QStringList targets;
+    int intervalMs = 60000;
+    int cycles = 10;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -56,6 +63,7 @@ struct Config {
     SyntheticConfig synthetic;
     CostConfig cost;
     TraceConfig traces;
+    PathConfig path;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

@@ -9,6 +9,7 @@
 #include "AlertEngine.h"
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
+#include "PathStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -35,6 +36,7 @@ public:
     void setAlerts(const QList<Alert> &alerts);
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
     void setTraceSnapshot(const TraceSnapshot &snapshot);
+    void setPathSnapshot(const PathSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -61,6 +63,7 @@ private:
     QWidget *buildSecurityView();
     QWidget *buildTracesView();
     QWidget *buildSoftwareView();
+    QWidget *buildNetworkPathView();
 
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
@@ -108,6 +111,9 @@ private:
     QLabel *m_traceRecent = nullptr;
     QLabel *m_softwareSummary = nullptr;
     QLabel *m_software = nullptr;
+    QLabel *m_pathSummary = nullptr;
+    QLabel *m_pathTargets = nullptr;
+    QTreeWidget *m_pathHops = nullptr;
     QLabel *m_services = nullptr;
     QLabel *m_servicesSummary = nullptr;
     QLabel *m_servicesChanges = nullptr;
