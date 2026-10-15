@@ -321,6 +321,56 @@ int main() {
               "cost: top workload first is the largest");
     }
 
+    {
+        QList<ObjectRef> objects;
+        objects.append(ObjectRef{QStringLiteral("extensions/v1beta1"),
+                                 QStringLiteral("Deployment"), QStringLiteral("default"),
+                                 QStringLiteral("old")});
+        objects.append(ObjectRef{QStringLiteral("apps/v1"),
+                                 QStringLiteral("Deployment"), QStringLiteral("default"),
+                                 QStringLiteral("new")});
+        objects.append(ObjectRef{QStringLiteral("networking.k8s.io/v1beta1"),
+                                 QStringLiteral("Ingress"), QStringLiteral("web"),
+                                 QStringLiteral("ing")});
+        objects.append(ObjectRef{QStringLiteral("batch/v1beta1"),
+                                 QStringLiteral("CronJob"), QStringLiteral("ci"),
+                                 QStringLiteral("job")});
+
+        const QList<DeprecationFinding> findings = checkDeprecations(objects);
+        check(findings.size() == 3, "deprecation: three deprecated objects");
+        bool sawDeployment = false;
+        bool sawIngress = false;
+        for (const DeprecationFinding &finding : findings) {
+            if (finding.kind == QStringLiteral("Deployment")
+                && finding.removedIn == QStringLiteral("v1.16.0")
+                && finding.replacement == QStringLiteral("apps/v1")) {
+                sawDeployment = true;
+            }
+            if (finding.kind == QStringLiteral("Ingress")
+                && finding.removedIn == QStringLiteral("v1.22.0")) {
+                sawIngress = true;
+            }
+        }
+        check(sawDeployment, "deprecation: deployment removed mapping");
+        check(sawIngress, "deprecation: ingress v1beta1 mapping");
+        check(deprecationSummaryText(findings).contains(QStringLiteral("deprecated")),
+              "deprecation: summary text");
+        check(deprecationDetailText(findings).contains(QStringLiteral("REMOVED")),
+              "deprecation: detail marks removed");
+
+        const QByteArray json = QByteArrayLiteral(
+            "{\"items\":[{\"apiVersion\":\"extensions/v1beta1\","
+            "\"kind\":\"Deployment\",\"metadata\":{\"namespace\":\"default\","
+            "\"name\":\"legacy\"},\"spec\":{\"replicas\":1},"
+            "\"status\":{\"availableReplicas\":1}}]}");
+        bool ok = false;
+        const KubeResources res = parseKubectlResources(json, &ok);
+        check(ok && res.objects.size() == 1
+                  && res.objects.at(0).apiVersion
+                         == QStringLiteral("extensions/v1beta1"),
+              "kube: parse collects object apiVersion");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

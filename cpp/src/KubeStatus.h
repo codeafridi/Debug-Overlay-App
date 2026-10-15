@@ -6,6 +6,8 @@
 #include <QString>
 #include <QtGlobal>
 
+#include "DeprecationStatus.h"
+
 struct KubePod {
     QString ns;
     QString name;
@@ -70,6 +72,7 @@ struct KubeResources {
     QList<KubePod> pods;
     QList<KubeDeployment> deployments;
     QList<KubeEvent> events;
+    QList<ObjectRef> objects;
 };
 
 struct KubeSnapshot {
@@ -79,6 +82,7 @@ struct KubeSnapshot {
     QList<KubeEvent> events;
     QList<KubeDiagnosis> diagnoses;
     QList<KubeChange> timeline;
+    QList<DeprecationFinding> deprecations;
     int totalPods = 0;
     int issueCount = 0;
     int eventCount = 0;

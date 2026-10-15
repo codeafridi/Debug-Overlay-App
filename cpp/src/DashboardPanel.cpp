@@ -245,6 +245,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddSensitive { color: #9aa2ac; }"
         "#ddSloSummary { color: #c4cad1; }"
         "#ddSlo { color: #9aa2ac; }"
+        "#ddDeprecations { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -638,6 +639,13 @@ QWidget *DashboardPanel::buildKubernetesView() {
     m_kubeTimeline->setWordWrap(false);
     insight->addWidget(
         makeCard(QStringLiteral("CHANGE TIMELINE"), m_kubeTimeline, view), 1);
+
+    m_deprecations = new QLabel(QStringLiteral("--"), view);
+    m_deprecations->setObjectName(QStringLiteral("ddDeprecations"));
+    m_deprecations->setFont(monoFont(10));
+    m_deprecations->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("DEPRECATED / REMOVED APIs"), m_deprecations, view), 1);
     layout->addLayout(insight, 1);
     return view;
 }
@@ -1331,6 +1339,11 @@ void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
                                       : QStringLiteral("--"));
     m_kubeTimeline->setText(haveData ? kubeTimelineText(snapshot.timeline)
                                      : QStringLiteral("--"));
+    m_deprecations->setText(
+        haveData ? deprecationSummaryText(snapshot.deprecations)
+                       + QStringLiteral("\n")
+                       + deprecationDetailText(snapshot.deprecations)
+                 : QStringLiteral("--"));
 
     if (haveData) {
         m_costSummary->setText(

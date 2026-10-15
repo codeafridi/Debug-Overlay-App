@@ -100,6 +100,7 @@ private:
     QLabel *m_kubeEvents = nullptr;
     QLabel *m_kubeDiagnosis = nullptr;
     QLabel *m_kubeTimeline = nullptr;
+    QLabel *m_deprecations = nullptr;
     QLabel *m_costSummary = nullptr;
     QLabel *m_costWarnings = nullptr;
     QTreeWidget *m_costNamespaces = nullptr;

@@ -234,6 +234,7 @@ void KubeSource::emitSnapshot(KubeState state, const QString &message,
             kubeIssueCount(resources.pods, resources.deployments);
         snapshot.eventCount = kubeWarningCount(resources.events);
         snapshot.diagnoses = kubeDiagnose(resources.pods, resources.events);
+        snapshot.deprecations = checkDeprecations(resources.objects);
 
         const CostSummary cost =
             computeClusterCost(resources.pods, m_costConfig.cpuPerCoreHour,

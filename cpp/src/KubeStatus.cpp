@@ -254,6 +254,15 @@ KubeResources parseKubectlResources(const QByteArray &json, bool *ok) {
         const QJsonObject item = itemValue.toObject();
         const QString kind = item.value(QStringLiteral("kind")).toString();
 
+        const QJsonObject metadata =
+            item.value(QStringLiteral("metadata")).toObject();
+        ObjectRef ref;
+        ref.apiVersion = item.value(QStringLiteral("apiVersion")).toString();
+        ref.kind = kind;
+        ref.ns = metadata.value(QStringLiteral("namespace")).toString();
+        ref.name = metadata.value(QStringLiteral("name")).toString();
+        resources.objects.append(ref);
+
         if (kind == QStringLiteral("Deployment")) {
             resources.deployments.append(parseDeployment(item));
         } else if (kind == QStringLiteral("Event")) {
