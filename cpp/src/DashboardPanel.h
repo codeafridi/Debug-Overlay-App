@@ -11,6 +11,7 @@
 #include "TraceStatus.h"
 #include "PathStatus.h"
 #include "StatsdStatus.h"
+#include "ThreatStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -110,6 +111,7 @@ private:
     QTreeWidget *m_disks = nullptr;
     QLabel *m_securitySummary = nullptr;
     QLabel *m_security = nullptr;
+    QLabel *m_threats = nullptr;
     QLabel *m_traceSummary = nullptr;
     QLabel *m_traceMap = nullptr;
     QLabel *m_traceServices = nullptr;

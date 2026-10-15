@@ -133,6 +133,8 @@ add_library(syspeek_core STATIC
     src/SloStatus.h
     src/DeprecationStatus.cpp
     src/DeprecationStatus.h
+    src/ThreatStatus.cpp
+    src/ThreatStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

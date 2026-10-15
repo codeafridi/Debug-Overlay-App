@@ -16,6 +16,7 @@
 #include "StatsdStatus.h"
 #include "SensitiveStatus.h"
 #include "SloStatus.h"
+#include "ThreatStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -767,6 +768,50 @@ int main(int argc, char *argv[]) {
               "slo: detail shows budget state");
         check(breached.windows.at(0).burnRate > 1.0,
               "slo: burn rate exceeds 1 when over budget");
+    }
+
+    {
+        const ThreatEvent ev = parseAuthEvent(
+            QStringLiteral("Failed password for root from 203.0.113.9 port 51022 ssh2"),
+            1000);
+        check(ev.logType == QStringLiteral("ssh_failed-auth")
+                  && ev.sourceIp == QStringLiteral("203.0.113.9")
+                  && ev.targetUser == QStringLiteral("root"),
+              "threat: parse ssh failed-auth");
+
+        QList<ThreatEvent> burst;
+        for (int i = 0; i < 8; ++i) {
+            ThreatEvent e;
+            e.atMs = 1000 + i * 100; // 0.1s apart -> deep within 10s window
+            e.logType = QStringLiteral("ssh_failed-auth");
+            e.sourceIp = QStringLiteral("203.0.113.9");
+            e.targetUser = QStringLiteral("root");
+            burst.append(e);
+        }
+        const ThreatReport report = evaluateThreats(burst);
+        check(report.events == 8 && report.overflows >= 1,
+              "threat: ssh brute-force overflow detected");
+        check(!report.findings.isEmpty()
+                  && report.findings.first().label
+                         == QStringLiteral("SSH Bruteforce"),
+              "threat: labeled SSH Bruteforce");
+        check(!report.findings.isEmpty()
+                  && report.findings.first().sourceIp
+                         == QStringLiteral("203.0.113.9"),
+              "threat: source IP reported");
+
+        QList<ThreatEvent> spread;
+        for (int i = 0; i < 6; ++i) {
+            ThreatEvent e;
+            e.atMs = 1000 + i * 30000; // 30s apart -> bucket leaks
+            e.logType = QStringLiteral("ssh_failed-auth");
+            e.sourceIp = QStringLiteral("198.51.100.4");
+            spread.append(e);
+        }
+        check(evaluateThreats(spread).overflows == 0,
+              "threat: slow attempts do not overflow");
+        check(threatDetailText(report).contains(QStringLiteral("SSH")),
+              "threat: detail text");
     }
 
     std::printf("%d failure(s)\n", failures);

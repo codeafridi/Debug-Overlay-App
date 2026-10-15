@@ -235,6 +235,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddTcp { color: #9aa2ac; }"
         "#ddSecuritySummary { color: #c4cad1; }"
         "#ddSecurity { color: #9aa2ac; }"
+        "#ddThreats { color: #9aa2ac; }"
         "#ddSoftwareSummary { color: #c4cad1; }"
         "#ddSoftware { color: #9aa2ac; }"
         "#ddPathSummary { color: #c4cad1; }"
@@ -922,6 +923,13 @@ QWidget *DashboardPanel::buildSecurityView() {
     layout->addWidget(
         makeCard(QStringLiteral("HARDENING FINDINGS"), m_security, view), 1);
 
+    m_threats = new QLabel(QStringLiteral("--"), view);
+    m_threats->setObjectName(QStringLiteral("ddThreats"));
+    m_threats->setFont(monoFont(10));
+    m_threats->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("THREATS (log-based SIEM)"), m_threats, view), 1);
+
     return view;
 }
 
@@ -1431,6 +1439,18 @@ void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     const SensitiveReport sensitive = scanSensitiveLines(messages);
     m_sensitiveSummary->setText(sensitiveSummaryText(sensitive));
     m_sensitive->setText(sensitiveDetailText(sensitive));
+
+    QList<ThreatEvent> events;
+    for (const JournalEntry &entry : snapshot.entries) {
+        const ThreatEvent event =
+            parseAuthEvent(entry.message, entry.timestampUsec / 1000);
+        if (!event.logType.isEmpty()) {
+            events.append(event);
+        }
+    }
+    const ThreatReport threats = evaluateThreats(events);
+    m_threats->setText(threatSummaryText(threats) + QStringLiteral("\n")
+                       + threatDetailText(threats));
 }
 
 void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
