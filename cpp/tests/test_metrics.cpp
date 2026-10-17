@@ -19,6 +19,7 @@
 #include "ThreatStatus.h"
 #include "DbmStatus.h"
 #include "WatchdogStatus.h"
+#include "TlsStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -884,6 +885,40 @@ int main(int argc, char *argv[]) {
               "watchdog: text marks anomaly");
         check(watchdogText(metrics).contains(QStringLiteral("mad")),
               "watchdog: text names the model");
+    }
+
+    {
+        const QDateTime now = QDateTime::fromSecsSinceEpoch(1791907433);
+        check(daysUntil(now.addDays(10), now) == 10, "tls: days until expiry");
+        check(tlsSeverity(-1) == QStringLiteral("expired"),
+              "tls: expired severity");
+        check(tlsSeverity(5) == QStringLiteral("critical"),
+              "tls: critical severity");
+        check(tlsSeverity(20) == QStringLiteral("warning"),
+              "tls: warning severity");
+        check(tlsSeverity(200) == QStringLiteral("ok"), "tls: ok severity");
+
+        TlsSnapshot snapshot;
+        snapshot.available = true;
+        TlsResult good;
+        good.ok = true;
+        good.host = QStringLiteral("example.com");
+        good.port = 443;
+        good.daysLeft = 120;
+        good.protocol = QStringLiteral("TLSv1.3");
+        good.cipher = QStringLiteral("TLS_AES_256_GCM_SHA384");
+        TlsResult soon;
+        soon.ok = true;
+        soon.host = QStringLiteral("api.example.com");
+        soon.port = 8443;
+        soon.daysLeft = 7;
+        soon.protocol = QStringLiteral("TLSv1.2");
+        soon.cipher = QStringLiteral("ECDHE-RSA-AES256-GCM-SHA384");
+        snapshot.results = {good, soon};
+        check(tlsSummaryText(snapshot).contains(QStringLiteral("warning")),
+              "tls: summary counts warnings");
+        check(tlsDetailText(snapshot).contains(QStringLiteral("CRITICAL")),
+              "tls: detail marks critical");
     }
 
     std::printf("%d failure(s)\n", failures);

@@ -245,6 +245,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDbmSummary { color: #c4cad1; }"
         "#ddDbm { color: #9aa2ac; }"
         "#ddWatchdog { color: #9aa2ac; }"
+        "#ddTlsSummary { color: #c4cad1; }"
+        "#ddTls { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
         "#ddSensitive { color: #9aa2ac; }"
         "#ddSloSummary { color: #c4cad1; }"
@@ -522,6 +524,21 @@ QWidget *DashboardPanel::buildNetworkView() {
     tcpLayout->addWidget(m_tcpSummary);
     tcpLayout->addWidget(m_tcp);
     layout->addWidget(makeCard(QStringLiteral("TCP HEALTH"), tcpBox, view), 1);
+
+    auto *tlsBox = new QWidget(view);
+    auto *tlsLayout = new QVBoxLayout(tlsBox);
+    tlsLayout->setContentsMargins(0, 0, 0, 0);
+    tlsLayout->setSpacing(4);
+    m_tlsSummary = new QLabel(QStringLiteral("--"), tlsBox);
+    m_tlsSummary->setObjectName(QStringLiteral("ddTlsSummary"));
+    m_tlsSummary->setFont(monoFont(11, true));
+    m_tls = new QLabel(QStringLiteral("--"), tlsBox);
+    m_tls->setObjectName(QStringLiteral("ddTls"));
+    m_tls->setFont(monoFont(10));
+    m_tls->setWordWrap(false);
+    tlsLayout->addWidget(m_tlsSummary);
+    tlsLayout->addWidget(m_tls);
+    layout->addWidget(makeCard(QStringLiteral("TLS CERTIFICATES"), tlsBox, view), 1);
     return view;
 }
 
@@ -1551,4 +1568,9 @@ void DashboardPanel::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
 void DashboardPanel::setDbmSnapshot(const DbmSnapshot &snapshot) {
     m_dbmSummary->setText(dbmSummaryText(snapshot));
     m_dbm->setText(dbmDetailText(snapshot));
+}
+
+void DashboardPanel::setTlsSnapshot(const TlsSnapshot &snapshot) {
+    m_tlsSummary->setText(tlsSummaryText(snapshot));
+    m_tls->setText(tlsDetailText(snapshot));
 }

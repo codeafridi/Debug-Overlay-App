@@ -77,6 +77,12 @@ struct DbmConfig {
     int intervalMs = 5000;
 };
 
+struct TlsConfig {
+    bool enabled = false;
+    QStringList targets;
+    int intervalMs = 300000;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -88,6 +94,7 @@ struct Config {
     StatsdConfig dogstatsd;
     SloConfig slo;
     DbmConfig database;
+    TlsConfig tls;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

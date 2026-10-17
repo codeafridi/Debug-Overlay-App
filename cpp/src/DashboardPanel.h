@@ -14,6 +14,7 @@
 #include "ThreatStatus.h"
 #include "DbmStatus.h"
 #include "WatchdogStatus.h"
+#include "TlsStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -43,6 +44,7 @@ public:
     void setPathSnapshot(const PathSnapshot &snapshot);
     void setStatsdSnapshot(const StatsdSnapshot &snapshot);
     void setDbmSnapshot(const DbmSnapshot &snapshot);
+    void setTlsSnapshot(const TlsSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -118,6 +120,8 @@ private:
     QLabel *m_threats = nullptr;
     QLabel *m_dbmSummary = nullptr;
     QLabel *m_dbm = nullptr;
+    QLabel *m_tlsSummary = nullptr;
+    QLabel *m_tls = nullptr;
     QLabel *m_traceSummary = nullptr;
     QLabel *m_traceMap = nullptr;
     QLabel *m_traceServices = nullptr;

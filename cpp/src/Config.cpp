@@ -95,6 +95,11 @@ void validate(Config &config) {
     config.database.port = clampInt(config.database.port, 1, 65535);
     config.database.intervalMs =
         clampInt(config.database.intervalMs, 1000, 300000);
+
+    config.tls.intervalMs = clampInt(config.tls.intervalMs, 10000, 86400000);
+    if (config.tls.targets.size() > 32) {
+        config.tls.targets = config.tls.targets.mid(0, 32);
+    }
 }
 
 } // namespace
@@ -350,6 +355,24 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
         if (interval > 0) {
             config.database.intervalMs = interval;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("tls"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.tls.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        const QString targets =
+            settings.value(QStringLiteral("targets")).toString();
+        config.tls.targets =
+            targets.split(QRegularExpression(QStringLiteral("[\\s,]+")),
+                          Qt::SkipEmptyParts);
+        const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
+        if (interval > 0) {
+            config.tls.intervalMs = interval;
         }
     }
     settings.endGroup();
