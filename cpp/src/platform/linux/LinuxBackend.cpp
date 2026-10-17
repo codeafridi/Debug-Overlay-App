@@ -1,5 +1,7 @@
 #include "LinuxBackend.h"
 
+#include <QFile>
+
 QString LinuxBackend::platformName() const {
     return QStringLiteral("linux");
 }
@@ -40,6 +42,15 @@ bool LinuxBackend::diskUsage(const QString &path, unsigned long long &totalBytes
 
 bool LinuxBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
     return linuxproc::hostInterfaces(out);
+}
+
+bool LinuxBackend::readDiskCounters(QList<DiskCounters> &out) {
+    QFile file(QStringLiteral("/proc/diskstats"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    out = parseDiskstats(file.readAll());
+    return !out.isEmpty();
 }
 
 bool LinuxBackend::exists(int pid) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DiskStatus.h"
 #include "LinuxProcess.h"
 #include "ProcessIdentity.h"
 
@@ -52,6 +53,10 @@ public:
         return false;
     }
     virtual bool hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
+        Q_UNUSED(out);
+        return false;
+    }
+    virtual bool readDiskCounters(QList<DiskCounters> &out) {
         Q_UNUSED(out);
         return false;
     }

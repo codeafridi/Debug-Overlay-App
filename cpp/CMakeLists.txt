@@ -206,7 +206,7 @@ target_include_directories(syspeek_core PUBLIC src)
 target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::Network)
 if(APPLE)
     target_link_libraries(syspeek_core PUBLIC
-        "-framework Cocoa" "-framework CoreFoundation")
+        "-framework Cocoa" "-framework CoreFoundation" "-framework IOKit")
     target_compile_options(syspeek_core PUBLIC $<$<COMPILE_LANGUAGE:OBJCXX>:-Wno-deprecated-declarations>)
 elseif(UNIX)
     target_link_libraries(syspeek_core PUBLIC Qt6::DBus)

@@ -162,6 +162,9 @@ int main(int argc, char *argv[]) {
     unsigned long long groupRss = 0;
     check(linux.sumRssKb(QList<int>{self}, groupRss) && groupRss > 0,
           "linux: sumRssKb(self) positive");
+    QList<DiskCounters> diskCounters;
+    check(linux.readDiskCounters(diskCounters) && !diskCounters.isEmpty(),
+          "linux: readDiskCounters() non-empty");
 #endif
 
     const QString report = dumpReportJson(5);

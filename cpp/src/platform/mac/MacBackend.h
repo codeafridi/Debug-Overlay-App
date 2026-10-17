@@ -14,6 +14,7 @@ public:
     bool diskUsage(const QString &path, unsigned long long &totalBytes,
                    unsigned long long &freeBytes) override;
     bool hostInterfaces(QList<linuxproc::InterfaceStats> &out) override;
+    bool readDiskCounters(QList<DiskCounters> &out) override;
 
     bool exists(int pid) override;
     QString comm(int pid) override;

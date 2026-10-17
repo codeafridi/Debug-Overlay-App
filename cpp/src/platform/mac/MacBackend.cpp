@@ -12,6 +12,10 @@
 
 #include <libproc.h>
 
+#if defined(Q_OS_MACOS)
+#include <IOKit/IOKitLib.h>
+#endif
+
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_var.h>
@@ -256,6 +260,81 @@ bool MacBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
     }
     out.append(ifaces);
     return true;
+}
+
+bool MacBackend::readDiskCounters(QList<DiskCounters> &out) {
+    out.clear();
+    CFMutableDictionaryRef matching = IOServiceMatching("IOBlockStorageDriver");
+    if (matching == nullptr) {
+        return false;
+    }
+    io_iterator_t iterator = MACH_PORT_NULL;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault, matching,
+                                     &iterator) != KERN_SUCCESS) {
+        return false;
+    }
+
+    io_registry_entry_t entry = 0;
+    while ((entry = IOIteratorNext(iterator)) != 0) {
+        io_registry_entry_t media = MACH_PORT_NULL;
+        if (IORegistryEntryGetParentEntry(entry, kIOServicePlane,
+                                          &media) == KERN_SUCCESS) {
+            CFStringRef name = static_cast<CFStringRef>(
+                IORegistryEntryCreateCFProperty(media, CFSTR("BSD Name"),
+                                                kCFAllocatorDefault, 0));
+            CFDictionaryRef stats = static_cast<CFDictionaryRef>(
+                IORegistryEntryCreateCFProperty(entry, CFSTR("Statistics"),
+                                                kCFAllocatorDefault, 0));
+            if (name != nullptr && stats != nullptr) {
+                DiskCounters counters;
+                counters.name = QString::fromCFString(name);
+
+                auto num = [&stats](CFStringRef key, unsigned long long &v) {
+                    CFNumberRef value = static_cast<CFNumberRef>(
+                        CFDictionaryGetValue(stats, key));
+                    return value != nullptr
+                           && CFNumberGetValue(value, kCFNumberLongLongType,
+                                               &v);
+                };
+
+                unsigned long long reads = 0;
+                unsigned long long writes = 0;
+                unsigned long long bytesRead = 0;
+                unsigned long long bytesWritten = 0;
+                unsigned long long readTimeNs = 0;
+                unsigned long long writeTimeNs = 0;
+                num(CFSTR("Operations (Read)"), reads);
+                num(CFSTR("Operations (Write)"), writes);
+                num(CFSTR("Bytes (Read)"), bytesRead);
+                num(CFSTR("Bytes (Write)"), bytesWritten);
+                num(CFSTR("TotalTime (Read)"), readTimeNs);
+                num(CFSTR("TotalTime (Write)"), writeTimeNs);
+
+                counters.reads = reads;
+                counters.writes = writes;
+                counters.sectorsRead = bytesRead / 512ULL;
+                counters.sectorsWritten = bytesWritten / 512ULL;
+                counters.msReading = readTimeNs / 1000000ULL;
+                counters.msWriting = writeTimeNs / 1000000ULL;
+                counters.msDoingIo = counters.msReading + counters.msWriting;
+                counters.weightedMsDoingIo = counters.msDoingIo;
+                out.append(counters);
+            }
+            if (name != nullptr) {
+                CFRelease(name);
+            }
+            if (stats != nullptr) {
+                CFRelease(stats);
+            }
+            if (media != MACH_PORT_NULL) {
+                IOObjectRelease(media);
+            }
+        }
+        IOObjectRelease(entry);
+    }
+    IOObjectRelease(iterator);
+
+    return !out.isEmpty();
 }
 
 bool MacBackend::hostLoad(double &l1, double &l5, double &l15) {

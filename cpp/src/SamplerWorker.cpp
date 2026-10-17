@@ -22,6 +22,7 @@ SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
     , m_sampler(provider, *m_backend)
     , m_cpuSampler(CpuSource::fromBackend(*m_backend))
     , m_hostSampler(HostSource::fromBackend(*m_backend))
+    , m_diskSampler(DiskSource::fromBackend(*m_backend))
     , m_groupCache(5000, *m_backend)
     , m_health(config.health) {
     m_intervalMs = config.sampleIntervalMs;
