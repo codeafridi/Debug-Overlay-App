@@ -73,9 +73,10 @@ bool fetchUnifiedLogJournalJson(QByteArray &out, int limitEntries,
                 object.insert(QStringLiteral("_PID"),
                               static_cast<int>(logEntry.processIdentifier));
                 object.insert(QStringLiteral("_COMM"),
-                              QJsonValue(logEntry.process));
+                              QString::fromNSString(logEntry.process));
                 object.insert(QStringLiteral("MESSAGE"),
-                              QJsonValue(logEntry.composedMessage));
+                              QString::fromNSString(
+                                  logEntry.composedMessage));
                 out.append(QJsonDocument(object)
                                .toJson(QJsonDocument::Compact));
                 out.append('\n');
