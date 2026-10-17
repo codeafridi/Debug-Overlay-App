@@ -245,6 +245,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
 
     snap.runtime = detectRuntime(focus.identity.pid);
 
+    snap.profile = m_profileSampler.sample(focus.identity.pid);
+
     QList<QPair<QString, int>> counts;
     for (auto it = stateCounts.constBegin(); it != stateCounts.constEnd(); ++it) {
         counts.append(qMakePair(it.key(), it.value()));

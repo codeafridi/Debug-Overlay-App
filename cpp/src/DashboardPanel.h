@@ -55,6 +55,7 @@ private:
     QWidget *buildOverviewView();
     QWidget *buildAlertsView();
     QWidget *buildIncidentsView();
+    QWidget *buildProfilesView();
     QWidget *buildProcessesView();
     QWidget *buildMemoryView();
     QWidget *buildNetworkView();
@@ -83,6 +84,10 @@ private:
     QLabel *m_alerts = nullptr;
     QLabel *m_incidentsSummary = nullptr;
     QLabel *m_incidents = nullptr;
+    QLabel *m_profileSummary = nullptr;
+    QLabel *m_profileThreads = nullptr;
+    QLabel *m_profileOffCpu = nullptr;
+    QLabel *m_profileMemory = nullptr;
     QLabel *m_cpuValue = nullptr;
     QLabel *m_memValue = nullptr;
     QLabel *m_procCount = nullptr;

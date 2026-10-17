@@ -22,6 +22,7 @@
 #include "TlsStatus.h"
 #include "RuntimeStatus.h"
 #include "IncidentStatus.h"
+#include "ProfileStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -1049,6 +1050,38 @@ int main(int argc, char *argv[]) {
         check(hw.anomalous, "holt-winters: seasonal spike flagged");
         check(hw.model == QStringLiteral("holt_winters"),
               "holt-winters: model name");
+    }
+
+    {
+        const QByteArray stat = QByteArrayLiteral(
+            "1234 (my (app) worker) S 1 1234 1234 0 -1 4194560 100 0 0 0 12 34 0 0");
+        const ThreadSample sample =
+            parseTaskStat(stat, QStringLiteral("futex_wait"), 1234);
+        check(sample.comm == QStringLiteral("my (app) worker"),
+              "profile: parses comm with parens");
+        check(sample.state == QStringLiteral("S"), "profile: thread state");
+        check(sample.utimeTicks == 12 && sample.stimeTicks == 34,
+              "profile: thread cpu ticks");
+        check(sample.waitChannel == QStringLiteral("futex_wait"),
+              "profile: wait channel");
+
+        const QByteArray smaps = QByteArrayLiteral(
+            "7f0000000000-7f0000001000 r-xp 00000000 08:01 1234 "
+            "/usr/lib/libfoo.so\n"
+            "Size:                  4 kB\n"
+            "Pss:                   8 kB\n"
+            "7f0000001000-7f0000002000 rw-p 00000000 00:00 0\n"
+            "Size:                  4 kB\n"
+            "Pss:                   4 kB\n");
+        const QList<MemoryRegion> regions = parseSmaps(smaps);
+        check(regions.size() == 2, "profile: parses two memory regions");
+        check(regions.at(0).path == QStringLiteral("/usr/lib/libfoo.so")
+                  && regions.at(0).pssBytes == 8ULL * 1024,
+              "profile: top region by PSS");
+        check(regions.at(1).path == QStringLiteral("[anon]"),
+              "profile: anonymous mapping grouped");
+        check(profileSummaryText(ProfileSnapshot{}).contains("unavailable"),
+              "profile: summary for unavailable");
     }
 
     std::printf("%d failure(s)\n", failures);

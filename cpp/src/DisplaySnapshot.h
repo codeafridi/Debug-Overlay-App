@@ -5,6 +5,7 @@
 #include "SecurityStatus.h"
 #include "SloStatus.h"
 #include "RuntimeStatus.h"
+#include "ProfileStatus.h"
 #include "TcpStatus.h"
 
 #include <QList>
@@ -99,6 +100,7 @@ struct DisplaySnapshot {
     SbomReport sbom;
     SloReport slo;
     RuntimeInfo runtime;
+    ProfileSnapshot profile;
     int focusThreads = 0;
     int focusFds = -1;
     unsigned long long focusVolCtx = 0;

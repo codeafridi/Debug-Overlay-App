@@ -192,7 +192,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildSyntheticView());
     m_views->addWidget(buildInstrumentationView());
     m_views->addWidget(buildTracesView());
-    m_views->addWidget(buildPlaceholderView(QStringLiteral("Profiles")));
+    m_views->addWidget(buildProfilesView());
     m_views->addWidget(buildDatabasesView());
     m_views->addWidget(buildSecurityView());    m_views->addWidget(buildCostView());
     m_views->addWidget(buildPlaceholderView(QStringLiteral("Settings")));
@@ -248,6 +248,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddWatchdog { color: #9aa2ac; }"
         "#ddRuntime { color: #9aa2ac; }"
         "#ddForecast { color: #9aa2ac; }"
+        "#ddProfileSummary { color: #c4cad1; }"
+        "#ddProfileThreads, #ddProfileOffCpu, #ddProfileMemory { color: #9aa2ac; }"
         "#ddIncidentsSummary { color: #c4cad1; }"
         "#ddIncidents { color: #9aa2ac; }"
         "#ddTlsSummary { color: #c4cad1; }"
@@ -451,6 +453,44 @@ QWidget *DashboardPanel::buildIncidentsView() {
     m_incidents->setWordWrap(false);
     layout->addWidget(
         makeCard(QStringLiteral("TIMELINE"), m_incidents, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildProfilesView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_profileSummary = new QLabel(QStringLiteral("--"), view);
+    m_profileSummary->setObjectName(QStringLiteral("ddProfileSummary"));
+    m_profileSummary->setFont(monoFont(13, true));
+    layout->addWidget(makeCard(
+        QStringLiteral("PROFILES (threads / off-CPU / memory)"),
+        m_profileSummary, view));
+
+    m_profileThreads = new QLabel(QStringLiteral("--"), view);
+    m_profileThreads->setObjectName(QStringLiteral("ddProfileThreads"));
+    m_profileThreads->setFont(monoFont(10));
+    m_profileThreads->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("THREADS (cpu)"), m_profileThreads, view), 1);
+
+    auto *row = new QHBoxLayout;
+    row->setSpacing(10);
+    m_profileOffCpu = new QLabel(QStringLiteral("--"), view);
+    m_profileOffCpu->setObjectName(QStringLiteral("ddProfileOffCpu"));
+    m_profileOffCpu->setFont(monoFont(10));
+    m_profileOffCpu->setWordWrap(false);
+    row->addWidget(
+        makeCard(QStringLiteral("OFF-CPU / WAIT"), m_profileOffCpu, view), 1);
+    m_profileMemory = new QLabel(QStringLiteral("--"), view);
+    m_profileMemory->setObjectName(QStringLiteral("ddProfileMemory"));
+    m_profileMemory->setFont(monoFont(10));
+    m_profileMemory->setWordWrap(false);
+    row->addWidget(
+        makeCard(QStringLiteral("MEMORY (PSS)"), m_profileMemory, view), 1);
+    layout->addLayout(row, 1);
     return view;
 }
 
@@ -1265,6 +1305,11 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     const ForecastResult hostForecast =
         forecastCrossing(m_hostCpuStore.values(), 90.0, 60);
     m_forecast->setText(forecastText(cpuForecast, hostForecast));
+
+    m_profileSummary->setText(profileSummaryText(snapshot.profile));
+    m_profileThreads->setText(profileThreadsText(snapshot.profile));
+    m_profileOffCpu->setText(profileOffCpuText(snapshot.profile));
+    m_profileMemory->setText(profileMemoryText(snapshot.profile));
 
     DiskSnapshot disk;
     disk.disks = snapshot.disks;
