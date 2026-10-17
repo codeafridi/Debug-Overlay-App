@@ -12,7 +12,6 @@
 
 #include <libproc.h>
 
-#include <ifaddrs.h>
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_var.h>
@@ -33,7 +32,9 @@ constexpr unsigned long long kHostTickNs = 10000000ULL;
 constexpr int kProcPidListFds = 1;
 constexpr int kProcPidTaskInfo = 4;
 constexpr int kProcPidFdVnodePathInfo = 2;
-constexpr int kProcPidVnodePathInfo = 9;
+constexpr int kPfRoute = 17;
+constexpr int kNetRtIfList2 = 6;
+constexpr unsigned char kRtmIfInfo2 = 0x12;
 
 double machTimebaseRatio() {
     mach_timebase_info_data_t tb{};
@@ -89,6 +90,48 @@ bool readTaskInfo(int pid, proc_taskinfo &pti) {
     std::memset(&pti, 0, sizeof(pti));
     const int rc = proc_pidinfo(pid, kProcPidTaskInfo, 0, &pti, sizeof(pti));
     return rc == static_cast<int>(sizeof(pti));
+}
+
+QList<linuxproc::InterfaceStats> readIfList2() {
+    QList<linuxproc::InterfaceStats> out;
+    int mib[6] = {CTL_NET, kPfRoute, 0, 0, kNetRtIfList2, 0};
+    size_t len = 0;
+    if (sysctl(mib, 6, nullptr, &len, nullptr, 0) != 0 || len == 0) {
+        return out;
+    }
+    std::vector<char> buf(len);
+    if (sysctl(mib, 6, buf.data(), &len, nullptr, 0) != 0) {
+        return out;
+    }
+
+    const char *p = buf.data();
+    const char *end = p + len;
+    while (p + 4 <= end) {
+        const unsigned short msglen =
+            *reinterpret_cast<const unsigned short *>(p);
+        if (msglen == 0 || p + msglen > end) {
+            break;
+        }
+        if (static_cast<unsigned char>(p[3]) == kRtmIfInfo2 &&
+            p + sizeof(struct if_msghdr2) + sizeof(struct sockaddr_dl) <= end) {
+            const auto *hdr = reinterpret_cast<const struct if_msghdr2 *>(p);
+            const struct if_data64 &d = hdr->ifm_data;
+            const auto *sdl = reinterpret_cast<const struct sockaddr_dl *>(
+                p + sizeof(struct if_msghdr2));
+            linuxproc::InterfaceStats st;
+            st.name = QString::fromUtf8(sdl->sdl_data, sdl->sdl_nlen);
+            st.rxBytes = d.ifi_ibytes;
+            st.txBytes = d.ifi_obytes;
+            st.rxPackets = d.ifi_ipackets;
+            st.txPackets = d.ifi_opackets;
+            st.rxErrs = d.ifi_ierrors;
+            st.txErrs = d.ifi_oerrors;
+            st.rxDrop = d.ifi_iqdrops;
+            out.append(st);
+        }
+        p += msglen;
+    }
+    return out;
 }
 
 struct ProcArgs {
@@ -194,57 +237,24 @@ bool MacBackend::hostMem(linuxproc::HostMem &out) {
 }
 
 bool MacBackend::hostNet(linuxproc::NetTotals &out) {
-    struct ifaddrs *ifs = nullptr;
-    if (getifaddrs(&ifs) != 0) {
-        return false;
-    }
     unsigned long long rx = 0;
     unsigned long long tx = 0;
-    for (struct ifaddrs *ifa = ifs; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK) {
-            continue;
-        }
-        if (std::strcmp(ifa->ifa_name, "lo0") == 0) {
-            continue;
-        }
-        const auto *data = reinterpret_cast<const struct if_data *>(ifa->ifa_data);
-        if (data == nullptr) {
-            continue;
-        }
-        rx += data->ifi_ibytes;
-        tx += data->ifi_obytes;
+    const QList<linuxproc::InterfaceStats> ifaces = readIfList2();
+    for (const linuxproc::InterfaceStats &st : ifaces) {
+        rx += st.rxBytes;
+        tx += st.txBytes;
     }
-    freeifaddrs(ifs);
     out.rxBytes = rx;
     out.txBytes = tx;
     return true;
 }
 
 bool MacBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
-    struct ifaddrs *ifs = nullptr;
-    if (getifaddrs(&ifs) != 0) {
+    const QList<linuxproc::InterfaceStats> ifaces = readIfList2();
+    if (ifaces.isEmpty()) {
         return false;
     }
-    for (struct ifaddrs *ifa = ifs; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK) {
-            continue;
-        }
-        const auto *data = reinterpret_cast<const struct if_data *>(ifa->ifa_data);
-        if (data == nullptr) {
-            continue;
-        }
-        linuxproc::InterfaceStats st;
-        st.name = QString::fromUtf8(ifa->ifa_name);
-        st.rxBytes = data->ifi_ibytes;
-        st.txBytes = data->ifi_obytes;
-        st.rxPackets = data->ifi_ipackets;
-        st.txPackets = data->ifi_opackets;
-        st.rxErrs = data->ifi_ierrors;
-        st.txErrs = data->ifi_oerrors;
-        st.rxDrop = data->ifi_iqdrops;
-        out.append(st);
-    }
-    freeifaddrs(ifs);
+    out.append(ifaces);
     return true;
 }
 
@@ -424,6 +434,7 @@ bool MacBackend::procSample(int pid, linuxproc::MemInfo &mem,
     mem.sharedKb = 0;
 
     detail.threads = pti.pti_threadnum;
+    detail.voluntaryCtx = pti.pti_csw;
     detail.fdCount = countFds(pid);
 
     struct rusage_info_v6 ri{};
@@ -462,8 +473,8 @@ QList<QString> MacBackend::fdTargets(int pid) {
         struct vnode_fdinfowithpath vpi{};
         const int rc = proc_pidfdinfo(pid, fd, kProcPidFdVnodePathInfo, &vpi,
                                       sizeof(vpi));
-        if (rc > 0 && vpi.pvip_path[0] != '\0') {
-            out.append(QString::fromUtf8(vpi.pvip_path));
+        if (rc > 0 && vpi.pvip.vip_path[0] != '\0') {
+            out.append(QString::fromUtf8(vpi.pvip.vip_path));
         } else {
             out.append(QStringLiteral("fd:%1").arg(fd));
         }
