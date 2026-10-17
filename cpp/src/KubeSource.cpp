@@ -108,7 +108,8 @@ void KubeSource::beginQuery() {
 
     m_process->start(m_kubectlPath,
                      {QStringLiteral("get"),
-                      QStringLiteral("pods,deployments,events"), QStringLiteral("-A"),
+                      QStringLiteral("pods,deployments,events,nodes"),
+                      QStringLiteral("-A"),
                       QStringLiteral("-o"), QStringLiteral("json")});
     m_deadlineTimer->start(m_config.timeoutMs);
 }
@@ -230,6 +231,16 @@ void KubeSource::emitSnapshot(KubeState state, const QString &message,
         snapshot.deployments = resources.deployments;
         snapshot.events = resources.events;
         snapshot.totalPods = resources.pods.size();
+        snapshot.nodes = resources.nodes;
+        for (KubeNode &node : snapshot.nodes) {
+            int running = 0;
+            for (const KubePod &pod : resources.pods) {
+                if (pod.nodeName == node.name) {
+                    ++running;
+                }
+            }
+            node.podsRunning = running;
+        }
         snapshot.issueCount =
             kubeIssueCount(resources.pods, resources.deployments);
         snapshot.eventCount = kubeWarningCount(resources.events);

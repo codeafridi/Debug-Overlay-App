@@ -14,6 +14,7 @@ struct KubePod {
     QString phase;
     QString reason;
     QString lastReason;
+    QString nodeName;
     int restarts = 0;
     double cpuRequestCores = 0.0;
     double memRequestBytes = 0.0;
@@ -68,10 +69,31 @@ enum class KubeState {
     Stale,
 };
 
+struct KubeNode {
+    QString name;
+    bool ready = false;
+    QString roles;
+    QString kubeletVersion;
+    QString runtime;
+    QString osImage;
+    QString providerId;
+    QString instanceType;
+    QString zone;
+    QString region;
+    double cpuCapacityCores = 0.0;
+    double cpuAllocatableCores = 0.0;
+    unsigned long long memCapacityBytes = 0;
+    unsigned long long memAllocatableBytes = 0;
+    int podsCapacity = 0;
+    int podsAllocatable = 0;
+    int podsRunning = 0;
+};
+
 struct KubeResources {
     QList<KubePod> pods;
     QList<KubeDeployment> deployments;
     QList<KubeEvent> events;
+    QList<KubeNode> nodes;
     QList<ObjectRef> objects;
 };
 
@@ -80,6 +102,7 @@ struct KubeSnapshot {
     QList<KubePod> pods;
     QList<KubeDeployment> deployments;
     QList<KubeEvent> events;
+    QList<KubeNode> nodes;
     QList<KubeDiagnosis> diagnoses;
     QList<KubeChange> timeline;
     QList<DeprecationFinding> deprecations;
@@ -122,3 +145,4 @@ QString kubePodsText(const KubeSnapshot &snapshot);
 QString kubeDeploymentsText(const KubeSnapshot &snapshot);
 QString kubeDiagnosisText(const QList<KubeDiagnosis> &diagnoses);
 QString kubeTimelineText(const QList<KubeChange> &changes);
+QString kubeNodesText(const QList<KubeNode> &nodes);

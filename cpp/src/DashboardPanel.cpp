@@ -654,6 +654,12 @@ QWidget *DashboardPanel::buildKubernetesView() {
     tables->addWidget(makeCard(QStringLiteral("DEPLOYMENTS"), m_kubeDeploys, view), 1);
     layout->addLayout(tables, 1);
 
+    m_nodes = new QLabel(QStringLiteral("--"), view);
+    m_nodes->setObjectName(QStringLiteral("ddNodes"));
+    m_nodes->setFont(monoFont(10));
+    m_nodes->setWordWrap(false);
+    layout->addWidget(makeCard(QStringLiteral("NODES"), m_nodes, view), 1);
+
     m_kubeEvents = new QLabel(QStringLiteral("--"), view);
     m_kubeEvents->setObjectName(QStringLiteral("ddKubeEvents"));
     m_kubeEvents->setFont(monoFont(10));
@@ -1417,6 +1423,8 @@ void DashboardPanel::setKubeSnapshot(const KubeSnapshot &snapshot) {
                        + QStringLiteral("\n")
                        + deprecationDetailText(snapshot.deprecations)
                  : QStringLiteral("--"));
+    m_nodes->setText(haveData ? kubeNodesText(snapshot.nodes)
+                              : QStringLiteral("--"));
 
     if (haveData) {
         m_costSummary->setText(

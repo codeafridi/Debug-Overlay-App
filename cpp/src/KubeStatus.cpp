@@ -91,6 +91,87 @@ double kubeParseMemoryBytes(const QString &quantity) {
 
 namespace {
 
+KubeNode parseNode(const QJsonObject &item) {
+    KubeNode node;
+    const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
+    node.name = metadata.value(QStringLiteral("name")).toString();
+    const QJsonObject labels = metadata.value(QStringLiteral("labels")).toObject();
+    node.instanceType =
+        labels.value(QStringLiteral("node.kubernetes.io/instance-type")).toString();
+    if (node.instanceType.isEmpty()) {
+        node.instanceType = labels
+                                .value(QStringLiteral(
+                                    "beta.kubernetes.io/instance-type"))
+                                .toString();
+    }
+    node.zone =
+        labels.value(QStringLiteral("topology.kubernetes.io/zone")).toString();
+    if (node.zone.isEmpty()) {
+        node.zone = labels
+                        .value(QStringLiteral(
+                            "failure-domain.beta.kubernetes.io/zone"))
+                        .toString();
+    }
+    node.region =
+        labels.value(QStringLiteral("topology.kubernetes.io/region")).toString();
+
+    QStringList roles;
+    const QString rolePrefix = QStringLiteral("node-role.kubernetes.io/");
+    for (auto it = labels.constBegin(); it != labels.constEnd(); ++it) {
+        if (it.key().startsWith(rolePrefix)) {
+            const QString role = it.key().mid(rolePrefix.size());
+            if (!role.isEmpty()) {
+                roles.append(role);
+            }
+        }
+    }
+    node.roles = roles.join(QLatin1Char(','));
+
+    node.providerId =
+        item.value(QStringLiteral("spec"))
+            .toObject()
+            .value(QStringLiteral("providerID"))
+            .toString();
+
+    const QJsonObject status = item.value(QStringLiteral("status")).toObject();
+    const QJsonObject nodeInfo = status.value(QStringLiteral("nodeInfo")).toObject();
+    node.kubeletVersion =
+        nodeInfo.value(QStringLiteral("kubeletVersion")).toString();
+    node.runtime =
+        nodeInfo.value(QStringLiteral("containerRuntimeVersion")).toString();
+    node.osImage = nodeInfo.value(QStringLiteral("osImage")).toString();
+
+    const QJsonObject capacity =
+        status.value(QStringLiteral("capacity")).toObject();
+    const QJsonObject allocatable =
+        status.value(QStringLiteral("allocatable")).toObject();
+    node.cpuCapacityCores =
+        kubeParseCpuCores(capacity.value(QStringLiteral("cpu")).toString());
+    node.cpuAllocatableCores =
+        kubeParseCpuCores(allocatable.value(QStringLiteral("cpu")).toString());
+    node.memCapacityBytes = static_cast<unsigned long long>(
+        kubeParseMemoryBytes(capacity.value(QStringLiteral("memory")).toString()));
+    node.memAllocatableBytes = static_cast<unsigned long long>(
+        kubeParseMemoryBytes(allocatable.value(QStringLiteral("memory")).toString()));
+    node.podsCapacity =
+        capacity.value(QStringLiteral("pods")).toString().toInt();
+    node.podsAllocatable =
+        allocatable.value(QStringLiteral("pods")).toString().toInt();
+
+    const QJsonArray conditions =
+        status.value(QStringLiteral("conditions")).toArray();
+    for (const QJsonValue &value : conditions) {
+        const QJsonObject condition = value.toObject();
+        if (condition.value(QStringLiteral("type")).toString()
+                == QStringLiteral("Ready")
+            && condition.value(QStringLiteral("status")).toString()
+                   == QStringLiteral("True")) {
+            node.ready = true;
+        }
+    }
+    return node;
+}
+
 KubePod parsePod(const QJsonObject &item) {
     const QJsonObject metadata = item.value(QStringLiteral("metadata")).toObject();
     const QJsonObject spec = item.value(QStringLiteral("spec")).toObject();
@@ -100,6 +181,7 @@ KubePod parsePod(const QJsonObject &item) {
     pod.ns = metadata.value(QStringLiteral("namespace")).toString();
     pod.name = metadata.value(QStringLiteral("name")).toString();
     pod.phase = status.value(QStringLiteral("phase")).toString();
+    pod.nodeName = spec.value(QStringLiteral("nodeName")).toString();
 
     const QJsonArray containers = spec.value(QStringLiteral("containers")).toArray();
     for (const QJsonValue &containerValue : containers) {
@@ -269,6 +351,8 @@ KubeResources parseKubectlResources(const QByteArray &json, bool *ok) {
             resources.events.append(parseEvent(item));
         } else if (kind == QStringLiteral("Pod")) {
             resources.pods.append(parsePod(item));
+        } else if (kind == QStringLiteral("Node")) {
+            resources.nodes.append(parseNode(item));
         }
     }
 
@@ -677,4 +761,35 @@ QString kubeTimelineText(const QList<KubeChange> &changes) {
         }
     }
     return lines.join(QLatin1Char('\n'));
+}
+
+QString kubeNodesText(const QList<KubeNode> &nodes) {
+    if (nodes.isEmpty()) {
+        return QStringLiteral("no nodes");
+    }
+    QString text;
+    for (const KubeNode &node : nodes) {
+        const double memCapacity = node.memCapacityBytes / (1024.0 * 1024.0 * 1024.0);
+        const double memAlloc = node.memAllocatableBytes / (1024.0 * 1024.0 * 1024.0);
+        text += QStringLiteral("%1 %2  %3  k8s %4  cpu %5/%6  mem %7/%8GiB  "
+                               "pods %9/%10%11%12\n")
+                    .arg(node.name.leftJustified(20, ' '),
+                         node.ready ? QStringLiteral("Ready ")
+                                    : QStringLiteral("NotRdy"),
+                         node.roles.leftJustified(10, ' '),
+                         node.kubeletVersion,
+                         QString::number(node.cpuAllocatableCores, 'f', 1),
+                         QString::number(node.cpuCapacityCores, 'f', 1),
+                         QString::number(memAlloc, 'f', 1),
+                         QString::number(memCapacity, 'f', 1))
+                    .arg(node.podsRunning)
+                    .arg(node.podsAllocatable)
+                    .arg(node.instanceType.isEmpty()
+                             ? QString()
+                             : QStringLiteral("  ") + node.instanceType,
+                         node.zone.isEmpty()
+                             ? QString()
+                             : QStringLiteral("  ") + node.zone);
+    }
+    return text.trimmed();
 }

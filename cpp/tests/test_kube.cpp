@@ -371,6 +371,54 @@ int main() {
               "kube: parse collects object apiVersion");
     }
 
+    {
+        const QByteArray json = QByteArrayLiteral(
+            "{\"items\":["
+            "{\"kind\":\"Node\",\"metadata\":{\"name\":\"node-1\",\"labels\":{"
+            "\"node-role.kubernetes.io/control-plane\":\"\","
+            "\"node.kubernetes.io/instance-type\":\"m5.large\","
+            "\"topology.kubernetes.io/zone\":\"us-east-1a\","
+            "\"topology.kubernetes.io/region\":\"us-east-1\"}},"
+            "\"spec\":{\"providerID\":\"aws:///us-east-1a/i-123\"},"
+            "\"status\":{\"nodeInfo\":{\"kubeletVersion\":\"v1.30.1\","
+            "\"containerRuntimeVersion\":\"containerd://1.7.2\","
+            "\"osImage\":\"Ubuntu 24.04\"},"
+            "\"capacity\":{\"cpu\":\"8\",\"memory\":\"16384000Ki\",\"pods\":\"110\"},"
+            "\"allocatable\":{\"cpu\":\"7900m\",\"memory\":\"15000000Ki\",\"pods\":\"110\"},"
+            "\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},"
+            "{\"kind\":\"Pod\",\"metadata\":{\"namespace\":\"default\",\"name\":\"web\"},"
+            "\"spec\":{\"nodeName\":\"node-1\",\"containers\":[]},"
+            "\"status\":{\"phase\":\"Running\"}}]}");
+        bool ok = false;
+        const KubeResources res = parseKubectlResources(json, &ok);
+        check(ok && res.nodes.size() == 1, "kube: parsed one node");
+        const KubeNode &node = res.nodes.first();
+        check(node.name == QStringLiteral("node-1") && node.ready,
+              "kube: node name + ready");
+        check(node.roles.contains(QStringLiteral("control-plane")),
+              "kube: node roles");
+        check(node.instanceType == QStringLiteral("m5.large")
+                  && node.zone == QStringLiteral("us-east-1a")
+                  && node.region == QStringLiteral("us-east-1"),
+              "kube: node topology labels");
+        check(node.providerId == QStringLiteral("aws:///us-east-1a/i-123"),
+              "kube: provisioner id");
+        check(node.kubeletVersion == QStringLiteral("v1.30.1")
+                  && node.runtime == QStringLiteral("containerd://1.7.2")
+                  && node.osImage == QStringLiteral("Ubuntu 24.04"),
+              "kube: nodeInfo");
+        check(std::fabs(node.cpuCapacityCores - 8.0) < 1e-6
+                  && std::fabs(node.cpuAllocatableCores - 7.9) < 1e-6,
+              "kube: node cpu capacity/allocatable");
+        check(node.memCapacityBytes == 16384000ULL * 1024
+                  && node.memAllocatableBytes == 15000000ULL * 1024,
+              "kube: node memory capacity/allocatable");
+        check(res.pods.at(0).nodeName == QStringLiteral("node-1"),
+              "kube: pod nodeName");
+        check(kubeNodesText(res.nodes).contains(QStringLiteral("node-1")),
+              "kube: nodes text");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }
