@@ -1,5 +1,143 @@
 #include "MacBackend.h"
 
+#ifdef Q_OS_MACOS
+
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#include <mach/mach_timebase_info.h>
+#include <mach/processor_info.h>
+#include <mach/vm_statistics.h>
+
+#include <libproc.h>
+
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <net/if_var.h>
+#include <signal.h>
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/resource.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <cerrno>
+#include <cstring>
+#include <vector>
+
+namespace {
+
+constexpr unsigned long long kHostTickNs = 10000000ULL;
+constexpr int kProcPidListFds = 1;
+constexpr int kProcPidTaskInfo = 4;
+constexpr int kProcPidFdVnodePathInfo = 2;
+constexpr int kProcPidVnodePathInfo = 9;
+
+double machTimebaseRatio() {
+    mach_timebase_info_data_t tb{};
+    if (mach_timebase_info(&tb) != KERN_SUCCESS || tb.denom == 0) {
+        return 1.0;
+    }
+    return static_cast<double>(tb.numer) / static_cast<double>(tb.denom);
+}
+
+bool readHostCpuLoad(uint64_t counts[CPU_STATE_MAX]) {
+    host_cpu_load_info_data_t info{};
+    mach_msg_type_number_t count = HOST_CPU_LOAD_INFO_COUNT;
+    if (host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO,
+                        reinterpret_cast<host_info_t>(&info), &count) != KERN_SUCCESS) {
+        return false;
+    }
+    for (int i = 0; i < CPU_STATE_MAX; ++i) {
+        counts[i] = info.cpu_ticks[i];
+    }
+    return true;
+}
+
+bool sysctlU64(const char *name, uint64_t &out) {
+    size_t size = sizeof(out);
+    return sysctlbyname(name, &out, &size, nullptr, 0) == 0;
+}
+
+bool sysctlU32(const char *name, uint32_t &out) {
+    size_t size = sizeof(out);
+    return sysctlbyname(name, &out, &size, nullptr, 0) == 0;
+}
+
+bool sysctlU32OrU64(const char *name, uint64_t &out) {
+    uint32_t v32 = 0;
+    if (sysctlU32(name, v32)) {
+        out = v32;
+        return true;
+    }
+    return sysctlU64(name, out);
+}
+
+bool readKinfo(int pid, kinfo_proc &kp) {
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
+    size_t size = sizeof(kp);
+    std::memset(&kp, 0, sizeof(kp));
+    if (sysctl(mib, 4, &kp, &size, nullptr, 0) != 0) {
+        return false;
+    }
+    return size >= sizeof(kp) && kp.kp_proc.p_pid == pid;
+}
+
+bool readTaskInfo(int pid, proc_taskinfo &pti) {
+    std::memset(&pti, 0, sizeof(pti));
+    const int rc = proc_pidinfo(pid, kProcPidTaskInfo, 0, &pti, sizeof(pti));
+    return rc == static_cast<int>(sizeof(pti));
+}
+
+struct ProcArgs {
+    QList<QByteArray> argv;
+    QByteArray env;
+};
+
+bool readProcArgs(int pid, ProcArgs &out) {
+    int argmax = 0;
+    size_t size = sizeof(argmax);
+    int mibMax[2] = {CTL_KERN, KERN_ARGMAX};
+    if (sysctl(mibMax, 2, &argmax, &size, nullptr, 0) != 0 || argmax <= 4) {
+        return false;
+    }
+
+    std::vector<char> buf(static_cast<size_t>(argmax));
+    int mib[3] = {CTL_KERN, KERN_PROCARGS2, pid};
+    size_t len = buf.size();
+    if (sysctl(mib, 3, buf.data(), &len, nullptr, 0) != 0 || len <= sizeof(int)) {
+        return false;
+    }
+
+    int argc = 0;
+    std::memcpy(&argc, buf.data(), sizeof(argc));
+    size_t pos = sizeof(int);
+    auto skipString = [&](size_t &p) {
+        while (p < len && buf[p] != '\0') {
+            ++p;
+        }
+    };
+
+    skipString(pos);
+    while (pos < len && buf[pos] == '\0') {
+        ++pos;
+    }
+
+    for (int i = 0; i < argc && pos < len; ++i) {
+        const size_t start = pos;
+        skipString(pos);
+        out.argv.append(QByteArray(buf.data() + start, static_cast<int>(pos - start)));
+        ++pos;
+    }
+
+    if (pos < len) {
+        out.env = QByteArray(buf.data() + pos, static_cast<int>(len - pos));
+    }
+    return true;
+}
+
+} // namespace
+
 QString MacBackend::platformName() const {
     return QStringLiteral("macos");
 }
@@ -7,3 +145,351 @@ QString MacBackend::platformName() const {
 PlatformCapabilities MacBackend::capabilities() const {
     return PlatformCapabilities{};
 }
+
+bool MacBackend::hostCpuTimes(linuxproc::HostCpuTimes &out) {
+    uint64_t counts[CPU_STATE_MAX] = {};
+    if (!readHostCpuLoad(counts)) {
+        return false;
+    }
+    out.idle = counts[CPU_STATE_IDLE];
+    out.total = counts[CPU_STATE_USER] + counts[CPU_STATE_SYSTEM] +
+                counts[CPU_STATE_IDLE] + counts[CPU_STATE_NICE];
+    return true;
+}
+
+bool MacBackend::hostMem(linuxproc::HostMem &out) {
+    uint64_t memsize = 0;
+    if (!sysctlU64("hw.memsize", memsize)) {
+        return false;
+    }
+
+    vm_statistics64_data_t vm{};
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    if (host_statistics64(mach_host_self(), HOST_VM_INFO64,
+                          reinterpret_cast<host_info64_t>(&vm), &count) != KERN_SUCCESS) {
+        return false;
+    }
+
+    vm_size_t pageSize = 0;
+    if (host_page_size(mach_host_self(), &pageSize) != KERN_SUCCESS || pageSize == 0) {
+        pageSize = static_cast<vm_size_t>(getpagesize());
+    }
+    const unsigned long long page = pageSize;
+
+    const unsigned long long freePages =
+        static_cast<unsigned long long>(vm.free_count) + vm.speculative_count;
+    const unsigned long long availPages =
+        static_cast<unsigned long long>(vm.free_count) + vm.inactive_count +
+        vm.speculative_count + vm.purgeable_count;
+
+    out.totalKb = memsize / 1024ULL;
+    out.freeKb = freePages * page / 1024ULL;
+    out.availableKb = availPages * page / 1024ULL;
+    if (out.availableKb > out.totalKb) {
+        out.availableKb = out.totalKb;
+    }
+    return true;
+}
+
+bool MacBackend::hostNet(linuxproc::NetTotals &out) {
+    struct ifaddrs *ifs = nullptr;
+    if (getifaddrs(&ifs) != 0) {
+        return false;
+    }
+    unsigned long long rx = 0;
+    unsigned long long tx = 0;
+    for (struct ifaddrs *ifa = ifs; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK) {
+            continue;
+        }
+        if (std::strcmp(ifa->ifa_name, "lo0") == 0) {
+            continue;
+        }
+        const auto *data = reinterpret_cast<const struct if_data *>(ifa->ifa_data);
+        if (data == nullptr) {
+            continue;
+        }
+        rx += data->ifi_ibytes;
+        tx += data->ifi_obytes;
+    }
+    freeifaddrs(ifs);
+    out.rxBytes = rx;
+    out.txBytes = tx;
+    return true;
+}
+
+bool MacBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
+    struct ifaddrs *ifs = nullptr;
+    if (getifaddrs(&ifs) != 0) {
+        return false;
+    }
+    for (struct ifaddrs *ifa = ifs; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK) {
+            continue;
+        }
+        const auto *data = reinterpret_cast<const struct if_data *>(ifa->ifa_data);
+        if (data == nullptr) {
+            continue;
+        }
+        linuxproc::InterfaceStats st;
+        st.name = QString::fromUtf8(ifa->ifa_name);
+        st.rxBytes = data->ifi_ibytes;
+        st.txBytes = data->ifi_obytes;
+        st.rxPackets = data->ifi_ipackets;
+        st.txPackets = data->ifi_opackets;
+        st.rxErrs = data->ifi_ierrors;
+        st.txErrs = data->ifi_oerrors;
+        st.rxDrop = data->ifi_iqdrops;
+        out.append(st);
+    }
+    freeifaddrs(ifs);
+    return true;
+}
+
+bool MacBackend::hostLoad(double &l1, double &l5, double &l15) {
+    struct loadavg la{};
+    int mib[2] = {CTL_VM, VM_LOADAVG};
+    size_t size = sizeof(la);
+    if (sysctl(mib, 2, &la, &size, nullptr, 0) != 0 || la.fscale == 0) {
+        return false;
+    }
+    const double scale = static_cast<double>(la.fscale);
+    l1 = static_cast<double>(la.ldavg[0]) / scale;
+    l5 = static_cast<double>(la.ldavg[1]) / scale;
+    l15 = static_cast<double>(la.ldavg[2]) / scale;
+    return true;
+}
+
+bool MacBackend::diskUsage(const QString &path, unsigned long long &totalBytes,
+                           unsigned long long &freeBytes) {
+    struct statfs st{};
+    const QByteArray p = path.toUtf8();
+    if (statfs(p.constData(), &st) != 0) {
+        return false;
+    }
+    const unsigned long long bsize = st.f_bsize;
+    totalBytes = st.f_blocks * bsize;
+    freeBytes = st.f_bavail * bsize;
+    return true;
+}
+
+bool MacBackend::exists(int pid) {
+    if (pid < 0) {
+        return false;
+    }
+    if (pid == 0) {
+        return true;
+    }
+    if (kill(pid, 0) == 0) {
+        return true;
+    }
+    if (errno == EPERM) {
+        return true;
+    }
+    if (errno == ESRCH) {
+        return false;
+    }
+    return true;
+}
+
+QString MacBackend::comm(int pid) {
+    char buf[2 * MAXCOMLEN + 1] = {};
+    if (proc_name(pid, buf, sizeof(buf)) <= 0) {
+        return QString();
+    }
+    return QString::fromUtf8(buf);
+}
+
+QString MacBackend::exePath(int pid) {
+    char buf[PROC_PIDPATHINFO_MAXSIZE] = {};
+    if (proc_pidpath(pid, buf, sizeof(buf)) <= 0) {
+        return QString();
+    }
+    return QString::fromUtf8(buf);
+}
+
+int MacBackend::parentPid(int pid) {
+    kinfo_proc kp{};
+    if (!readKinfo(pid, kp)) {
+        return -1;
+    }
+    return kp.kp_eproc.e_ppid;
+}
+
+unsigned long long MacBackend::startTime(int pid) {
+    kinfo_proc kp{};
+    if (!readKinfo(pid, kp)) {
+        return 0;
+    }
+    return static_cast<unsigned long long>(kp.kp_proc.p_starttime.tv_sec);
+}
+
+QList<int> MacBackend::allPids() {
+    QList<int> pids;
+    const int count = proc_listallpids(nullptr, 0);
+    if (count <= 0) {
+        return pids;
+    }
+    std::vector<pid_t> buf(static_cast<size_t>(count) + 64);
+    const int got = proc_listallpids(buf.data(),
+                                     static_cast<int>(buf.size() * sizeof(pid_t)));
+    if (got <= 0) {
+        return pids;
+    }
+    pids.reserve(got);
+    for (int i = 0; i < got; ++i) {
+        if (buf[i] > 0) {
+            pids.append(buf[i]);
+        }
+    }
+    return pids;
+}
+
+ProcessIdentity MacBackend::identity(int pid) {
+    ProcessIdentity id;
+    id.pid = pid;
+    id.startTime = startTime(pid);
+    return id;
+}
+
+bool MacBackend::procCpu(int pid, unsigned long long &ticks,
+                         unsigned long long &start) {
+    proc_taskinfo pti{};
+    if (!readTaskInfo(pid, pti)) {
+        return false;
+    }
+    start = startTime(pid);
+    if (start == 0) {
+        return false;
+    }
+    const double ratio = machTimebaseRatio();
+    const double ns =
+        static_cast<double>(pti.pti_total_user + pti.pti_total_system) * ratio;
+    ticks = static_cast<unsigned long long>(ns);
+    return true;
+}
+
+bool MacBackend::totalCpuTicks(unsigned long long &out) {
+    uint64_t counts[CPU_STATE_MAX] = {};
+    if (!readHostCpuLoad(counts)) {
+        return false;
+    }
+    const unsigned long long total = counts[CPU_STATE_USER] + counts[CPU_STATE_SYSTEM] +
+                                     counts[CPU_STATE_IDLE] + counts[CPU_STATE_NICE];
+    out = total * kHostTickNs;
+    return true;
+}
+
+int MacBackend::onlineCpuCount() {
+    uint64_t v = 0;
+    if (sysctlU32OrU64("hw.logicalcpu", v) && v > 0) {
+        return static_cast<int>(v);
+    }
+    const long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? static_cast<int>(n) : 0;
+}
+
+bool MacBackend::rssKb(int pid, unsigned long long &out) {
+    proc_taskinfo pti{};
+    if (!readTaskInfo(pid, pti)) {
+        return false;
+    }
+    out = pti.pti_resident_size / 1024ULL;
+    return true;
+}
+
+bool MacBackend::procMem(int pid, linuxproc::MemInfo &out) {
+    proc_taskinfo pti{};
+    if (!readTaskInfo(pid, pti)) {
+        return false;
+    }
+    out.rssKb = pti.pti_resident_size / 1024ULL;
+    out.vmsKb = pti.pti_virtual_size / 1024ULL;
+    out.swapKb = 0;
+    out.sharedKb = 0;
+    return true;
+}
+
+bool MacBackend::procSample(int pid, linuxproc::MemInfo &mem,
+                            linuxproc::ProcDetail &detail) {
+    proc_taskinfo pti{};
+    if (!readTaskInfo(pid, pti)) {
+        return false;
+    }
+    mem.rssKb = pti.pti_resident_size / 1024ULL;
+    mem.vmsKb = pti.pti_virtual_size / 1024ULL;
+    mem.swapKb = 0;
+    mem.sharedKb = 0;
+
+    detail.threads = pti.pti_threadnum;
+    detail.fdCount = countFds(pid);
+
+    struct rusage_info_v6 ri{};
+    if (proc_pid_rusage(pid, RUSAGE_INFO_V6,
+                        reinterpret_cast<rusage_info_t *>(&ri)) == 0) {
+        detail.readBytes = static_cast<long long>(ri.ri_diskio_bytesread);
+        detail.writeBytes = static_cast<long long>(ri.ri_diskio_byteswritten);
+        detail.voluntaryCtx = ri.ri_pswitches;
+        detail.involuntaryCtx = ri.ri_interrupt_wkups;
+    }
+    return true;
+}
+
+int MacBackend::countFds(int pid) {
+    const int bytes = proc_pidinfo(pid, kProcPidListFds, 0, nullptr, 0);
+    if (bytes <= 0) {
+        return -1;
+    }
+    return bytes / static_cast<int>(sizeof(struct proc_fdinfo));
+}
+
+QList<QString> MacBackend::fdTargets(int pid) {
+    QList<QString> out;
+    const int bytes = proc_pidinfo(pid, kProcPidListFds, 0, nullptr, 0);
+    if (bytes <= 0) {
+        return out;
+    }
+    const int capacity = bytes + static_cast<int>(sizeof(struct proc_fdinfo)) * 8;
+    std::vector<char> raw(static_cast<size_t>(capacity));
+    const int got = proc_pidinfo(pid, kProcPidListFds, 0, raw.data(), capacity);
+    if (got <= 0) {
+        return out;
+    }
+    const int n = got / static_cast<int>(sizeof(struct proc_fdinfo));
+    const auto *fds = reinterpret_cast<const struct proc_fdinfo *>(raw.data());
+    for (int i = 0; i < n; ++i) {
+        const int fd = fds[i].proc_fd;
+        struct vnode_fdinfowithpath vpi{};
+        const int rc = proc_pidfdinfo(pid, fd, kProcPidFdVnodePathInfo, &vpi,
+                                      sizeof(vpi));
+        if (rc > 0 && vpi.pvip_path[0] != '\0') {
+            out.append(QString::fromUtf8(vpi.pvip_path));
+        } else {
+            out.append(QStringLiteral("fd:%1").arg(fd));
+        }
+    }
+    return out;
+}
+
+QByteArray MacBackend::processEnv(int pid) {
+    ProcArgs args;
+    if (!readProcArgs(pid, args)) {
+        return QByteArray();
+    }
+    return args.env;
+}
+
+QString MacBackend::processCmdline(int pid) {
+    ProcArgs args;
+    if (!readProcArgs(pid, args)) {
+        return QString();
+    }
+    QList<QString> parts;
+    parts.reserve(args.argv.size());
+    for (const QByteArray &a : args.argv) {
+        parts.append(QString::fromUtf8(a));
+    }
+    return parts.join(QLatin1Char(' '));
+}
+
+#endif // Q_OS_MACOS

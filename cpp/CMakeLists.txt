@@ -162,6 +162,8 @@ add_library(syspeek_core STATIC
     src/FimStatus.h
     src/FimSource.cpp
     src/FimSource.h
+    src/DumpReport.cpp
+    src/DumpReport.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

@@ -30,3 +30,20 @@ jobs:
         run: ctest --test-dir cpp/build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
+
+      - name: Dump smoke
+        run: |
+          ./cpp/build/syspeek --dump > "${RUNNER_TEMP}/syspeek-dump.json"
+          python3 - "${RUNNER_TEMP}/syspeek-dump.json" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          h = d["host"]
+          assert d["processCount"] > 0, d
+          assert len(d["processes"]) > 0, d
+          assert h["cores"] > 0, h
+          assert h["memTotalKb"] > 0, h
+          print("dump ok:", d["platform"], h["cores"], "cores",
+                int(h["memTotalKb"] // 1024), "MiB", d["processCount"], "procs")
+          PY
+        env:
+          QT_QPA_PLATFORM: offscreen

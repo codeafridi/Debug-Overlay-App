@@ -3,11 +3,16 @@
 #include "platform/PortCatalog.h"
 #include "platform/null/NullBackend.h"
 
+#include "DumpReport.h"
+
 #if defined(Q_OS_LINUX)
 #include "platform/linux/LinuxBackend.h"
 #endif
 
 #include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <unistd.h>
 
@@ -157,6 +162,26 @@ int main(int argc, char *argv[]) {
     unsigned long long groupRss = 0;
     check(linux.sumRssKb(QList<int>{self}, groupRss) && groupRss > 0,
           "linux: sumRssKb(self) positive");
+#endif
+
+    const QString report = dumpReportJson(5);
+    const QJsonDocument doc = QJsonDocument::fromJson(report.toUtf8());
+    check(doc.isObject(), "dump: valid JSON object");
+    const QJsonObject root = doc.object();
+    check(root.value(QStringLiteral("platform")).toString()
+              == backend->platformName(),
+          "dump: platform matches factory");
+    check(root.value(QStringLiteral("processCount")).toInt() > 0,
+          "dump: processCount > 0");
+#if defined(Q_OS_LINUX)
+    check(root.value(QStringLiteral("host"))
+                  .toObject()
+                  .value(QStringLiteral("memTotalKb"))
+                  .toDouble()
+              > 0.0,
+          "dump: host mem positive");
+    check(!root.value(QStringLiteral("processes")).toArray().isEmpty(),
+          "dump: processes non-empty");
 #endif
 
     std::printf("%d failure(s)\n", failures);

@@ -14,6 +14,7 @@
 #include "PathSource.h"
 #include "StatsdSource.h"
 #include "DbmSource.h"
+#include "DumpReport.h"
 #include "TlsSource.h"
 #include "FimSource.h"
 #include "platform/PlatformFactory.h"
@@ -86,6 +87,12 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Syspeek"));
+
+    if (app.arguments().contains(QStringLiteral("--dump"))) {
+        const QByteArray report = dumpReportJson().toUtf8();
+        std::fwrite(report.constData(), 1, report.size(), stdout);
+        return 0;
+    }
 
     QString configError;
     const Config config = loadConfig(defaultConfigPath(), &configError);
