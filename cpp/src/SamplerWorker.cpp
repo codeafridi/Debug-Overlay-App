@@ -253,7 +253,7 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         snap.security = evaluateSecurity(securityInput);
     }
 
-    snap.runtime = detectRuntime(focus.identity.pid);
+    snap.runtime = detectRuntime(focus.identity.pid, *m_backend);
 
     snap.profile = m_profileSampler.sample(focus.identity.pid);
 
