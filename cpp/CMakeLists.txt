@@ -184,9 +184,18 @@ if(UNIX AND NOT APPLE)
         src/platform/linux/LinuxBackend.cpp
         src/platform/linux/LinuxBackend.h)
 elseif(APPLE)
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 20)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
     target_sources(syspeek_core PRIVATE
         src/platform/mac/MacBackend.cpp
-        src/platform/mac/MacBackend.h)
+        src/platform/mac/MacBackend.h
+        src/platform/mac/MacFocusProvider.mm
+        src/platform/mac/MacFocusProvider.h
+        src/platform/mac/MacNotifier.mm
+        src/platform/mac/MacNotifier.h
+        src/platform/mac/MacOverlay.mm
+        src/platform/mac/MacOverlay.h)
 elseif(WIN32)
     target_sources(syspeek_core PRIVATE
         src/platform/win/WindowsBackend.cpp
@@ -195,7 +204,11 @@ endif()
 
 target_include_directories(syspeek_core PUBLIC src)
 target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::Network)
-if(UNIX AND NOT APPLE)
+if(APPLE)
+    target_link_libraries(syspeek_core PUBLIC
+        "-framework Cocoa" "-framework CoreFoundation")
+    target_compile_options(syspeek_core PUBLIC $<$<COMPILE_LANGUAGE:OBJCXX>:-Wno-deprecated-declarations>)
+elseif(UNIX)
     target_link_libraries(syspeek_core PUBLIC Qt6::DBus)
 endif()
 target_compile_options(syspeek_core PRIVATE

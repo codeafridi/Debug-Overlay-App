@@ -3,6 +3,10 @@
 #include "DashboardPanel.h"
 #include "platform/NotifierFactory.h"
 
+#ifdef Q_OS_MACOS
+#include "platform/mac/MacOverlay.h"
+#endif
+
 #include <QApplication>
 #include <QDateTime>
 #include <QFont>
@@ -600,6 +604,13 @@ void HudWindow::toggleCompact() {
     }
 
     adjustSize();
+}
+
+void HudWindow::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+#ifdef Q_OS_MACOS
+    applyMacOverlay(this);
+#endif
 }
 
 void HudWindow::keyPressEvent(QKeyEvent *event) {

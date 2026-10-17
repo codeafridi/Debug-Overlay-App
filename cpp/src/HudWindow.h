@@ -65,6 +65,7 @@ public:
     bool isExpanded() const { return m_detailsExpanded; }
 
 protected:
+    void showEvent(QShowEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;

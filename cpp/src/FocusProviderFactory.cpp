@@ -9,6 +9,10 @@
 #include "SwaymsgFocusProvider.h"
 #include "XdotoolFocusProvider.h"
 
+#ifdef Q_OS_MACOS
+#include "platform/mac/MacFocusProvider.h"
+#endif
+
 #include <QProcessEnvironment>
 
 FocusProviderKind selectProviderKind(const SessionInfo &info) {
@@ -77,7 +81,8 @@ QString focusProviderKindName(FocusProviderKind kind) {
 std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config) {
 #ifdef Q_OS_MACOS
     Q_UNUSED(config);
-    return std::make_unique<NullFocusProvider>();
+    return std::make_unique<CachingFocusProvider>(
+        std::make_unique<MacFocusProvider>(), config.focusCacheTtlMs);
 #else
     const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 
