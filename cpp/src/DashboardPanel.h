@@ -82,6 +82,17 @@ private:
     QWidget *buildMetricsView();
     QWidget *buildSloView();
 
+    QString unsupportedOsText() const;
+
+    bool m_osTcpCounters = true;
+    bool m_osCgroups = true;
+    bool m_osPsi = true;
+    bool m_osJournal = true;
+    bool m_osDpkgSbom = true;
+    bool m_osFim = true;
+    bool m_osSecurity = true;
+    QString m_osName = QStringLiteral("linux");
+
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
     QLabel *m_alerts = nullptr;

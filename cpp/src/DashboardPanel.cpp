@@ -1,5 +1,7 @@
 #include "DashboardPanel.h"
 
+#include "platform/PlatformFactory.h"
+
 #include "LogParser.h"
 #include "MemoryFormat.h"
 #include "SensitiveStatus.h"
@@ -96,9 +98,23 @@ QFrame *makeStatCard(const QString &caption, QWidget *content, QWidget *parent) 
 
 } // namespace
 
+QString DashboardPanel::unsupportedOsText() const {
+    return QStringLiteral("not supported on this OS (%1)").arg(m_osName);
+}
+
 DashboardPanel::DashboardPanel(QWidget *parent)
     : QWidget(parent) {
     setObjectName(QStringLiteral("ddRoot"));
+
+    const PlatformCapabilities osCaps = systemBackend().capabilities();
+    m_osTcpCounters = osCaps.tcpCounters;
+    m_osCgroups = osCaps.cgroups;
+    m_osPsi = osCaps.psi;
+    m_osJournal = osCaps.journal;
+    m_osDpkgSbom = osCaps.dpkgSbom;
+    m_osFim = osCaps.fim;
+    m_osSecurity = osCaps.namespaces;
+    m_osName = systemBackend().platformName();
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -1312,6 +1328,9 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     if (snapshot.tcpHealthAvailable) {
         m_tcpSummary->setText(tcpHealthSummaryText(snapshot.tcpHealth));
         m_tcp->setText(tcpHealthDetailText(snapshot.tcpHealth));
+    } else if (!m_osTcpCounters) {
+        m_tcpSummary->setText(unsupportedOsText());
+        m_tcp->setText(unsupportedOsText());
     } else {
         m_tcpSummary->setText(QStringLiteral("warming up"));
         m_tcp->setText(QStringLiteral("--"));
@@ -1336,6 +1355,8 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                     .arg(snapshot.cgroupThrottled)
                     .arg(snapshot.cgroupPeriods);
         m_cgroup->setText(text);
+    } else if (!m_osCgroups) {
+        m_cgroup->setText(unsupportedOsText());
     } else {
         m_cgroup->setText(QStringLiteral("no cgroup stats"));
     }
@@ -1410,6 +1431,8 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                 .arg(snapshot.ioPressure.fullAvg10, 0, 'f', 2)
                 .arg(snapshot.ioPressure.fullAvg60, 0, 'f', 2)
                 .arg(snapshot.ioPressure.fullAvg300, 0, 'f', 2));
+    } else if (!m_osPsi) {
+        m_diskPressure->setText(unsupportedOsText());
     } else {
         m_diskPressure->setText(QStringLiteral("not available"));
     }
@@ -1444,14 +1467,19 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     if (snapshot.security.available) {
         m_securitySummary->setText(securitySummaryText(snapshot.security));
         m_security->setText(securityDetailText(snapshot.security));
+    } else if (!m_osSecurity) {
+        m_securitySummary->setText(unsupportedOsText());
+        m_security->setText(unsupportedOsText());
     } else {
         m_securitySummary->setText(QStringLiteral("--"));
         m_security->setText(QStringLiteral("--"));
     }
 
     m_softwareSummary->setText(sbomSummaryText(snapshot.sbom));
-    m_software->setText(snapshot.sbom.available ? sbomDetailText(snapshot.sbom)
-                                                : QStringLiteral("--"));
+    m_software->setText(snapshot.sbom.available
+                            ? sbomDetailText(snapshot.sbom)
+                            : (m_osDpkgSbom ? QStringLiteral("--")
+                                            : unsupportedOsText()));
 
     m_sloSummary->setText(sloSummaryText(snapshot.slo));
     m_slo->setText(sloDetailText(snapshot.slo));
@@ -1665,11 +1693,14 @@ void DashboardPanel::setServicesSnapshot(const ServicesSnapshot &snapshot) {
 
 void DashboardPanel::setJournalSnapshot(const JournalSnapshot &snapshot) {
     m_logsSummary->setText(journalSummaryText(snapshot));
-    m_logs->setText(snapshot.available ? journalLogsText(snapshot, 40)
-                                       : QStringLiteral("--"));
+    m_logs->setText(snapshot.available
+                        ? journalLogsText(snapshot, 40)
+                        : (m_osJournal ? QStringLiteral("--")
+                                       : unsupportedOsText()));
     m_errors->setText(snapshot.available
                           ? journalErrorGroupsText(snapshot.errorGroups)
-                          : QStringLiteral("--"));
+                          : (m_osJournal ? QStringLiteral("--")
+                                         : unsupportedOsText()));
 
     QStringList messages;
     for (const JournalEntry &entry : snapshot.entries) {
@@ -1773,6 +1804,7 @@ void DashboardPanel::setTlsSnapshot(const TlsSnapshot &snapshot) {
 }
 
 void DashboardPanel::setFimSnapshot(const FimSnapshot &snapshot) {
-    m_fimSummary->setText(fimSummaryText(snapshot));
-    m_fim->setText(fimDetailText(snapshot));
+    m_fimSummary->setText(m_osFim ? fimSummaryText(snapshot)
+                                  : unsupportedOsText());
+    m_fim->setText(m_osFim ? fimDetailText(snapshot) : unsupportedOsText());
 }
