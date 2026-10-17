@@ -56,12 +56,9 @@ int main(int argc, char *argv[]) {
     XdotoolFocusProvider xdotoolProvider(xdotool);
     check(xdotoolProvider.name() == QStringLiteral("xdotool"),
           "xdotool adapter name");
-#ifdef Q_OS_LINUX
+#ifndef Q_OS_WIN
     check(xdotoolProvider.focusedPid() == me,
           "xdotool adapter returns pid from command (args validated)");
-#else
-    check(xdotoolProvider.focusedPid() == -1,
-          "xdotool adapter stub backend -> -1");
 #endif
 
     const QString hyprctl = writeScript(
@@ -70,12 +67,9 @@ int main(int argc, char *argv[]) {
                        "|| exit 2\necho '{\"pid\":%1}'\n")
             .arg(pid));
     HyprctlFocusProvider hyprctlProvider(hyprctl);
-#ifdef Q_OS_LINUX
+#ifndef Q_OS_WIN
     check(hyprctlProvider.focusedPid() == me,
           "hyprctl adapter returns pid from JSON");
-#else
-    check(hyprctlProvider.focusedPid() == -1,
-          "hyprctl adapter stub backend -> -1");
 #endif
 
     const QString swaymsg = writeScript(
@@ -85,12 +79,9 @@ int main(int argc, char *argv[]) {
                        "\"pid\":%1}'\n")
             .arg(pid));
     SwaymsgFocusProvider swayProvider(swaymsg);
-#ifdef Q_OS_LINUX
+#ifndef Q_OS_WIN
     check(swayProvider.focusedPid() == me,
           "swaymsg adapter returns pid from tree JSON");
-#else
-    check(swayProvider.focusedPid() == -1,
-          "swaymsg adapter stub backend -> -1");
 #endif
 
     const QString niri = writeScript(
@@ -101,12 +92,9 @@ int main(int argc, char *argv[]) {
             .arg(pid));
     NiriFocusProvider niriProvider(niri);
     check(niriProvider.name() == QStringLiteral("niri"), "niri adapter name");
-#ifdef Q_OS_LINUX
+#ifndef Q_OS_WIN
     check(niriProvider.focusedPid() == me,
           "niri adapter returns pid from focused-window JSON");
-#else
-    check(niriProvider.focusedPid() == -1,
-          "niri adapter stub backend -> -1");
 #endif
 
     XdotoolFocusProvider nonzero(
