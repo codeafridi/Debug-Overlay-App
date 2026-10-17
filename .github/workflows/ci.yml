@@ -33,7 +33,12 @@ jobs:
 
       - name: Dump smoke
         run: |
-          ./cpp/build/syspeek --dump > "${RUNNER_TEMP}/syspeek-dump.json"
+          SYSPEEK_BIN=./cpp/build/syspeek
+          if [ "$(uname -s)" = "Darwin" ] && [ -x ./cpp/build/syspeek.app/Contents/MacOS/syspeek ]; then
+            SYSPEEK_BIN=./cpp/build/syspeek.app/Contents/MacOS/syspeek
+          fi
+          echo "syspeek binary: $SYSPEEK_BIN"
+          "$SYSPEEK_BIN" --dump > "${RUNNER_TEMP}/syspeek-dump.json"
           ps ax | wc -l > "${RUNNER_TEMP}/ps-count.txt"
           python3 - "${RUNNER_TEMP}/syspeek-dump.json" \
             "${RUNNER_TEMP}/ps-count.txt" <<'PY'

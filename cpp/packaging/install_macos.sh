@@ -13,8 +13,12 @@ PLIST="${HOME}/Library/LaunchAgents/${BUNDLE_ID}.plist"
 LOG_FILE="${HOME}/Library/Logs/Syspeek/syspeek.log"
 ERR_FILE="${HOME}/Library/Logs/Syspeek/syspeek.err.log"
 
-BIN_DEFAULT="/Applications/Syspeek.app/Contents/MacOS/Syspeek"
+BIN_DEFAULT="/Applications/Syspeek.app/Contents/MacOS/syspeek"
 BIN="${SYSPEEK_BIN:-$BIN_DEFAULT}"
+if [ ! -x "$BIN" ] && [ -x "/Applications/Syspeek.app/Contents/MacOS/Syspeek" ]; then
+    # Older bundles capitalised the executable name; tolerate both.
+    BIN="/Applications/Syspeek.app/Contents/MacOS/Syspeek"
+fi
 if [ ! -x "$BIN" ]; then
     BIN="{{BIN_PATH}}"
 fi

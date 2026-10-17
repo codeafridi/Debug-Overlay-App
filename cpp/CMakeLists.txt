@@ -220,6 +220,20 @@ target_compile_options(syspeek_core PRIVATE
 add_executable(syspeek src/main.cpp)
 target_link_libraries(syspeek PRIVATE syspeek_core)
 
+if(APPLE)
+    set_target_properties(syspeek PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "Syspeek"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "dev.syspeek.hud"
+        MACOSX_BUNDLE_EXECUTABLE_NAME "syspeek"
+        MACOSX_BUNDLE_INFO_STRING "Syspeek ${PROJECT_VERSION} - local system HUD"
+        MACOSX_BUNDLE_LONG_VERSION_STRING "syspeek ${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_INFO_PLIST
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info.plist.in")
+endif()
+
 enable_testing()
 
 add_executable(syspeek_tests tests/test_hud_buttons.cpp)
