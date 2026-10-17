@@ -18,7 +18,7 @@ bool MacNotifier::send(const Alert &alert) {
     QStringList args;
     args << QStringLiteral("-e")
          << QStringLiteral("display notification \"%1\" with title \"Syspeek\" subtitle \"%2\"")
-                .arg(escapeAppleScript(alert.message),
+                .arg(escapeAppleScript(alert.detail),
                      escapeAppleScript(alert.title));
 
     QProcess process;

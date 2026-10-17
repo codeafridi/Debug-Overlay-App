@@ -12,6 +12,8 @@
 
 #include <libproc.h>
 
+#include <CoreFoundation/CoreFoundation.h>
+
 #if defined(Q_OS_MACOS)
 #include <IOKit/IOKitLib.h>
 #endif
