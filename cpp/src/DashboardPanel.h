@@ -13,6 +13,7 @@
 #include "StatsdStatus.h"
 #include "ThreatStatus.h"
 #include "DbmStatus.h"
+#include "WatchdogStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -85,6 +86,7 @@ private:
     QLabel *m_hostDisk = nullptr;
     QLabel *m_hostNet = nullptr;
     QLabel *m_hostLoad = nullptr;
+    QLabel *m_watchdog = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;
     QLabel *m_focusDetail = nullptr;

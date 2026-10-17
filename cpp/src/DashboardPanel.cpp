@@ -244,6 +244,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddStatsd { color: #9aa2ac; }"
         "#ddDbmSummary { color: #c4cad1; }"
         "#ddDbm { color: #9aa2ac; }"
+        "#ddWatchdog { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
         "#ddSensitive { color: #9aa2ac; }"
         "#ddSloSummary { color: #c4cad1; }"
@@ -345,6 +346,13 @@ QWidget *DashboardPanel::buildOverviewView() {
     hostRow->addWidget(makeStatCard(QStringLiteral("NET rx / tx"), m_hostNet, view), 1);
     hostRow->addWidget(makeStatCard(QStringLiteral("LOAD 1m"), m_hostLoad, view), 1);
     layout->addLayout(hostRow);
+
+    m_watchdog = new QLabel(QStringLiteral("--"), view);
+    m_watchdog->setObjectName(QStringLiteral("ddWatchdog"));
+    m_watchdog->setFont(monoFont(10));
+    m_watchdog->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("WATCHDOG (anomaly detection)"), m_watchdog, view), 1);
     layout->addStretch(1);
     return view;
 }
@@ -1172,6 +1180,18 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
             label->setText(QStringLiteral("--"));
         }
     }
+
+    QList<WatchdogMetric> watchdog;
+    watchdog.append(WatchdogMetric{
+        QStringLiteral("cpu"),
+        detectAnomaly(m_cpuStore.values(), AnomalyModel::Mad, 3.5)});
+    watchdog.append(WatchdogMetric{
+        QStringLiteral("rss"),
+        detectAnomaly(m_memStore.values(), AnomalyModel::PredictLinear, 3.0)});
+    watchdog.append(WatchdogMetric{
+        QStringLiteral("host-cpu"),
+        detectAnomaly(m_hostCpuStore.values(), AnomalyModel::ZScore, 3.0)});
+    m_watchdog->setText(watchdogText(watchdog));
 
     DiskSnapshot disk;
     disk.disks = snapshot.disks;

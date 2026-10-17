@@ -18,6 +18,7 @@
 #include "SloStatus.h"
 #include "ThreatStatus.h"
 #include "DbmStatus.h"
+#include "WatchdogStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -851,6 +852,38 @@ int main(int argc, char *argv[]) {
               "dbm: summary text");
         check(dbmDetailText(snapshot).contains(QStringLiteral("deadlocks")),
               "dbm: detail text");
+    }
+
+    {
+        QList<double> flat;
+        for (int i = 0; i < 30; ++i) flat.append(10.0 + (i % 2));
+        const AnomalyResult flatZ =
+            detectAnomaly(flat, AnomalyModel::Mad, 3.5);
+        check(!flatZ.anomalous, "watchdog: flat series not anomalous");
+
+        QList<double> spike = flat;
+        spike.append(90.0);
+        const AnomalyResult mad = detectAnomaly(spike, AnomalyModel::Mad, 3.5);
+        check(mad.anomalous && mad.value == 90.0,
+              "watchdog: mad flags spike");
+        check(std::fabs(mad.expected - 10.5) < 1.5,
+              "watchdog: mad expected value");
+
+        const AnomalyResult z = detectAnomaly(spike, AnomalyModel::ZScore, 3.0);
+        check(z.anomalous, "watchdog: zscore flags spike");
+        const AnomalyResult q =
+            detectAnomaly(spike, AnomalyModel::Quantile, 3.0);
+        check(q.anomalous, "watchdog: quantile flags spike");
+        const AnomalyResult p =
+            detectAnomaly(spike, AnomalyModel::PredictLinear, 3.0);
+        check(p.anomalous, "watchdog: predict_linear flags spike");
+
+        QList<WatchdogMetric> metrics;
+        metrics.append(WatchdogMetric{QStringLiteral("cpu"), mad});
+        check(watchdogText(metrics).contains(QStringLiteral("ANOMALY")),
+              "watchdog: text marks anomaly");
+        check(watchdogText(metrics).contains(QStringLiteral("mad")),
+              "watchdog: text names the model");
     }
 
     std::printf("%d failure(s)\n", failures);

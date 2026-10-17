@@ -141,6 +141,8 @@ add_library(syspeek_core STATIC
     src/DbmStatus.h
     src/DbmSource.cpp
     src/DbmSource.h
+    src/WatchdogStatus.cpp
+    src/WatchdogStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp
