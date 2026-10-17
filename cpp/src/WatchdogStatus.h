@@ -23,7 +23,24 @@ struct WatchdogMetric {
     AnomalyResult result;
 };
 
+struct ForecastResult {
+    double predicted = 0.0;   // next value
+    double slope = 0.0;       // change per sample
+    double threshold = 0.0;
+    int stepsToThreshold = -1; // -1 when not reached within the horizon
+    bool crosses = false;
+    QString direction;        // "rising" / "falling" / "flat"
+};
+
 QString anomalyModelName(AnomalyModel model);
 AnomalyResult detectAnomaly(const QList<double> &series, AnomalyModel model,
                             double threshold);
+// Prometheus predict_linear-style forecast + time-to-threshold.
+ForecastResult forecastCrossing(const QList<double> &series, double threshold,
+                                int horizon = 60);
+// Prometheus holt_winters-style additive seasonal decomposition.
+AnomalyResult holtWinters(const QList<double> &series, int season,
+                          double alpha, double beta, double gamma,
+                          double band);
 QString watchdogText(const QList<WatchdogMetric> &metrics);
+QString forecastText(const ForecastResult &cpu, const ForecastResult &hostCpu);

@@ -1017,6 +1017,40 @@ int main(int argc, char *argv[]) {
               "incident: detail text");
     }
 
+    {
+        QList<double> rising;
+        for (int i = 0; i < 60; ++i) {
+            rising.append(i);
+        }
+        const ForecastResult risingForecast =
+            forecastCrossing(rising, 90.0, 60);
+        check(risingForecast.crosses
+                  && risingForecast.stepsToThreshold > 0,
+              "forecast: rising series crosses threshold");
+        check(risingForecast.direction == QStringLiteral("rising"),
+              "forecast: rising direction");
+
+        QList<double> flat;
+        for (int i = 0; i < 60; ++i) {
+            flat.append(12.0);
+        }
+        const ForecastResult flatForecast = forecastCrossing(flat, 90.0, 60);
+        check(!flatForecast.crosses
+                  && flatForecast.direction == QStringLiteral("flat"),
+              "forecast: flat series does not cross");
+
+        QList<double> seasonal;
+        for (int i = 0; i < 40; ++i) {
+            seasonal.append(10.0 + (i % 4));
+        }
+        seasonal.append(100.0); // injected spike
+        const AnomalyResult hw =
+            holtWinters(seasonal, 4, 0.5, 0.1, 0.1, 3.0);
+        check(hw.anomalous, "holt-winters: seasonal spike flagged");
+        check(hw.model == QStringLiteral("holt_winters"),
+              "holt-winters: model name");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

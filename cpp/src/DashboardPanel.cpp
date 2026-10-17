@@ -247,6 +247,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDbm { color: #9aa2ac; }"
         "#ddWatchdog { color: #9aa2ac; }"
         "#ddRuntime { color: #9aa2ac; }"
+        "#ddForecast { color: #9aa2ac; }"
         "#ddIncidentsSummary { color: #c4cad1; }"
         "#ddIncidents { color: #9aa2ac; }"
         "#ddTlsSummary { color: #c4cad1; }"
@@ -366,6 +367,13 @@ QWidget *DashboardPanel::buildOverviewView() {
     m_runtime->setWordWrap(false);
     layout->addWidget(
         makeCard(QStringLiteral("RUNTIME (SSI)"), m_runtime, view), 1);
+
+    m_forecast = new QLabel(QStringLiteral("--"), view);
+    m_forecast->setObjectName(QStringLiteral("ddForecast"));
+    m_forecast->setFont(monoFont(10));
+    m_forecast->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("FORECAST (predictive)"), m_forecast, view), 1);
     layout->addStretch(1);
     return view;
 }
@@ -1251,6 +1259,12 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
     m_runtime->setText(runtimeSummaryText(snapshot.runtime)
                        + QStringLiteral("\n")
                        + runtimeDetailText(snapshot.runtime));
+
+    const ForecastResult cpuForecast =
+        forecastCrossing(m_cpuStore.values(), 90.0, 60);
+    const ForecastResult hostForecast =
+        forecastCrossing(m_hostCpuStore.values(), 90.0, 60);
+    m_forecast->setText(forecastText(cpuForecast, hostForecast));
 
     DiskSnapshot disk;
     disk.disks = snapshot.disks;

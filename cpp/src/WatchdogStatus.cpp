@@ -161,3 +161,118 @@ QString watchdogText(const QList<WatchdogMetric> &metrics) {
     }
     return text.trimmed();
 }
+
+ForecastResult forecastCrossing(const QList<double> &series, double threshold,
+                                int horizon) {
+    ForecastResult result;
+    result.threshold = threshold;
+    if (series.size() < 5) {
+        return result;
+    }
+    const int n = series.size();
+    const int window = std::min(n, 60);
+    const int start = n - window;
+    double sumX = 0.0;
+    double sumY = 0.0;
+    double sumXY = 0.0;
+    double sumXX = 0.0;
+    for (int i = 0; i < window; ++i) {
+        const double y = series.at(start + i);
+        sumX += i;
+        sumY += y;
+        sumXY += i * y;
+        sumXX += static_cast<double>(i) * i;
+    }
+    const double denom = window * sumXX - sumX * sumX;
+    const double slope = denom != 0.0 ? (window * sumXY - sumX * sumY) / denom : 0.0;
+    const double intercept = (sumY - slope * sumX) / window;
+    const double current = series.last();
+    result.slope = slope;
+    result.predicted = slope * window + intercept;
+    result.direction = slope > 1e-9   ? QStringLiteral("rising")
+                       : slope < -1e-9 ? QStringLiteral("falling")
+                                       : QStringLiteral("flat");
+    if (std::fabs(slope) > 1e-9) {
+        const double steps = (threshold - current) / slope;
+        if (steps >= 0.0 && steps <= horizon) {
+            result.stepsToThreshold = static_cast<int>(std::ceil(steps));
+            result.crosses = true;
+        }
+    }
+    return result;
+}
+
+AnomalyResult holtWinters(const QList<double> &series, int season, double alpha,
+                          double beta, double gamma, double band) {
+    AnomalyResult result;
+    result.model = QStringLiteral("holt_winters");
+    if (series.isEmpty()) {
+        return result;
+    }
+    result.value = series.last();
+    const int n = series.size();
+    if (season < 2 || n < season * 2) {
+        return detectAnomaly(series, AnomalyModel::ZScore, band);
+    }
+
+    double level = 0.0;
+    for (int i = 0; i < season; ++i) {
+        level += series.at(i);
+    }
+    level /= season;
+    double trend = (series.at(season) - series.at(0)) / season;
+    QList<double> seasonal;
+    for (int i = 0; i < season; ++i) {
+        seasonal.append(series.at(i) - level);
+    }
+
+    QList<double> residuals;
+    for (int t = season; t < n - 1; ++t) {
+        const double x = series.at(t);
+        const double s = seasonal.at(t % season);
+        const double prevLevel = level;
+        level = alpha * (x - s) + (1.0 - alpha) * (level + trend);
+        trend = beta * (level - prevLevel) + (1.0 - beta) * trend;
+        seasonal[t % season] = gamma * (x - level) + (1.0 - gamma) * s;
+        residuals.append(x - (prevLevel + trend + s));
+    }
+
+    const double forecast = level + trend + seasonal.at((n - 1) % season);
+    double mean = 0.0;
+    for (double r : residuals) {
+        mean += r;
+    }
+    mean /= residuals.size();
+    double variance = 0.0;
+    for (double r : residuals) {
+        variance += (r - mean) * (r - mean);
+    }
+    variance /= std::max(1, static_cast<int>(residuals.size()) - 1);
+    const double sd = std::sqrt(variance);
+
+    result.expected = forecast;
+    result.lower = forecast - band * sd;
+    result.upper = forecast + band * sd;
+    result.score = sd > 1e-9 ? (result.value - forecast) / sd : 0.0;
+    result.anomalous = result.value < result.lower || result.value > result.upper;
+    return result;
+}
+
+QString forecastText(const ForecastResult &cpu, const ForecastResult &hostCpu) {
+    auto line = [](const QString &name, const ForecastResult &forecast) {
+        QString text = QStringLiteral("%1 next %2  slope %3")
+                           .arg(name.leftJustified(6, ' '),
+                                QString::number(forecast.predicted, 'f', 1),
+                                QString::number(forecast.slope, 'f', 2));
+        if (forecast.crosses) {
+            text += QStringLiteral("  -> %1 in ~%2 samples")
+                        .arg(forecast.threshold)
+                        .arg(forecast.stepsToThreshold);
+        } else {
+            text += QStringLiteral("  stable");
+        }
+        return text;
+    };
+    return line(QStringLiteral("cpu"), cpu) + QLatin1Char('\n')
+           + line(QStringLiteral("host"), hostCpu);
+}
