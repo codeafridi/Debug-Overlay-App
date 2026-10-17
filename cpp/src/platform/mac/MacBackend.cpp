@@ -21,10 +21,15 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_var.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <signal.h>
 #include <sys/mount.h>
 #include <sys/param.h>
+#include <sys/proc_info.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -262,6 +267,144 @@ bool MacBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
     }
     out.append(ifaces);
     return true;
+}
+
+QList<linuxproc::SocketInfo> MacBackend::readNetSockets() {
+    QList<linuxproc::SocketInfo> out;
+
+    const int count = proc_listallpids(nullptr, 0);
+    if (count <= 0) {
+        return out;
+    }
+    std::vector<pid_t> pids(static_cast<size_t>(count) + 64);
+    const int got = proc_listallpids(pids.data(),
+                                     static_cast<int>(pids.size()
+                                                          * sizeof(pid_t)));
+    if (got <= 0) {
+        return out;
+    }
+
+    for (int i = 0; i < got; ++i) {
+        const pid_t pid = pids[i];
+        if (pid <= 0) {
+            continue;
+        }
+        const int fdsLen = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, 0, 0);
+        if (fdsLen <= 0) {
+            continue;
+        }
+        std::vector<char> fdsBuf(static_cast<size_t>(fdsLen));
+        const int readLen = proc_pidinfo(pid, PROC_PIDLISTFDS, 0,
+                                         fdsBuf.data(), fdsLen);
+        if (readLen <= 0) {
+            continue;
+        }
+        const auto *fds = reinterpret_cast<const struct proc_fdinfo *>(
+            fdsBuf.data());
+        const int fdCount = readLen / static_cast<int>(sizeof(*fds));
+
+        for (int k = 0; k < fdCount; ++k) {
+            if (fds[k].proc_fdtype != PROX_FDTYPE_SOCKET) {
+                continue;
+            }
+            struct socket_fdinfo sfi {};
+            const int n = proc_pidinfo(pid, PROC_PIDFDSOCKETINFO,
+                                       fds[k].proc_fd, &sfi, sizeof(sfi));
+            if (n <= 0) {
+                continue;
+            }
+            const int family = sfi.psi.soi_family;
+            const int proto = sfi.psi.soi_protocol;
+            if (family != AF_INET && family != AF_INET6) {
+                continue;
+            }
+            if (proto != IPPROTO_TCP && proto != IPPROTO_UDP) {
+                continue;
+            }
+
+            linuxproc::SocketInfo info;
+            const bool v6 = family == AF_INET6;
+            info.proto = proto == IPPROTO_TCP
+                             ? (v6 ? QStringLiteral("tcp6")
+                                   : QStringLiteral("tcp"))
+                             : (v6 ? QStringLiteral("udp6")
+                                   : QStringLiteral("udp"));
+
+            char addrBuf[INET6_ADDRSTRLEN];
+            if (v6) {
+                inet_ntop(AF_INET6,
+                          &sfi.psi.soi_proto.pri_in.insi_laddr.ina_6,
+                          addrBuf, sizeof(addrBuf));
+            } else {
+                inet_ntop(AF_INET,
+                          &sfi.psi.soi_proto.pri_in.insi_laddr.ina_46
+                               .i46a_addr4,
+                          addrBuf, sizeof(addrBuf));
+            }
+            info.localAddr = QString::fromLatin1(addrBuf);
+            if (v6) {
+                inet_ntop(AF_INET6,
+                          &sfi.psi.soi_proto.pri_in.insi_faddr.ina_6,
+                          addrBuf, sizeof(addrBuf));
+            } else {
+                inet_ntop(AF_INET,
+                          &sfi.psi.soi_proto.pri_in.insi_faddr.ina_46
+                               .i46a_addr4,
+                          addrBuf, sizeof(addrBuf));
+            }
+            info.remoteAddr = QString::fromLatin1(addrBuf);
+            info.localPort = ntohs(
+                sfi.psi.soi_proto.pri_in.insi_lport);
+            info.remotePort = ntohs(
+                sfi.psi.soi_proto.pri_in.insi_fport);
+
+            if (proto == IPPROTO_TCP) {
+                // Darwin TCP FSM (netinet/tcp_fsm.h): TCPS_CLOSED=0 .. TCPS_TIME_WAIT=10.
+                switch (sfi.psi.soi_state) {
+                case TCPS_CLOSED:
+                    info.state = QStringLiteral("CLOSE");
+                    break;
+                case TCPS_LISTEN:
+                    info.state = QStringLiteral("LISTEN");
+                    break;
+                case TCPS_SYN_SENT:
+                    info.state = QStringLiteral("SYN_SENT");
+                    break;
+                case TCPS_SYN_RECEIVED:
+                    info.state = QStringLiteral("SYN_RECV");
+                    break;
+                case TCPS_ESTABLISHED:
+                    info.state = QStringLiteral("ESTABLISHED");
+                    break;
+                case TCPS_CLOSE_WAIT:
+                    info.state = QStringLiteral("CLOSE_WAIT");
+                    break;
+                case TCPS_FIN_WAIT_1:
+                    info.state = QStringLiteral("FIN_WAIT1");
+                    break;
+                case TCPS_CLOSING:
+                    info.state = QStringLiteral("CLOSING");
+                    break;
+                case TCPS_LAST_ACK:
+                    info.state = QStringLiteral("LAST_ACK");
+                    break;
+                case TCPS_FIN_WAIT_2:
+                    info.state = QStringLiteral("FIN_WAIT2");
+                    break;
+                case TCPS_TIME_WAIT:
+                    info.state = QStringLiteral("TIME_WAIT");
+                    break;
+                default:
+                    info.state = QStringLiteral("UNKNOWN");
+                    break;
+                }
+            } else {
+                info.state = QStringLiteral("CLOSE");
+            }
+            out.append(info);
+        }
+    }
+    return out;
 }
 
 bool MacBackend::readDiskCounters(QList<DiskCounters> &out) {

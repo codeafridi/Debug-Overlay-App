@@ -15,6 +15,7 @@ public:
                    unsigned long long &freeBytes) override;
     bool hostInterfaces(QList<linuxproc::InterfaceStats> &out) override;
     bool readDiskCounters(QList<DiskCounters> &out) override;
+    QList<linuxproc::SocketInfo> readNetSockets() override;
 
     bool exists(int pid) override;
     QString comm(int pid) override;
