@@ -4,6 +4,8 @@
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QtGlobal>
 
 #include <algorithm>
 
@@ -433,10 +435,16 @@ QString defaultConfigPath() {
         return override;
     }
 
+#if defined(Q_OS_LINUX)
     const QString configHome =
         QProcessEnvironment::systemEnvironment().value(
             QStringLiteral("XDG_CONFIG_HOME"),
             QProcessEnvironment::systemEnvironment().value(
                 QStringLiteral("HOME")) + QStringLiteral("/.config"));
     return configHome + QStringLiteral("/syspeek/config.ini");
+#else
+    const QString base =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return base + QStringLiteral("/config.ini");
+#endif
 }

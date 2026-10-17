@@ -1,6 +1,7 @@
 #include "HudWindow.h"
 
 #include "DashboardPanel.h"
+#include "platform/NotifierFactory.h"
 
 #include <QApplication>
 #include <QDateTime>
@@ -60,10 +61,12 @@ HudWindow::HudWindow(QWidget *parent)
                    | Qt::WindowDoesNotAcceptFocus);
     setAttribute(Qt::WA_StyledBackground, true);
     setAttribute(Qt::WA_ShowWithoutActivating, true);
+#ifdef Q_OS_LINUX
     setAttribute(Qt::WA_X11DoNotAcceptFocus, true);
+#endif
     setObjectName(QStringLiteral("hudRoot"));
 
-    m_notifier = std::make_unique<DesktopNotifier>();
+    m_notifier = createNotifier();
 
     m_pages = new QWidget(this);
     auto *pagesLayout = new QVBoxLayout(m_pages);

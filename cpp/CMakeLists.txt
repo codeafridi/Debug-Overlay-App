@@ -17,7 +17,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets DBus Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+if(UNIX AND NOT APPLE)
+    find_package(Qt6 REQUIRED COMPONENTS DBus)
+endif()
 
 add_library(syspeek_core STATIC
     src/HudWindow.cpp
@@ -162,10 +165,37 @@ add_library(syspeek_core STATIC
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp
-    src/KubeSource.h)
+    src/KubeSource.h
+    src/platform/SystemBackend.h
+    src/platform/PlatformFactory.cpp
+    src/platform/PlatformFactory.h
+    src/platform/PortCatalog.cpp
+    src/platform/PortCatalog.h
+    src/platform/NotifierFactory.cpp
+    src/platform/NotifierFactory.h
+    src/platform/NullNotifier.h
+    src/platform/null/NullBackend.cpp
+    src/platform/null/NullBackend.h)
+
+if(UNIX AND NOT APPLE)
+    target_sources(syspeek_core PRIVATE
+        src/platform/linux/LinuxBackend.cpp
+        src/platform/linux/LinuxBackend.h)
+elseif(APPLE)
+    target_sources(syspeek_core PRIVATE
+        src/platform/mac/MacBackend.cpp
+        src/platform/mac/MacBackend.h)
+elseif(WIN32)
+    target_sources(syspeek_core PRIVATE
+        src/platform/win/WindowsBackend.cpp
+        src/platform/win/WindowsBackend.h)
+endif()
 
 target_include_directories(syspeek_core PUBLIC src)
-target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::DBus Qt6::Network)
+target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::Network)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(syspeek_core PUBLIC Qt6::DBus)
+endif()
 target_compile_options(syspeek_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra>)
 
@@ -216,6 +246,9 @@ target_link_libraries(syspeek_metrics_tests PRIVATE syspeek_core)
 add_executable(syspeek_screenshot EXCLUDE_FROM_ALL tools/screenshot.cpp)
 target_link_libraries(syspeek_screenshot PRIVATE syspeek_core)
 
+add_executable(syspeek_backend_tests tests/test_backend.cpp)
+target_link_libraries(syspeek_backend_tests PRIVATE syspeek_core)
+
 add_test(NAME hud_buttons COMMAND syspeek_tests)
 add_test(NAME focus COMMAND syspeek_focus_tests)
 add_test(NAME cpu COMMAND syspeek_cpu_tests)
@@ -229,6 +262,7 @@ add_test(NAME config COMMAND syspeek_config_tests)
 add_test(NAME kube COMMAND syspeek_kube_tests)
 add_test(NAME adapters COMMAND syspeek_adapter_tests)
 add_test(NAME metrics COMMAND syspeek_metrics_tests)
+add_test(NAME backend COMMAND syspeek_backend_tests)
 
-set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters metrics PROPERTIES
+set_tests_properties(hud_buttons focus cpu memory group sampler health providers docker config kube adapters metrics backend PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -66,6 +66,8 @@ QString focusProviderKindName(FocusProviderKind kind) {
         return QStringLiteral("niri");
     case FocusProviderKind::X11:
         return QStringLiteral("xdotool");
+    case FocusProviderKind::Mac:
+        return QStringLiteral("mac-nsworkspace");
     case FocusProviderKind::Null:
     default:
         return QStringLiteral("null");
@@ -73,6 +75,10 @@ QString focusProviderKindName(FocusProviderKind kind) {
 }
 
 std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config) {
+#ifdef Q_OS_MACOS
+    Q_UNUSED(config);
+    return std::make_unique<NullFocusProvider>();
+#else
     const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 
     SessionInfo info;
@@ -107,4 +113,5 @@ std::unique_ptr<FocusedWindowProvider> createFocusProvider(const Config &config)
     default:
         return std::make_unique<NullFocusProvider>();
     }
+#endif
 }

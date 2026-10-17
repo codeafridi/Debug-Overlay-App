@@ -365,6 +365,7 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- real /proc ----
+#ifdef Q_OS_LINUX
     const int self = static_cast<int>(::getpid());
     unsigned long long rss = 0;
     check(linuxproc::rssKb(self, rss), "rssKb(self) read succeeds");
@@ -452,6 +453,7 @@ int main(int argc, char *argv[]) {
                   && h2.cpuPercent <= 100.0,
               "host sampler real: second measured 0-100%");
     }
+#endif
 
     // ---- group sum (deterministic seam) ----
     {
@@ -484,6 +486,7 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- group sum (real /proc) ----
+#ifdef Q_OS_LINUX
     {
         unsigned long long total = 0;
         check(linuxproc::sumRssKb(QList<int>{self}, total) && total > 0,
@@ -494,6 +497,7 @@ int main(int argc, char *argv[]) {
 
     std::printf("sample rss(self)=%llu kB -> %s\n", rss,
                 qUtf8Printable(formatMemoryKb(rss)));
+#endif
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

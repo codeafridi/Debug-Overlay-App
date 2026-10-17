@@ -1,12 +1,13 @@
 #include "FocusSampler.h"
 
 #include "FocusedWindowProvider.h"
-#include "LinuxProcess.h"
 
 #include <unistd.h>
 
-FocusSampler::FocusSampler(const FocusedWindowProvider *provider)
-    : m_provider(provider) {
+FocusSampler::FocusSampler(const FocusedWindowProvider *provider,
+                           SystemBackend &backend)
+    : m_provider(provider)
+    , m_backend(backend) {
 }
 
 FocusSample FocusSampler::sample() const {
@@ -36,14 +37,14 @@ FocusSample FocusSampler::sample() const {
         return result;
     }
 
-    const ProcessIdentity identity = linuxproc::identity(pid);
+    const ProcessIdentity identity = m_backend.identity(pid);
     if (!identity.isValid()) {
         return result;
     }
 
     result.available = true;
     result.identity = identity;
-    result.appName = linuxproc::comm(pid);
+    result.appName = m_backend.comm(pid);
     if (result.appName.isEmpty()) {
         result.appName = QStringLiteral("pid %1").arg(pid);
     }

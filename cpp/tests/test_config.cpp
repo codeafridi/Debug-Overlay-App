@@ -128,9 +128,15 @@ int main(int argc, char *argv[]) {
         check(!c.fim.watch, "fim watch loaded");
     }
 
+#ifdef Q_OS_LINUX
     check(defaultConfigPath().endsWith(QStringLiteral("syspeek/config.ini"))
               || qEnvironmentVariableIsSet("SYSPEEK_CONFIG"),
           "default config path shape");
+#else
+    check(defaultConfigPath().endsWith(QStringLiteral("config.ini"))
+              || qEnvironmentVariableIsSet("SYSPEEK_CONFIG"),
+          "default config path shape");
+#endif
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

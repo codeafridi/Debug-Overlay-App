@@ -229,10 +229,17 @@ void FimSource::onTick() {
         meta.uid = static_cast<unsigned int>(st.st_uid);
         meta.gid = static_cast<unsigned int>(st.st_gid);
         meta.mode = static_cast<unsigned int>(st.st_mode) & 0x0FFFu;
+#if defined(Q_OS_MACOS)
+        meta.mtimeMs = static_cast<qint64>(st.st_mtimespec.tv_sec) * 1000
+                       + st.st_mtimespec.tv_nsec / 1000000;
+        meta.ctimeMs = static_cast<qint64>(st.st_ctimespec.tv_sec) * 1000
+                       + st.st_ctimespec.tv_nsec / 1000000;
+#else
         meta.mtimeMs = static_cast<qint64>(st.st_mtim.tv_sec) * 1000
                        + st.st_mtim.tv_nsec / 1000000;
         meta.ctimeMs = static_cast<qint64>(st.st_ctim.tv_sec) * 1000
                        + st.st_ctim.tv_nsec / 1000000;
+#endif
         meta.inode = static_cast<quint64>(st.st_ino);
         if (maxBytes == 0 || meta.size <= maxBytes) {
             meta.hash = hashFile(path, algorithm, &bytesHashed);

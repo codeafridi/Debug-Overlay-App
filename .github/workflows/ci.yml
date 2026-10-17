@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat_macos, feat_m39]
+  pull_request:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          cache: true
+
+      - name: Configure
+        run: cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build cpp/build -j 3
+
+      - name: Test
+        run: ctest --test-dir cpp/build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen

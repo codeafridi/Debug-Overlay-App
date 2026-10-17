@@ -6,7 +6,6 @@
 #include "KubeSource.h"
 #include "GnomePidFileProvider.h"
 #include "KdeFocusService.h"
-#include "LinuxProcess.h"
 #include "SamplerWorker.h"
 #include "ServicesSource.h"
 #include "JournalSource.h"
@@ -17,6 +16,7 @@
 #include "DbmSource.h"
 #include "TlsSource.h"
 #include "FimSource.h"
+#include "platform/PlatformFactory.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
         if (pid > 0) {
             std::printf("focused_pid=%d\n", pid);
             std::printf("focused_comm=%s\n",
-                        qUtf8Printable(linuxproc::comm(pid)));
+                        qUtf8Printable(systemBackend().comm(pid)));
         } else {
             std::printf("focused_pid=none\n");
         }

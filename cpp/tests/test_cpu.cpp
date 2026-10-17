@@ -331,6 +331,7 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- real /proc integration ----
+#ifdef Q_OS_LINUX
     {
         unsigned long long total = 0;
         check(linuxproc::totalCpuTicks(total) && total > 0,
@@ -363,6 +364,7 @@ int main(int argc, char *argv[]) {
         check(second.percent >= 0.0 && second.percent <= 999.0 * 64,
               "real: percent within bounds");
     }
+#endif
 
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;

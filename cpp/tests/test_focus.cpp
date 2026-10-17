@@ -14,6 +14,8 @@
 
 #include <cstdio>
 
+#ifdef Q_OS_LINUX
+
 namespace {
 
 class FakeProvider : public FocusedWindowProvider {
@@ -125,3 +127,14 @@ int main(int argc, char *argv[]) {
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }
+
+#else
+
+int main(int argc, char *argv[]) {
+    Q_UNUSED(argc);
+    Q_UNUSED(argv);
+    std::printf("focus tests skipped (linux-only)\n");
+    return 0;
+}
+
+#endif
