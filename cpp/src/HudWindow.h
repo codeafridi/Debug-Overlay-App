@@ -7,6 +7,7 @@
 #include "ServicesStatus.h"
 #include "AlertEngine.h"
 #include "IncidentStatus.h"
+#include "WatchdogStatus.h"
 #include "Notifier.h"
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
@@ -101,6 +102,8 @@ private:
     QRect m_savedGeometry;
     AlertEngine m_alerts;
     IncidentTracker m_incidents;
+    QList<double> m_cpuHistory;
+    QList<double> m_hostCpuHistory;
     AlertInput m_alertInput;
     std::unique_ptr<Notifier> m_notifier;
     void evaluateAlerts();

@@ -100,6 +100,7 @@ private:
     QLabel *m_hostLoad = nullptr;
     QLabel *m_watchdog = nullptr;
     QLabel *m_forecast = nullptr;
+    QLabel *m_insights = nullptr;
     QLabel *m_runtime = nullptr;
     QLabel *m_memDetail = nullptr;
     QTreeWidget *m_procs = nullptr;

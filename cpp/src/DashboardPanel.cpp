@@ -248,6 +248,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddWatchdog { color: #9aa2ac; }"
         "#ddRuntime { color: #9aa2ac; }"
         "#ddForecast { color: #9aa2ac; }"
+        "#ddInsights { color: #9aa2ac; }"
         "#ddProfileSummary { color: #c4cad1; }"
         "#ddProfileThreads, #ddProfileOffCpu, #ddProfileMemory { color: #9aa2ac; }"
         "#ddIncidentsSummary { color: #c4cad1; }"
@@ -376,6 +377,13 @@ QWidget *DashboardPanel::buildOverviewView() {
     m_forecast->setWordWrap(false);
     layout->addWidget(
         makeCard(QStringLiteral("FORECAST (predictive)"), m_forecast, view), 1);
+
+    m_insights = new QLabel(QStringLiteral("--"), view);
+    m_insights->setObjectName(QStringLiteral("ddInsights"));
+    m_insights->setFont(monoFont(10));
+    m_insights->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("WATCHDOG INSIGHTS"), m_insights, view), 1);
     layout->addStretch(1);
     return view;
 }
@@ -1300,11 +1308,15 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
                        + QStringLiteral("\n")
                        + runtimeDetailText(snapshot.runtime));
 
-    const ForecastResult cpuForecast =
+    ForecastResult cpuForecast =
         forecastCrossing(m_cpuStore.values(), 90.0, 60);
-    const ForecastResult hostForecast =
+    cpuForecast.name = QStringLiteral("cpu");
+    ForecastResult hostForecast =
         forecastCrossing(m_hostCpuStore.values(), 90.0, 60);
+    hostForecast.name = QStringLiteral("host-cpu");
     m_forecast->setText(forecastText(cpuForecast, hostForecast));
+    m_insights->setText(
+        watchdogInsightsText(watchdog, {cpuForecast, hostForecast}));
 
     m_profileSummary->setText(profileSummaryText(snapshot.profile));
     m_profileThreads->setText(profileThreadsText(snapshot.profile));

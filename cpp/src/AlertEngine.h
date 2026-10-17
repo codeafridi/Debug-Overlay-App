@@ -39,6 +39,9 @@ struct AlertInput {
     int k8sIssues = 0;
     bool journalValid = false;
     int journalErrors = 0;
+    bool watchdogValid = false;
+    double watchdogScore = 0.0;        // max robust anomaly score
+    int watchdogForecastSteps = 0;     // steps until forecast threshold
 };
 
 class AlertEngine {

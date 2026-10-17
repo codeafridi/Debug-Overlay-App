@@ -17,6 +17,8 @@
 #include <QVBoxLayout>
 #include <QWindow>
 
+#include <cmath>
+
 namespace {
 
 QFont valueFont() {
@@ -288,6 +290,30 @@ void HudWindow::setSnapshot(const DisplaySnapshot &snapshot) {
     m_alertInput.appCpu = snapshot.cpuPercent;
     m_alertInput.hostCpuValid = snapshot.hostAvailable && !snapshot.hostWarming;
     m_alertInput.hostCpu = snapshot.hostCpuPercent;
+
+    if (snapshot.cpuValid) {
+        m_cpuHistory.append(snapshot.cpuPercent);
+        if (m_cpuHistory.size() > 120) {
+            m_cpuHistory.removeFirst();
+        }
+    }
+    if (snapshot.hostAvailable && !snapshot.hostWarming) {
+        m_hostCpuHistory.append(snapshot.hostCpuPercent);
+        if (m_hostCpuHistory.size() > 120) {
+            m_hostCpuHistory.removeFirst();
+        }
+    }
+    const AnomalyResult cpuAnomaly =
+        detectAnomaly(m_cpuHistory, AnomalyModel::Mad, 3.5);
+    const AnomalyResult hostAnomaly =
+        detectAnomaly(m_hostCpuHistory, AnomalyModel::ZScore, 3.0);
+    const ForecastResult cpuForecast =
+        forecastCrossing(m_cpuHistory, 90.0, 60);
+    m_alertInput.watchdogValid = m_cpuHistory.size() >= 10;
+    m_alertInput.watchdogScore =
+        qMax(std::fabs(cpuAnomaly.score), std::fabs(hostAnomaly.score));
+    m_alertInput.watchdogForecastSteps =
+        cpuForecast.crosses ? cpuForecast.stepsToThreshold : 0;
     if (snapshot.hostMemTotalKb > 0) {
         m_alertInput.hostMemValid = true;
         m_alertInput.hostMemFreePct =

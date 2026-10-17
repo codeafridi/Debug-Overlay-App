@@ -276,3 +276,39 @@ QString forecastText(const ForecastResult &cpu, const ForecastResult &hostCpu) {
     return line(QStringLiteral("cpu"), cpu) + QLatin1Char('\n')
            + line(QStringLiteral("host"), hostCpu);
 }
+
+QString watchdogInsightsText(const QList<WatchdogMetric> &metrics,
+                             const QList<ForecastResult> &forecasts) {
+    QStringList lines;
+    int anomalies = 0;
+    for (const WatchdogMetric &metric : metrics) {
+        if (!metric.result.anomalous) {
+            continue;
+        }
+        ++anomalies;
+        lines.append(QStringLiteral("ANOMALY   %1  %2=%3  score %4")
+                         .arg(metric.name.leftJustified(8, ' '),
+                              metric.result.model,
+                              QString::number(metric.result.value, 'f', 1),
+                              QString::number(metric.result.score, 'f', 1)));
+    }
+    for (const ForecastResult &forecast : forecasts) {
+        if (!forecast.crosses) {
+            continue;
+        }
+        lines.append(QStringLiteral("FORECAST  %1 %2 will reach %3 in ~%4 samples")
+                         .arg(forecast.name.isEmpty() ? QStringLiteral("metric")
+                                                      : forecast.name,
+                              forecast.direction,
+                              QString::number(forecast.threshold, 'f', 0))
+                         .arg(forecast.stepsToThreshold));
+    }
+    if (anomalies >= 2) {
+        lines.prepend(QStringLiteral(
+            "CORRELATED  multiple metrics anomalous (possible resource exhaustion)"));
+    }
+    if (lines.isEmpty()) {
+        return QStringLiteral("no insights");
+    }
+    return lines.join(QLatin1Char('\n'));
+}

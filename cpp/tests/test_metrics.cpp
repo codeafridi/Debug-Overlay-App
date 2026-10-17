@@ -1084,6 +1084,64 @@ int main(int argc, char *argv[]) {
               "profile: summary for unavailable");
     }
 
+    {
+        AlertEngine engine;
+        AlertInput input;
+        input.watchdogValid = true;
+        input.watchdogScore = 6.0;
+        input.watchdogForecastSteps = 0;
+        QList<Alert> fired = engine.update(input, 1000);
+        bool anomalyAlert = false;
+        for (const Alert &alert : fired) {
+            if (alert.id == QStringLiteral("watchdog_anomaly")) {
+                anomalyAlert = true;
+            }
+        }
+        check(anomalyAlert, "watchdog-alert: anomaly fired");
+
+        input.watchdogForecastSteps = 5;
+        fired = engine.update(input, 2000);
+        bool forecastAlert = false;
+        for (const Alert &alert : fired) {
+            if (alert.id == QStringLiteral("watchdog_forecast")) {
+                forecastAlert = true;
+            }
+        }
+        check(forecastAlert, "watchdog-alert: forecast fired");
+
+        input.watchdogScore = 1.0;
+        input.watchdogForecastSteps = 0;
+        engine.update(input, 3000);
+        check(engine.active().isEmpty(), "watchdog-alert: clears when normal");
+
+        WatchdogMetric cpu;
+        cpu.name = QStringLiteral("cpu");
+        cpu.result.anomalous = true;
+        cpu.result.model = QStringLiteral("mad");
+        cpu.result.value = 95.0;
+        cpu.result.score = 8.0;
+        WatchdogMetric rss;
+        rss.name = QStringLiteral("rss");
+        rss.result.anomalous = true;
+        rss.result.model = QStringLiteral("predict_linear");
+        rss.result.value = 900.0;
+        rss.result.score = 6.0;
+        ForecastResult forecast;
+        forecast.name = QStringLiteral("cpu");
+        forecast.crosses = true;
+        forecast.direction = QStringLiteral("rising");
+        forecast.threshold = 90.0;
+        forecast.stepsToThreshold = 12;
+        const QString insights =
+            watchdogInsightsText({cpu, rss}, {forecast});
+        check(insights.contains(QStringLiteral("CORRELATED")),
+              "watchdog-insight: correlated anomalies");
+        check(insights.contains(QStringLiteral("FORECAST")),
+              "watchdog-insight: forecast line");
+        check(insights.contains(QStringLiteral("cpu")),
+              "watchdog-insight: metric named");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

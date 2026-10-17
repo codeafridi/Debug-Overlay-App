@@ -24,6 +24,7 @@ struct WatchdogMetric {
 };
 
 struct ForecastResult {
+    QString name;
     double predicted = 0.0;   // next value
     double slope = 0.0;       // change per sample
     double threshold = 0.0;
@@ -44,3 +45,6 @@ AnomalyResult holtWinters(const QList<double> &series, int season,
                           double band);
 QString watchdogText(const QList<WatchdogMetric> &metrics);
 QString forecastText(const ForecastResult &cpu, const ForecastResult &hostCpu);
+// Narrative insights from anomalies + forecasts, with correlation.
+QString watchdogInsightsText(const QList<WatchdogMetric> &metrics,
+                             const QList<ForecastResult> &forecasts);

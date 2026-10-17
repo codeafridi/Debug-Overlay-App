@@ -25,6 +25,12 @@ bool metricFor(const AlertRule &rule, const AlertInput &input, double &value,
     } else if (rule.id == QLatin1String("journal_errors")) {
         value = input.journalErrors;
         valid = input.journalValid;
+    } else if (rule.id == QLatin1String("watchdog_anomaly")) {
+        value = input.watchdogScore;
+        valid = input.watchdogValid;
+    } else if (rule.id == QLatin1String("watchdog_forecast")) {
+        value = input.watchdogForecastSteps;
+        valid = input.watchdogValid;
     } else {
         valid = false;
     }
@@ -60,6 +66,12 @@ AlertEngine::AlertEngine() {
          QStringLiteral("critical"), 0.0, true, 1, QString()},
         {QStringLiteral("journal_errors"), QStringLiteral("Journal error spike"),
          QStringLiteral("warning"), 20.0, true, 2, QStringLiteral(" errors")},
+        {QStringLiteral("watchdog_anomaly"),
+         QStringLiteral("Watchdog anomaly detected"), QStringLiteral("warning"),
+         5.0, true, 1, QStringLiteral("σ")},
+        {QStringLiteral("watchdog_forecast"),
+         QStringLiteral("Watchdog forecast threshold"), QStringLiteral("warning"),
+         0.0, true, 1, QStringLiteral(" samples")},
     };
 }
 
