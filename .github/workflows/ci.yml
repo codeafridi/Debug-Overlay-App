@@ -59,3 +59,19 @@ jobs:
           PY
         env:
           QT_QPA_PLATFORM: offscreen
+
+      - name: Package DMG (mac)
+        if: runner.os == 'macOS'
+        run: |
+          SYSPEEK_BUILD_DIR=cpp/build bash cpp/packaging/build_macos.sh
+          ls -la cpp/build/packaging/
+
+      - name: Upload dmg artifact (mac)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: syspeek-macos-dmg
+          path: |
+            cpp/build/packaging/Syspeek-*-macos.dmg
+            cpp/build/packaging/Syspeek-*-macos.dmg.sha256
+          if-no-files-found: error

@@ -9,6 +9,37 @@ permissions:
   contents: write
 
 jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          cache: true
+
+      - name: Build, test and package universal DMG
+        run: |
+          cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build cpp/build -j3
+          QT_QPA_PLATFORM=offscreen ctest --test-dir cpp/build --output-on-failure
+          ./cpp/build/syspeek.app/Contents/MacOS/syspeek --dump | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d['processCount'] > 0 and d['host']['cores'] > 0
+print('mac dump ok:', d['processCount'], 'procs')"
+          SYSPEEK_BUILD_DIR=cpp/build bash cpp/packaging/build_macos.sh
+
+      - name: Upload macos artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos
+          path: |
+            cpp/build/packaging/Syspeek-*-macos.dmg
+            cpp/build/packaging/Syspeek-*-macos.dmg.sha256
+          if-no-files-found: error
+
   build:
     runs-on: ubuntu-24.04
     steps:
@@ -55,19 +86,25 @@ jobs:
             cpp/build/packaging/SHA256SUMS
 
   github-release:
-    needs: build
+    needs: [build, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: packages
           path: dist-ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages-macos
+          path: dist-macos
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist-ci/*.deb
             dist-ci/SHA256SUMS
+            dist-macos/*.dmg
+            dist-macos/*.dmg.sha256
           generate_release_notes: true
       # NOTE: the portable tarball + AppImage (with zsync) are built by the
       # maintainer via bash cpp/packaging/build_portable.sh && bash
