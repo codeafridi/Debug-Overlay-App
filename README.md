@@ -100,9 +100,9 @@ It self-updates via delta (a `.zsync` file ships alongside on the release page â
 use [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate)):
 
 ```bash
-curl -fLO https://github.com/codeafridi/Syspeek/releases/latest/download/Syspeek-0.5.0-x86_64.AppImage
-chmod +x Syspeek-0.5.0-x86_64.AppImage
-./Syspeek-0.5.0-x86_64.AppImage
+curl -fLO https://github.com/codeafridi/Syspeek/releases/latest/download/Syspeek-0.6.0-x86_64.AppImage
+chmod +x Syspeek-0.6.0-x86_64.AppImage
+./Syspeek-0.6.0-x86_64.AppImage
 ```
 
 The AppImage has no `syspeek` command and no start-at-login; it just runs. Use
@@ -120,7 +120,7 @@ verify, then install (`apt` resolves the Qt dependencies automatically):
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-sudo apt install ./syspeek_0.5.0_amd64.deb
+sudo apt install ./syspeek_0.6.0_amd64.deb
 ```
 
 This installs `/usr/bin/syspeek`, a user unit

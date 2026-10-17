@@ -15,7 +15,7 @@ fi
 if [ -z "${VERSION:-}" ]; then
   VERSION="$(grep -m1 -oP '^\s*VERSION\s+\K[0-9.]+' "$ROOT_DIR/CMakeLists.txt" 2>/dev/null)"
 fi
-VERSION="${VERSION:-0.5.0}"
+VERSION="${VERSION:-0.6.0}"
 ARCH="$(dpkg --print-architecture)"
 OUT="$BUILD_DIR/packaging"
 STAGE="$OUT/syspeek_${VERSION}_${ARCH}"

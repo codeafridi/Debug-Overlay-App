@@ -18,7 +18,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 name=syspeek
-version="$(grep -m1 -oP '^pkgver=\K.*' "$here/arch/PKGBUILD" 2>/dev/null || echo 0.5.0)"
+version="$(grep -m1 -oP '^pkgver=\K.*' "$here/arch/PKGBUILD" 2>/dev/null || echo 0.6.0)"
 work="$tmp/$name-$version"
 git -C "$repo_root" archive --format tar --prefix "$name-$version/" HEAD | tar -x -C "$tmp"
 cp -r "$work/cpp/packaging/debian" "$work/debian"

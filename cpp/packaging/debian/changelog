@@ -1,3 +1,19 @@
+syspeek (0.6.0-1) unstable; urgency=medium
+
+  * Watchdog anomaly detection (z-score/MAD/quantile/predict_linear)
+  * Forecast/predictive alerting + seasonal (Holt-Winters) detection
+  * Watchdog insights + watchdog alerts (anomaly -> incident)
+  * Profiles view: thread CPU, off-CPU/wait channels, PSS memory
+  * TLS/SSL certificate monitoring (expiry, issuer, protocol, cipher)
+  * Runtime / SSI language + instrumentation detection
+  * Kubernetes node inventory & capacity health
+  * Incident management (alert grouping + lifecycle)
+  * Earlier 0.5.0 features: disks/PSI, TCP health, network path, SBOM,
+    APM traces, DogStatsD, security posture, log pipeline, sensitive data,
+    log-based threats, SLOs, k8s cost + deprecated APIs, PostgreSQL DBM
+
+ -- Syspeek <noreply@example.com>  Fri, 17 Oct 2026 00:00:00 +0000
+
 syspeek (0.5.0-1) unstable; urgency=medium
 
   * Disks view: per-device I/O throughput/util + PSI pressure (iostat-style)
