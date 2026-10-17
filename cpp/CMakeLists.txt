@@ -153,6 +153,8 @@ add_library(syspeek_core STATIC
     src/IncidentStatus.h
     src/ProfileStatus.cpp
     src/ProfileStatus.h
+    src/HostInfoStatus.cpp
+    src/HostInfoStatus.h
     src/KubeStatus.cpp
     src/KubeStatus.h
     src/KubeSource.cpp

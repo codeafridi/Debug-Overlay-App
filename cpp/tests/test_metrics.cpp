@@ -23,6 +23,7 @@
 #include "RuntimeStatus.h"
 #include "IncidentStatus.h"
 #include "ProfileStatus.h"
+#include "HostInfoStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -1140,6 +1141,46 @@ int main(int argc, char *argv[]) {
               "watchdog-insight: forecast line");
         check(insights.contains(QStringLiteral("cpu")),
               "watchdog-insight: metric named");
+    }
+
+    {
+        const QByteArray cpuinfo = QByteArrayLiteral(
+            "processor\t: 0\n"
+            "vendor_id\t: GenuineIntel\n"
+            "model name\t: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz\n"
+            "cpu MHz\t\t: 2600.000\n"
+            "cache size\t: 12288 KB\n"
+            "physical id\t: 0\n"
+            "cpu cores\t: 6\n"
+            "processor\t: 1\n"
+            "processor\t: 2\n");
+        const HostCpuInfo cpu = parseCpuInfo(cpuinfo);
+        check(cpu.vendorId == QStringLiteral("GenuineIntel"),
+              "hostinfo: cpu vendor");
+        check(cpu.modelName.contains(QStringLiteral("i7-9750H")),
+              "hostinfo: cpu model");
+        check(cpu.logicalProcessors == 3 && cpu.cores == 6
+                  && cpu.packages == 1,
+              "hostinfo: cpu topology");
+        check(std::fabs(cpu.mhz - 2600.0) < 1e-6, "hostinfo: cpu mhz");
+        check(cpu.cacheSize == QStringLiteral("12288 KB"),
+              "hostinfo: cpu cache");
+
+        const QByteArray mounts = QByteArrayLiteral(
+            "/dev/nvme0n1p2 / ext4 rw,relatime 0 0\n"
+            "proc /proc proc rw 0 0\n"
+            "sysfs /sys sysfs rw 0 0\n"
+            "tmpfs /run tmpfs rw 0 0\n");
+        const QList<HostFsInfo> fs = parseMounts(mounts);
+        check(fs.size() == 2, "hostinfo: pseudo filesystems filtered");
+        check(fs.at(0).name == QStringLiteral("/dev/nvme0n1p2")
+                  && fs.at(0).mountedOn == QStringLiteral("/"),
+              "hostinfo: root filesystem");
+
+        check(parseOsRelease(QByteArrayLiteral(
+                  "NAME=\"Ubuntu\"\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"))
+                  == QStringLiteral("Ubuntu 24.04 LTS"),
+              "hostinfo: os pretty name");
     }
 
     std::printf("%d failure(s)\n", failures);

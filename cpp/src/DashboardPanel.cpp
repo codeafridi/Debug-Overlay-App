@@ -155,6 +155,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
                       QStringLiteral("Alerts"), QStringLiteral("Incidents"), QStringLiteral("SLO"),
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
                       QStringLiteral("Disks"),
+                      QStringLiteral("Host"),
                       QStringLiteral("Network"),
                       QStringLiteral("Network Path"),
                       QStringLiteral("Containers"), QStringLiteral("Kubernetes"),
@@ -179,6 +180,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
     m_views->addWidget(buildDisksView());
+    m_views->addWidget(buildHostView());
     m_views->addWidget(buildNetworkView());
     m_views->addWidget(buildNetworkPathView());
     m_views->addWidget(buildContainersView());
@@ -260,6 +262,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddSloSummary { color: #c4cad1; }"
         "#ddSlo { color: #9aa2ac; }"
         "#ddDeprecations { color: #9aa2ac; }"
+        "#ddHostInfoSummary { color: #c4cad1; }"
+        "#ddHostPlatform, #ddHostCpuInfo, #ddHostFilesystems, #ddHostNetInfo { color: #9aa2ac; }"
         "#ddServices, #ddServicesSummary, #ddDeps { color: #c4cad1; }"
         "#ddServicesChanges { color: #c4cad1; }"
         "#ddLogs, #ddLogsSummary, #ddErrors { color: #c4cad1; }"
@@ -1039,6 +1043,49 @@ QWidget *DashboardPanel::buildDisksView() {
     return view;
 }
 
+QWidget *DashboardPanel::buildHostView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_hostInfoSummary = new QLabel(QStringLiteral("--"), view);
+    m_hostInfoSummary->setObjectName(QStringLiteral("ddHostInfoSummary"));
+    m_hostInfoSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("HOST INVENTORY"), m_hostInfoSummary, view));
+
+    auto *row1 = new QHBoxLayout;
+    row1->setSpacing(10);
+    m_hostPlatform = new QLabel(QStringLiteral("--"), view);
+    m_hostPlatform->setObjectName(QStringLiteral("ddHostPlatform"));
+    m_hostPlatform->setFont(monoFont(10));
+    m_hostPlatform->setWordWrap(false);
+    row1->addWidget(makeCard(QStringLiteral("PLATFORM"), m_hostPlatform, view), 1);
+    m_hostCpuInfo = new QLabel(QStringLiteral("--"), view);
+    m_hostCpuInfo->setObjectName(QStringLiteral("ddHostCpuInfo"));
+    m_hostCpuInfo->setFont(monoFont(10));
+    m_hostCpuInfo->setWordWrap(false);
+    row1->addWidget(makeCard(QStringLiteral("CPU"), m_hostCpuInfo, view), 1);
+    layout->addLayout(row1, 1);
+
+    auto *row2 = new QHBoxLayout;
+    row2->setSpacing(10);
+    m_hostFilesystems = new QLabel(QStringLiteral("--"), view);
+    m_hostFilesystems->setObjectName(QStringLiteral("ddHostFilesystems"));
+    m_hostFilesystems->setFont(monoFont(10));
+    m_hostFilesystems->setWordWrap(false);
+    row2->addWidget(
+        makeCard(QStringLiteral("FILESYSTEMS"), m_hostFilesystems, view), 1);
+    m_hostNetwork = new QLabel(QStringLiteral("--"), view);
+    m_hostNetwork->setObjectName(QStringLiteral("ddHostNetInfo"));
+    m_hostNetwork->setFont(monoFont(10));
+    m_hostNetwork->setWordWrap(false);
+    row2->addWidget(makeCard(QStringLiteral("NETWORK"), m_hostNetwork, view), 1);
+    layout->addLayout(row2, 1);
+    return view;
+}
+
 QWidget *DashboardPanel::buildSecurityView() {
     auto *view = new QWidget(this);
     auto *layout = new QVBoxLayout(view);
@@ -1364,6 +1411,12 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         }
         m_disks->addTopLevelItem(item);
     }
+
+    m_hostInfoSummary->setText(hostInfoSummaryText(snapshot.hostInfo));
+    m_hostPlatform->setText(hostInfoPlatformText(snapshot.hostInfo));
+    m_hostCpuInfo->setText(hostInfoCpuText(snapshot.hostInfo));
+    m_hostFilesystems->setText(hostInfoFilesystemsText(snapshot.hostInfo));
+    m_hostNetwork->setText(hostInfoNetworkText(snapshot.hostInfo));
 
     if (snapshot.security.available) {
         m_securitySummary->setText(securitySummaryText(snapshot.security));

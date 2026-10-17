@@ -27,6 +27,10 @@ SamplerWorker::SamplerWorker(FocusedWindowProvider *provider,
 }
 
 void SamplerWorker::start() {
+    if (!m_hostInfoReady) {
+        m_hostInfo = collectHostInfo();
+        m_hostInfoReady = true;
+    }
     if (m_timer == nullptr) {
         m_timer = new QTimer(this);
         m_timer->setInterval(m_intervalMs);
@@ -315,6 +319,8 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
         snap.hostNetTxPerSec = host.netTxPerSec;
         snap.hostLoad1 = host.load1;
     }
+
+    snap.hostInfo = m_hostInfo;
 
     const DiskSnapshot disk = m_diskSampler.sample();
     snap.disksAvailable = disk.available;

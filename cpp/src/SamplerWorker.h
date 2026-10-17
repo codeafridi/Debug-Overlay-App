@@ -47,6 +47,8 @@ private:
     TcpSampler m_tcpSampler;
     SbomSource m_sbomSource;
     ProfileSampler m_profileSampler;
+    HostInfo m_hostInfo;
+    bool m_hostInfoReady = false;
     SloTracker m_slo;
     SloSpec m_sloSpec;
     IoRateTracker m_ioTracker;

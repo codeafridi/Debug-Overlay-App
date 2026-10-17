@@ -72,6 +72,7 @@ private:
     QWidget *buildPlaceholderView(const QString &text);
     QWidget *buildCostView();
     QWidget *buildDisksView();
+    QWidget *buildHostView();
     QWidget *buildSecurityView();
     QWidget *buildTracesView();
     QWidget *buildSoftwareView();
@@ -129,6 +130,11 @@ private:
     QLabel *m_diskSummary = nullptr;
     QLabel *m_diskPressure = nullptr;
     QTreeWidget *m_disks = nullptr;
+    QLabel *m_hostInfoSummary = nullptr;
+    QLabel *m_hostPlatform = nullptr;
+    QLabel *m_hostCpuInfo = nullptr;
+    QLabel *m_hostFilesystems = nullptr;
+    QLabel *m_hostNetwork = nullptr;
     QLabel *m_securitySummary = nullptr;
     QLabel *m_security = nullptr;
     QLabel *m_threats = nullptr;
