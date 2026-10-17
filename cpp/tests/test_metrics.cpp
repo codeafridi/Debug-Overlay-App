@@ -20,6 +20,7 @@
 #include "DbmStatus.h"
 #include "WatchdogStatus.h"
 #include "TlsStatus.h"
+#include "RuntimeStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -919,6 +920,54 @@ int main(int argc, char *argv[]) {
               "tls: summary counts warnings");
         check(tlsDetailText(snapshot).contains(QStringLiteral("CRITICAL")),
               "tls: detail marks critical");
+    }
+
+    {
+        check(languageFromCommand(QStringLiteral("python3.11"), {})
+                  == Runtime::Python,
+              "runtime: python prefix");
+        check(languageFromCommand(QStringLiteral("python"), {})
+                  == Runtime::Python,
+              "runtime: python exact");
+        check(languageFromCommand(QStringLiteral("node"), {}) == Runtime::Node,
+              "runtime: node exact");
+        check(languageFromCommand(QStringLiteral("npm"), {}) == Runtime::Node,
+              "runtime: npm exact");
+        check(languageFromCommand(QStringLiteral("java"), {}) == Runtime::Java,
+              "runtime: java exact");
+        check(languageFromCommand(QStringLiteral("javac"), {})
+                  == Runtime::Unknown,
+              "runtime: javac is not java");
+        check(languageFromCommand(QStringLiteral("ruby3.2"), {})
+                  == Runtime::Ruby,
+              "runtime: ruby version prefix");
+        check(languageFromCommand(QStringLiteral("rubyw"), {})
+                  == Runtime::Ruby,
+              "runtime: rubyw exact");
+        check(languageFromCommand(QStringLiteral("php-fpm8.2"), {})
+                  == Runtime::Php,
+              "runtime: php-fpm version");
+        check(languageFromCommand(QStringLiteral("dotnet"), {})
+                  == Runtime::Dotnet,
+              "runtime: dotnet exact");
+        check(languageFromCommand(QStringLiteral("java"),
+                                  {QStringLiteral("-jar"),
+                                   QStringLiteral("x"),
+                                   QStringLiteral("org.jruby.Main")})
+                  == Runtime::Ruby,
+              "runtime: JRuby detected");
+        check(languageFromCommand(QStringLiteral("myapp"), {})
+                  == Runtime::Unknown,
+              "runtime: unknown app");
+
+        check(mapsHasDotnet(QByteArrayLiteral(
+                  "7f00-7f10 r-xp 0 0 0 0 /usr/share/dotnet/shared/"
+                  "Microsoft.NETCore.App/System.Runtime.dll\n")),
+              "runtime: dotnet maps marker");
+        check(!mapsHasDotnet(QByteArrayLiteral("/usr/lib/libc.so.6\n")),
+              "runtime: non-dotnet maps");
+        check(runtimeSummaryText(RuntimeInfo{}) .contains(QStringLiteral("native")),
+              "runtime: summary for unknown");
     }
 
     std::printf("%d failure(s)\n", failures);

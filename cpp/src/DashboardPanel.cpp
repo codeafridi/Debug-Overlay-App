@@ -245,6 +245,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDbmSummary { color: #c4cad1; }"
         "#ddDbm { color: #9aa2ac; }"
         "#ddWatchdog { color: #9aa2ac; }"
+        "#ddRuntime { color: #9aa2ac; }"
         "#ddTlsSummary { color: #c4cad1; }"
         "#ddTls { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
@@ -355,6 +356,13 @@ QWidget *DashboardPanel::buildOverviewView() {
     m_watchdog->setWordWrap(false);
     layout->addWidget(
         makeCard(QStringLiteral("WATCHDOG (anomaly detection)"), m_watchdog, view), 1);
+
+    m_runtime = new QLabel(QStringLiteral("--"), view);
+    m_runtime->setObjectName(QStringLiteral("ddRuntime"));
+    m_runtime->setFont(monoFont(10));
+    m_runtime->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("RUNTIME (SSI)"), m_runtime, view), 1);
     layout->addStretch(1);
     return view;
 }
@@ -1209,6 +1217,10 @@ void DashboardPanel::setSnapshot(const DisplaySnapshot &snapshot) {
         QStringLiteral("host-cpu"),
         detectAnomaly(m_hostCpuStore.values(), AnomalyModel::ZScore, 3.0)});
     m_watchdog->setText(watchdogText(watchdog));
+
+    m_runtime->setText(runtimeSummaryText(snapshot.runtime)
+                       + QStringLiteral("\n")
+                       + runtimeDetailText(snapshot.runtime));
 
     DiskSnapshot disk;
     disk.disks = snapshot.disks;
