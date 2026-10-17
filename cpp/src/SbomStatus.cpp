@@ -104,6 +104,63 @@ SbomReport buildSbom(const QStringList &paths,
     return report;
 }
 
+bool classifyMacPath(const QString &path, MacPathPackage &out) {
+    out = MacPathPackage();
+    const QString normalized = path.startsWith(QStringLiteral("/private/"))
+                                   ? path.mid(8) + QStringLiteral("/")
+                                   : path;
+    const int cellar = normalized.indexOf(QStringLiteral("/Cellar/"));
+    if (cellar >= 0) {
+        const QStringList rest = normalized.mid(cellar + 8)
+                                     .split(QLatin1Char('/'));
+        if (rest.size() >= 2 && !rest.at(0).isEmpty()) {
+            out.kind = QStringLiteral("brew");
+            out.name = rest.at(0);
+            out.version = rest.at(1);
+            return true;
+        }
+        return false;
+    }
+    if (normalized.startsWith(QStringLiteral("/Applications/"))
+        && normalized.contains(QStringLiteral(".app/"))) {
+        const QStringList parts = normalized.split(QLatin1Char('/'));
+        for (const QString &part : parts) {
+            if (part.endsWith(QStringLiteral(".app"))) {
+                out.kind = QStringLiteral("bundle");
+                out.name = part.left(part.size()
+                                     - QStringLiteral(".app").size());
+                return true;
+            }
+        }
+        return false;
+    }
+    if (normalized.startsWith(QStringLiteral("/System/"))) {
+        out.kind = QStringLiteral("system");
+        out.name = normalized.section(QLatin1Char('/'), -1).section(
+            QLatin1Char('.'), 0, 0);
+        return true;
+    }
+    out.kind = QStringLiteral("generic");
+    out.name = normalized.section(QLatin1Char('/'), -1).section(
+        QLatin1Char('.'), 0, 0);
+    out.version = QString();
+    return !out.name.isEmpty();
+}
+
+QString macPurl(const MacPathPackage &pkg) {
+    if (pkg.kind == QStringLiteral("brew")) {
+        return QStringLiteral("pkg:generic/brew/%1@%2").arg(pkg.name,
+                                                           pkg.version);
+    }
+    if (pkg.kind == QStringLiteral("bundle")) {
+        return QStringLiteral("pkg:generic/bundle/%1").arg(pkg.name);
+    }
+    if (pkg.kind == QStringLiteral("system")) {
+        return QStringLiteral("pkg:generic/apple/%1").arg(pkg.name);
+    }
+    return QStringLiteral("pkg:generic/%1").arg(pkg.name);
+}
+
 QString sbomSummaryText(const SbomReport &report) {
     if (!report.available) {
         return QStringLiteral("sbom: unavailable");

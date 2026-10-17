@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QProcess>
+#include <QSettings>
 #include <QStringList>
 
 void SbomSource::ensureLoaded() {
@@ -20,7 +21,11 @@ void SbomSource::ensureLoaded() {
 }
 
 SbomReport SbomSource::resolve(const QStringList &paths) {
+#if defined(Q_OS_MACOS)
+    return resolveMac(paths);
+#else
     ensureLoaded();
+#endif
 
     QStringList unknown;
     for (const QString &path : paths) {
@@ -68,4 +73,54 @@ SbomReport SbomSource::resolve(const QStringList &paths) {
     }
 
     return buildSbom(paths, m_packages, m_fileOwner);
+}
+
+SbomReport SbomSource::resolveMac(const QStringList &paths) {
+    // osquery darwin grounding: apps table reads /Applications bundles'
+    // Info.plist keys (CFBundleShortVersionString x6 in strings) and the
+    // homebrew_packages table reads Cellar dirs (STR Cellar).
+    SbomReport report;
+    report.available = true;
+    report.libraryCount = paths.size();
+
+    QHash<QPair<QString, QString>, int> index;
+    QHash<QString, QString> bundleVersions;
+    for (const QString &path : paths) {
+        if (path.isEmpty() || !path.startsWith(QLatin1Char('/'))) {
+            continue;
+        }
+        MacPathPackage pkg;
+        if (!classifyMacPath(path, pkg)) {
+            continue;
+        }
+        if (pkg.kind == QStringLiteral("bundle")) {
+            if (!bundleVersions.contains(pkg.name)) {
+                const QString appRoot = path.section(
+                    QStringLiteral(".app/"), 0, 0);
+                QSettings info(appRoot + QStringLiteral(".app/Contents/Info.plist"),
+                               QSettings::NativeFormat);
+                bundleVersions.insert(
+                    pkg.name,
+                    info.value(QStringLiteral("CFBundleShortVersionString"))
+                        .toString());
+            }
+            pkg.version = bundleVersions.value(pkg.name);
+        }
+        const QPair<QString, QString> key(pkg.name, pkg.version);
+        if (!index.contains(key)) {
+            SbomEntry entry;
+            entry.package = pkg.name;
+            entry.version = pkg.version;
+            entry.arch = QStringLiteral("universal");
+            entry.purl = macPurl(pkg);
+            index.insert(key, report.entries.size());
+            report.entries.append(entry);
+        }
+        SbomEntry &entry = report.entries[index.value(key)];
+        if (!entry.files.contains(path)) {
+            entry.files.append(path);
+        }
+    }
+    report.resolvedCount = report.entries.size();
+    return report;
 }

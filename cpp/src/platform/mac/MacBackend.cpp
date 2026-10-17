@@ -224,6 +224,7 @@ PlatformCapabilities MacBackend::capabilities() const {
     caps.systemServices = true;
     caps.journal = true;
     caps.fim = true;
+    caps.sbom = true;
     return caps;
 }
 

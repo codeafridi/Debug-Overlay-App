@@ -40,6 +40,7 @@ QJsonObject capabilitiesJson(const PlatformCapabilities &caps) {
     obj.insert(QStringLiteral("systemServices"), caps.systemServices);
     obj.insert(QStringLiteral("journal"), caps.journal);
     obj.insert(QStringLiteral("fim"), caps.fim);
+    obj.insert(QStringLiteral("sbom"), caps.sbom);
     obj.insert(QStringLiteral("dpkgSbom"), caps.dpkgSbom);
     obj.insert(QStringLiteral("tcpCounters"), caps.tcpCounters);
     obj.insert(QStringLiteral("psi"), caps.psi);

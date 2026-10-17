@@ -111,7 +111,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_osCgroups = osCaps.cgroups;
     m_osPsi = osCaps.psi;
     m_osJournal = osCaps.journal;
-    m_osDpkgSbom = osCaps.dpkgSbom;
+    m_osDpkgSbom = osCaps.sbom;
     m_osFim = osCaps.fim;
     m_osSecurity = osCaps.namespaces;
     m_osName = systemBackend().platformName();

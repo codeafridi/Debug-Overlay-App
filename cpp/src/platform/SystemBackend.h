@@ -15,6 +15,7 @@ struct PlatformCapabilities {
     bool journal = false;
     bool fim = false;
     bool dpkgSbom = false;
+    bool sbom = false;
     bool tcpCounters = false;
     bool psi = false;
     bool namespaces = false;

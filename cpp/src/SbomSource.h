@@ -11,6 +11,7 @@ public:
     SbomReport resolve(const QStringList &paths);
 
 private:
+    SbomReport resolveMac(const QStringList &paths);
     void ensureLoaded();
 
     bool m_loaded = false;

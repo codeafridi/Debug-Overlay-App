@@ -13,6 +13,7 @@ PlatformCapabilities LinuxBackend::capabilities() const {
     caps.journal = true;
     caps.fim = true;
     caps.dpkgSbom = true;
+    caps.sbom = true;
     caps.tcpCounters = true;
     caps.psi = true;
     caps.namespaces = true;

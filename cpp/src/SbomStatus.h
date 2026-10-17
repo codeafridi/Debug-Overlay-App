@@ -40,5 +40,16 @@ SbomReport buildSbom(const QStringList &paths,
                      const QHash<QString, DpkgPackage> &packages,
                      const QHash<QString, QString> &fileOwner);
 
+// macOS path classification: Homebrew Cellar formula/cask, /Applications
+// bundle, Apple system path, or generic file.
+struct MacPathPackage {
+    QString name;
+    QString version;
+    QString kind; // "brew" | "bundle" | "system" | "generic"
+};
+
+bool classifyMacPath(const QString &path, MacPathPackage &out);
+QString macPurl(const MacPathPackage &pkg);
+
 QString sbomSummaryText(const SbomReport &report);
 QString sbomDetailText(const SbomReport &report);
