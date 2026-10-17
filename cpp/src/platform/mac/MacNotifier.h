@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Notifier.h"
+#include "../../Notifier.h"
 
 class MacNotifier : public Notifier {
 public:
