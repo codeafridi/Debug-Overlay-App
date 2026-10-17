@@ -6,6 +6,7 @@
 #include "KubeStatus.h"
 #include "ServicesStatus.h"
 #include "AlertEngine.h"
+#include "IncidentStatus.h"
 #include "Notifier.h"
 #include "SyntheticStatus.h"
 #include "TraceStatus.h"
@@ -99,6 +100,7 @@ private:
     QWidget *m_compactPage = nullptr;
     QRect m_savedGeometry;
     AlertEngine m_alerts;
+    IncidentTracker m_incidents;
     AlertInput m_alertInput;
     std::unique_ptr<Notifier> m_notifier;
     void evaluateAlerts();

@@ -21,6 +21,7 @@
 #include "WatchdogStatus.h"
 #include "TlsStatus.h"
 #include "RuntimeStatus.h"
+#include "IncidentStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -968,6 +969,52 @@ int main(int argc, char *argv[]) {
               "runtime: non-dotnet maps");
         check(runtimeSummaryText(RuntimeInfo{}) .contains(QStringLiteral("native")),
               "runtime: summary for unknown");
+    }
+
+    {
+        IncidentTracker tracker(5000, 10);
+        Alert cpu;
+        cpu.id = QStringLiteral("app_cpu");
+        cpu.title = QStringLiteral("Focused app CPU high");
+        cpu.severity = QStringLiteral("critical");
+        cpu.detail = QStringLiteral("95%");
+        QList<Alert> alerts{cpu};
+
+        tracker.update(alerts, 100000);
+        QList<Incident> incidents = tracker.incidents();
+        check(incidents.size() == 1
+                  && incidents.first().status == QStringLiteral("open")
+                  && incidents.first().count == 1,
+              "incident: opened from alert");
+
+        tracker.update(alerts, 101000);
+        incidents = tracker.incidents();
+        check(incidents.size() == 1 && incidents.first().count == 2,
+              "incident: repeated alert grouped");
+
+        Alert mem;
+        mem.id = QStringLiteral("host_mem");
+        mem.title = QStringLiteral("Host memory low");
+        mem.severity = QStringLiteral("warning");
+        mem.detail = QStringLiteral("90%");
+        alerts.append(mem);
+        tracker.update(alerts, 102000);
+        incidents = tracker.incidents();
+        check(incidents.size() == 2, "incident: separate groups by alert id");
+
+        tracker.update({}, 102000 + 6000);
+        incidents = tracker.incidents();
+        bool allResolved = true;
+        for (const Incident &incident : incidents) {
+            if (incident.status != QStringLiteral("resolved")) {
+                allResolved = false;
+            }
+        }
+        check(allResolved, "incident: resolved after silence interval");
+        check(incidentsSummaryText(incidents).contains(QStringLiteral("resolved")),
+              "incident: summary text");
+        check(incidentsDetailText(incidents).contains(QStringLiteral("resolved")),
+              "incident: detail text");
     }
 
     std::printf("%d failure(s)\n", failures);

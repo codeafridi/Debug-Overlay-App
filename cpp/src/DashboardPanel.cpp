@@ -152,7 +152,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_rail->setFixedWidth(158);
     m_rail->setFocusPolicy(Qt::NoFocus);
     m_rail->addItems({QStringLiteral("Overview"), QStringLiteral("Metrics"),
-                      QStringLiteral("Alerts"), QStringLiteral("SLO"),
+                      QStringLiteral("Alerts"), QStringLiteral("Incidents"), QStringLiteral("SLO"),
                       QStringLiteral("Processes"), QStringLiteral("Memory"),
                       QStringLiteral("Disks"),
                       QStringLiteral("Network"),
@@ -174,6 +174,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
     m_views->addWidget(buildOverviewView());
     m_views->addWidget(buildMetricsView());
     m_views->addWidget(buildAlertsView());
+    m_views->addWidget(buildIncidentsView());
     m_views->addWidget(buildSloView());
     m_views->addWidget(buildProcessesView());
     m_views->addWidget(buildMemoryView());
@@ -246,6 +247,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddDbm { color: #9aa2ac; }"
         "#ddWatchdog { color: #9aa2ac; }"
         "#ddRuntime { color: #9aa2ac; }"
+        "#ddIncidentsSummary { color: #c4cad1; }"
+        "#ddIncidents { color: #9aa2ac; }"
         "#ddTlsSummary { color: #c4cad1; }"
         "#ddTls { color: #9aa2ac; }"
         "#ddSensitiveSummary { color: #c4cad1; }"
@@ -419,6 +422,27 @@ QWidget *DashboardPanel::buildAlertsView() {
     m_alerts->setFont(monoFont(11));
     m_alerts->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("ACTIVE ALERTS"), m_alerts, view), 1);
+    return view;
+}
+
+QWidget *DashboardPanel::buildIncidentsView() {
+    auto *view = new QWidget(this);
+    auto *layout = new QVBoxLayout(view);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(10);
+
+    m_incidentsSummary = new QLabel(QStringLiteral("--"), view);
+    m_incidentsSummary->setObjectName(QStringLiteral("ddIncidentsSummary"));
+    m_incidentsSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("INCIDENTS"), m_incidentsSummary, view));
+
+    m_incidents = new QLabel(QStringLiteral("no incidents"), view);
+    m_incidents->setObjectName(QStringLiteral("ddIncidents"));
+    m_incidents->setFont(monoFont(10));
+    m_incidents->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("TIMELINE"), m_incidents, view), 1);
     return view;
 }
 
@@ -1537,6 +1561,11 @@ void DashboardPanel::setAlerts(const QList<Alert> &alerts) {
                     .arg(alert.severity.toUpper(), alert.title, alert.detail);
     }
     m_alerts->setText(text);
+}
+
+void DashboardPanel::setIncidents(const QList<Incident> &incidents) {
+    m_incidentsSummary->setText(incidentsSummaryText(incidents));
+    m_incidents->setText(incidentsDetailText(incidents));
 }
 
 void DashboardPanel::setSyntheticSnapshot(const SyntheticSnapshot &snapshot) {

@@ -15,6 +15,7 @@
 #include "DbmStatus.h"
 #include "WatchdogStatus.h"
 #include "TlsStatus.h"
+#include "IncidentStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -39,6 +40,7 @@ public:
     void setServicesSnapshot(const ServicesSnapshot &snapshot);
     void setJournalSnapshot(const JournalSnapshot &snapshot);
     void setAlerts(const QList<Alert> &alerts);
+    void setIncidents(const QList<Incident> &incidents);
     void setSyntheticSnapshot(const SyntheticSnapshot &snapshot);
     void setTraceSnapshot(const TraceSnapshot &snapshot);
     void setPathSnapshot(const PathSnapshot &snapshot);
@@ -52,6 +54,7 @@ signals:
 private:
     QWidget *buildOverviewView();
     QWidget *buildAlertsView();
+    QWidget *buildIncidentsView();
     QWidget *buildProcessesView();
     QWidget *buildMemoryView();
     QWidget *buildNetworkView();
@@ -78,6 +81,8 @@ private:
     QLabel *m_appValue = nullptr;
     QLabel *m_pidValue = nullptr;
     QLabel *m_alerts = nullptr;
+    QLabel *m_incidentsSummary = nullptr;
+    QLabel *m_incidents = nullptr;
     QLabel *m_cpuValue = nullptr;
     QLabel *m_memValue = nullptr;
     QLabel *m_procCount = nullptr;

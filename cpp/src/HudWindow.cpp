@@ -458,16 +458,18 @@ void HudWindow::setTlsSnapshot(const TlsSnapshot &snapshot) {
 }
 
 void HudWindow::evaluateAlerts() {
-    if (m_notifier == nullptr) {
-        return;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const QList<Alert> fired = m_alerts.update(m_alertInput, now);
+    if (m_notifier != nullptr) {
+        for (const Alert &alert : fired) {
+            m_notifier->send(alert);
+        }
     }
-    const QList<Alert> fired =
-        m_alerts.update(m_alertInput, QDateTime::currentMSecsSinceEpoch());
-    for (const Alert &alert : fired) {
-        m_notifier->send(alert);
-    }
+    const QList<Alert> active = m_alerts.active();
     if (m_panel != nullptr) {
-        m_panel->setAlerts(m_alerts.active());
+        m_panel->setAlerts(active);
+        m_incidents.update(active, now);
+        m_panel->setIncidents(m_incidents.incidents());
     }
 }
 
