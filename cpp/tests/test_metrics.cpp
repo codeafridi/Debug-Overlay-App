@@ -1183,6 +1183,31 @@ int main(int argc, char *argv[]) {
               "hostinfo: os pretty name");
     }
 
+    {
+        QList<QStringList> rows;
+        rows.append({QStringLiteral("123"), QStringLiteral("5"),
+                     QStringLiteral("100.5"), QStringLiteral("20.1"),
+                     QStringLiteral("10"),
+                     QStringLiteral("SELECT count(*) FROM pg_class")});
+        rows.append({QStringLiteral("-42"), QStringLiteral("2"),
+                     QStringLiteral("3.0"), QStringLiteral("1.5"),
+                     QStringLiteral("1"), QStringLiteral("SELECT 1")});
+        DbmSnapshot snapshot;
+        parseStatements(rows, snapshot);
+        check(snapshot.statementsAvailable && snapshot.statements.size() == 2,
+              "dbm: parsed pg_stat_statements rows");
+        check(snapshot.statements.first().calls == 5
+                  && std::fabs(snapshot.statements.first().totalMs - 100.5) < 1e-6
+                  && snapshot.statements.first().query.contains(
+                         QStringLiteral("pg_class")),
+              "dbm: statement metrics");
+        check(dbmStatementsText(snapshot).contains(QStringLiteral("pg_class")),
+              "dbm: statements text");
+        DbmSnapshot empty;
+        check(dbmStatementsText(empty).contains(QStringLiteral("not available")),
+              "dbm: statements unavailable text");
+    }
+
     std::printf("%d failure(s)\n", failures);
     return failures == 0 ? 0 : 1;
 }

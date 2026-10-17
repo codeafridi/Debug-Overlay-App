@@ -140,6 +140,7 @@ private:
     QLabel *m_threats = nullptr;
     QLabel *m_dbmSummary = nullptr;
     QLabel *m_dbm = nullptr;
+    QLabel *m_dbmStatements = nullptr;
     QLabel *m_tlsSummary = nullptr;
     QLabel *m_tls = nullptr;
     QLabel *m_traceSummary = nullptr;

@@ -247,6 +247,7 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddStatsd { color: #9aa2ac; }"
         "#ddDbmSummary { color: #c4cad1; }"
         "#ddDbm { color: #9aa2ac; }"
+        "#ddDbmStatements { color: #9aa2ac; }"
         "#ddWatchdog { color: #9aa2ac; }"
         "#ddRuntime { color: #9aa2ac; }"
         "#ddForecast { color: #9aa2ac; }"
@@ -877,6 +878,13 @@ QWidget *DashboardPanel::buildDatabasesView() {
     m_dbm->setFont(monoFont(10));
     m_dbm->setWordWrap(false);
     layout->addWidget(makeCard(QStringLiteral("DBM"), m_dbm, view), 1);
+
+    m_dbmStatements = new QLabel(QStringLiteral("--"), view);
+    m_dbmStatements->setObjectName(QStringLiteral("ddDbmStatements"));
+    m_dbmStatements->setFont(monoFont(10));
+    m_dbmStatements->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("TOP QUERIES (pg_stat_statements)"), m_dbmStatements, view), 1);
 
     m_databases = new QLabel(QStringLiteral("--"), view);
     m_databases->setObjectName(QStringLiteral("ddDatabases"));
@@ -1741,6 +1749,7 @@ void DashboardPanel::setStatsdSnapshot(const StatsdSnapshot &snapshot) {
 void DashboardPanel::setDbmSnapshot(const DbmSnapshot &snapshot) {
     m_dbmSummary->setText(dbmSummaryText(snapshot));
     m_dbm->setText(dbmDetailText(snapshot));
+    m_dbmStatements->setText(dbmStatementsText(snapshot));
 }
 
 void DashboardPanel::setTlsSnapshot(const TlsSnapshot &snapshot) {
