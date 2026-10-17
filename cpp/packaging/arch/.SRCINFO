@@ -1,6 +1,6 @@
 pkgbase = syspeek
 	pkgdesc = Compact always-on-top HUD for focused-process and infra status
-	pkgver = 0.3.2
+	pkgver = 0.5.0
 	pkgrel = 1
 	url = https://github.com/codeafridi/Syspeek
 	arch = x86_64
@@ -12,7 +12,7 @@ pkgbase = syspeek
 	optdepends = xdotool: focused-window detection on X11/XWayland sessions
 	optdepends = docker: Docker container health badges
 	optdepends = kubectl: Kubernetes workload health badges
-	source = syspeek-0.3.2.tar.gz::https://github.com/codeafridi/Syspeek/archive/refs/tags/v0.3.2.tar.gz
+	source = syspeek-0.5.0.tar.gz::https://github.com/codeafridi/Syspeek/archive/refs/tags/v0.5.0.tar.gz
 	sha256sums = 9f22f5b518cbb447712e08064561259725634899a47573731899e753a9aea690
 
 pkgname = syspeek

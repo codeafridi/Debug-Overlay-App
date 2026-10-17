@@ -25,11 +25,11 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-echo ">> building portable bundle (rockylinux:9 base, Qt 6 from EPEL)" >&2
+echo ">> building portable bundle (${BASE_IMAGE:-rockylinux:9} base, Qt 6 from EPEL)" >&2
 echo ">> output: $tarball" >&2
 
 # Everything except the final tar stream goes to stderr so stdout stays clean.
-docker run --rm -v "$repo_root":/src:ro rockylinux:9 bash -lc '
+docker run --rm -v "$repo_root":/src:ro "${BASE_IMAGE:-rockylinux:9}" bash -lc '
 set -euo pipefail
 {
   echo ">> installing build dependencies"

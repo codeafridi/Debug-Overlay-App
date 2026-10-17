@@ -1,5 +1,5 @@
 Name:           syspeek
-Version:        0.4.0
+Version:        0.5.0
 Release:        1%{?dist}
 Summary:        Compact always-on-top HUD for focused-process and infra status
 
@@ -68,6 +68,9 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir cpp/build --output-on-failure
 %{_datadir}/icons/hicolor/scalable/apps/syspeek.svg
 
 %changelog
+* Thu Oct 16 2026 Syspeek <noreply@example.com> - 0.5.0-1
+- Disks, TCP health, Network Path, SBOM, Traces, DogStatsD, Security,
+  Logs pipeline, SLO, Kubernetes cost/deprecations, PostgreSQL DBM
 * Sun Oct 11 2026 Syspeek <noreply@example.com> - 0.3.2-1
 - AppImage packaging
 * Thu Jan 01 2026 Syspeek <noreply@example.com> - 0.1.0-1

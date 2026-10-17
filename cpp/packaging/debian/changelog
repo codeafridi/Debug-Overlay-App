@@ -1,3 +1,18 @@
+syspeek (0.5.0-1) unstable; urgency=medium
+
+  * Disks view: per-device I/O throughput/util + PSI pressure (iostat-style)
+  * Network: TCP health (retransmits/errors) and Network Path (mtr)
+  * SBOM / software inventory for the focused app
+  * APM: OTLP/HTTP trace receiver, service map and latency
+  * Metrics: DogStatsD receiver (port 8125)
+  * Security: sandbox exposure score, sensitive-data scanner, log-based threats
+  * Logs: Fluent Bit-style parsing pipeline with facets
+  * SLO / error budget + burn rate
+  * Kubernetes: cost estimate + deprecated/removed API detection
+  * Database monitoring (PostgreSQL)
+
+ -- Syspeek <noreply@example.com>  Thu, 16 Oct 2026 00:00:00 +0000
+
 syspeek (0.4.0-1) unstable; urgency=medium
 
   * AppImage packaging
