@@ -3,8 +3,10 @@
 #ifdef Q_OS_MACOS
 
 #include <mach/mach.h>
+#include <mach/host_info.h>
+#include <mach/machine.h>
 #include <mach/mach_host.h>
-#include <mach/mach_timebase_info.h>
+#include <mach/mach_time.h>
 #include <mach/processor_info.h>
 #include <mach/vm_statistics.h>
 
@@ -429,8 +431,6 @@ bool MacBackend::procSample(int pid, linuxproc::MemInfo &mem,
                         reinterpret_cast<rusage_info_t *>(&ri)) == 0) {
         detail.readBytes = static_cast<long long>(ri.ri_diskio_bytesread);
         detail.writeBytes = static_cast<long long>(ri.ri_diskio_byteswritten);
-        detail.voluntaryCtx = ri.ri_pswitches;
-        detail.involuntaryCtx = ri.ri_interrupt_wkups;
     }
     return true;
 }
