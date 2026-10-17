@@ -24,7 +24,6 @@ bool applyMacOverlay(QWidget *widget) {
         | NSWindowCollectionBehaviorFullScreenAuxiliary
         | NSWindowCollectionBehaviorStationary;
     window.hidesOnDeactivate = NO;
-    window.behavior = NSWindowActivationBehaviorAccessory;
     return true;
 }
 
