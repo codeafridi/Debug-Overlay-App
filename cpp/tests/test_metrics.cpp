@@ -461,6 +461,17 @@ int main(int argc, char *argv[]) {
               "security: summary text");
         check(securityDetailText(bad).contains(QStringLiteral("CAP_SYS_ADMIN")),
               "security: detail lists capability");
+
+        QList<SecurityFinding> host;
+        host.append({QStringLiteral("system integrity protection"), 0.0, true});
+        host.append({QStringLiteral("disk encryption"), 8.0, false});
+        host.append({QStringLiteral("gatekeeper assessments"), 0.0, true});
+        host.append({QStringLiteral("application firewall"), 6.0, false});
+        const SecurityPosture mac = postureFromFindings(host);
+        check(mac.available && std::fabs(mac.exposure - 3.5) < 1e-6
+                  && mac.grade == QStringLiteral("medium")
+                  && mac.exposedCount == 2,
+              "security: host-posture findings averaged");
     }
 
     {

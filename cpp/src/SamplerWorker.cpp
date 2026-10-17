@@ -251,6 +251,9 @@ DisplaySnapshot SamplerWorker::buildSnapshot(const FocusSample &focus) {
     SecurityInput securityInput;
     if (readSecurityInput(focus.identity.pid, securityInput)) {
         snap.security = evaluateSecurity(securityInput);
+    } else if (QList<SecurityFinding> hostFindings;
+               m_backend->hostSecurityPosture(hostFindings)) {
+        snap.security = postureFromFindings(hostFindings);
     }
 
     snap.runtime = detectRuntime(focus.identity.pid, *m_backend);

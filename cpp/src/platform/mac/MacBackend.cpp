@@ -34,6 +34,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <QProcess>
+
 namespace {
 // Darwin TCP FSM values (netinet/tcp_fsm.h; not exposed by the SDK
 // userspace netinet/tcp.h):
@@ -290,6 +292,71 @@ bool MacBackend::hostInterfaces(QList<linuxproc::InterfaceStats> &out) {
     }
     out.append(ifaces);
     return true;
+}
+
+bool MacBackend::hostSecurityPosture(QList<SecurityFinding> &out) {
+    // osquery darwin tables ground the fact model: FileVault status
+    // (kFileVaultStatusOn/Off/Unknown), Gatekeeper assessment DB
+    // ("Cannot open Gatekeeper DB: ") and codesigning_flags; the tools
+    // used here follow the standard Apple userland probing set.
+    out.clear();
+
+    enum class Check { SIP, Gatekeeper, Firewall, FileVault };
+
+    auto runTool = [](const QString &program,
+                      const QStringList &args) -> QString {
+        QProcess process;
+        process.start(program, args);
+        if (!process.waitForStarted(800)
+            || !process.waitForFinished(2500)
+            || process.exitStatus() != QProcess::NormalExit
+            || process.exitCode() != 0) {
+            return QString();
+        }
+        return QString::fromUtf8(process.readAllStandardOutput()).toLower();
+    };
+
+    const QString sip =
+        runTool(QStringLiteral("/usr/bin/csrutil"),
+                QStringList{QStringLiteral("status")});
+    if (!sip.isEmpty() && sip.contains(QStringLiteral("enabled"))) {
+        out.append({QStringLiteral("system integrity protection"), 0.0, true});
+    } else if (!sip.isEmpty()) {
+        out.append({QStringLiteral("system integrity protection"), 10.0, false});
+    }
+
+    const QString fileVault =
+        runTool(QStringLiteral("/usr/bin/fdesetup"),
+                QStringList{QStringLiteral("status")});
+    if (!fileVault.isEmpty()
+        && fileVault.contains(QStringLiteral("filevault is on"))) {
+        out.append({QStringLiteral("disk encryption"), 0.0, true});
+    } else if (!fileVault.isEmpty()) {
+        out.append({QStringLiteral("disk encryption"), 8.0, false});
+    }
+
+    const QString gatekeeper =
+        runTool(QStringLiteral("/usr/sbin/spctl"),
+                QStringList{QStringLiteral("--status")});
+    if (!gatekeeper.isEmpty()
+        && gatekeeper.contains(QStringLiteral("enabled"))) {
+        out.append({QStringLiteral("gatekeeper assessments"), 0.0, true});
+    } else if (!gatekeeper.isEmpty()) {
+        out.append({QStringLiteral("gatekeeper assessments"), 8.0, false});
+    }
+
+    const QString firewall =
+        runTool(QStringLiteral(
+                    "/usr/libexec/ApplicationFirewall/socketfilterfw"),
+                QStringList{QStringLiteral("--getglobalstate")});
+    if (!firewall.isEmpty()
+        && firewall.contains(QStringLiteral("enabled"))) {
+        out.append({QStringLiteral("application firewall"), 0.0, true});
+    } else if (!firewall.isEmpty()) {
+        out.append({QStringLiteral("application firewall"), 6.0, false});
+    }
+
+    return !out.isEmpty();
 }
 
 QList<linuxproc::SocketInfo> MacBackend::readNetSockets() {

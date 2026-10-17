@@ -3,6 +3,7 @@
 #include "DiskStatus.h"
 #include "LinuxProcess.h"
 #include "ProcessIdentity.h"
+#include "SecurityStatus.h"
 
 #include <QByteArray>
 #include <QList>
@@ -171,5 +172,9 @@ public:
     // ---- network ----
     virtual QList<linuxproc::SocketInfo> readNetSockets() {
         return QList<linuxproc::SocketInfo>();
+    }
+    virtual bool hostSecurityPosture(QList<SecurityFinding> &out) {
+        Q_UNUSED(out);
+        return false;
     }
 };
