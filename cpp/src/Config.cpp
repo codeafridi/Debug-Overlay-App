@@ -100,6 +100,13 @@ void validate(Config &config) {
     if (config.tls.targets.size() > 32) {
         config.tls.targets = config.tls.targets.mid(0, 32);
     }
+
+    config.fim.intervalMs = clampInt(config.fim.intervalMs, 1000, 86400000);
+    config.fim.maxFileSizeKb =
+        clampInt(config.fim.maxFileSizeKb, 0, 1024 * 1024);
+    if (config.fim.paths.size() > 64) {
+        config.fim.paths = config.fim.paths.mid(0, 64);
+    }
 }
 
 } // namespace
@@ -373,6 +380,43 @@ Config loadConfig(const QString &path, QString *errorMessage) {
         const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
         if (interval > 0) {
             config.tls.intervalMs = interval;
+        }
+    }
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("fim"));
+    {
+        if (settings.contains(QStringLiteral("enabled"))) {
+            config.fim.enabled =
+                settings.value(QStringLiteral("enabled")).toBool();
+        }
+        if (settings.contains(QStringLiteral("paths"))) {
+            const QStringList raw =
+                settings.value(QStringLiteral("paths")).toStringList();
+            QStringList expanded;
+            for (const QString &item : raw) {
+                expanded += item.split(
+                    QRegularExpression(QStringLiteral("[\\s,]+")),
+                    Qt::SkipEmptyParts);
+            }
+            config.fim.paths = expanded;
+        }
+        const int interval = settings.value(QStringLiteral("interval_ms")).toInt();
+        if (interval > 0) {
+            config.fim.intervalMs = interval;
+        }
+        const QString algorithm =
+            settings.value(QStringLiteral("algorithm")).toString();
+        if (!algorithm.isEmpty()) {
+            config.fim.algorithm = algorithm;
+        }
+        const int maxSize =
+            settings.value(QStringLiteral("max_file_size_kb")).toInt();
+        if (maxSize > 0) {
+            config.fim.maxFileSizeKb = maxSize;
+        }
+        if (settings.contains(QStringLiteral("watch"))) {
+            config.fim.watch = settings.value(QStringLiteral("watch")).toBool();
         }
     }
     settings.endGroup();

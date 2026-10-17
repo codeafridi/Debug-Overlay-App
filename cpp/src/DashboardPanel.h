@@ -16,6 +16,7 @@
 #include "WatchdogStatus.h"
 #include "TlsStatus.h"
 #include "IncidentStatus.h"
+#include "FimStatus.h"
 
 #include <QSet>
 #include <QWidget>
@@ -47,6 +48,7 @@ public:
     void setStatsdSnapshot(const StatsdSnapshot &snapshot);
     void setDbmSnapshot(const DbmSnapshot &snapshot);
     void setTlsSnapshot(const TlsSnapshot &snapshot);
+    void setFimSnapshot(const FimSnapshot &snapshot);
 
 signals:
     void collapseRequested();
@@ -138,6 +140,8 @@ private:
     QLabel *m_securitySummary = nullptr;
     QLabel *m_security = nullptr;
     QLabel *m_threats = nullptr;
+    QLabel *m_fimSummary = nullptr;
+    QLabel *m_fim = nullptr;
     QLabel *m_dbmSummary = nullptr;
     QLabel *m_dbm = nullptr;
     QLabel *m_dbmStatements = nullptr;

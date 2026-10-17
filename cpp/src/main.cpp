@@ -16,6 +16,7 @@
 #include "StatsdSource.h"
 #include "DbmSource.h"
 #include "TlsSource.h"
+#include "FimSource.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -106,6 +107,7 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType<StatsdSnapshot>("StatsdSnapshot");
     qRegisterMetaType<DbmSnapshot>("DbmSnapshot");
     qRegisterMetaType<TlsSnapshot>("TlsSnapshot");
+    qRegisterMetaType<FimSnapshot>("FimSnapshot");
 
     g_latencyProbe = qEnvironmentVariableIsSet("SYSPEEK_LATENCY");
 
@@ -324,6 +326,18 @@ int main(int argc, char *argv[]) {
                          hud.setTlsSnapshot(snapshot);
                      });
     tlsThread->start();
+
+    auto *fimThread = new QThread;
+    auto *fim = new FimSource(config.fim);
+    fim->moveToThread(fimThread);
+    QObject::connect(fimThread, &QThread::started, fim, &FimSource::start);
+    QObject::connect(fimThread, &QThread::finished, fim,
+                     &QObject::deleteLater);
+    QObject::connect(fim, &FimSource::fimReady, &hud,
+                     [&hud](const FimSnapshot &snapshot) {
+                         hud.setFimSnapshot(snapshot);
+                     });
+    fimThread->start();
 
     const QString pidFilePath = GnomePidFileProvider::defaultPath();
     QString lastRaw;

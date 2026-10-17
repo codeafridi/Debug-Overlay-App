@@ -83,6 +83,19 @@ struct TlsConfig {
     int intervalMs = 300000;
 };
 
+struct FimConfig {
+    bool enabled = true;
+    QStringList paths = {
+        QStringLiteral("/etc/passwd"), QStringLiteral("/etc/group"),
+        QStringLiteral("/etc/hosts"),  QStringLiteral("/etc/hostname"),
+        QStringLiteral("/etc/resolv.conf"), QStringLiteral("/etc/cron.d"),
+        QStringLiteral("/etc/pam.d"),  QStringLiteral("/etc/ssh")};
+    int intervalMs = 30000;
+    QString algorithm = QStringLiteral("sha256");
+    int maxFileSizeKb = 4096;
+    bool watch = true;
+};
+
 struct Config {
     HealthConfig health;
     DockerConfig docker;
@@ -95,6 +108,7 @@ struct Config {
     SloConfig slo;
     DbmConfig database;
     TlsConfig tls;
+    FimConfig fim;
     int focusCacheTtlMs = 1500;
     int sampleIntervalMs = 1000;
 };

@@ -24,6 +24,7 @@
 #include "IncidentStatus.h"
 #include "ProfileStatus.h"
 #include "HostInfoStatus.h"
+#include "FimStatus.h"
 
 #include <QApplication>
 #include <QPixmap>
@@ -1206,6 +1207,122 @@ int main(int argc, char *argv[]) {
         DbmSnapshot empty;
         check(dbmStatementsText(empty).contains(QStringLiteral("not available")),
               "dbm: statements unavailable text");
+    }
+
+    {
+        auto meta = [](const char *path, const char *hash, quint64 size,
+                       quint64 inode, unsigned int mode, qint64 mtime) {
+            FimFileMeta m;
+            m.path = QString::fromLatin1(path);
+            m.hash = QString::fromLatin1(hash);
+            m.size = size;
+            m.inode = inode;
+            m.mode = mode;
+            m.mtimeMs = mtime;
+            return m;
+        };
+
+        QHash<QString, FimFileMeta> previous;
+        previous.insert(QStringLiteral("/etc/passwd"),
+                        meta("/etc/passwd", "aa11", 100, 10, 0644, 1000));
+        previous.insert(QStringLiteral("/etc/hosts"),
+                        meta("/etc/hosts", "bb22", 50, 20, 0644, 2000));
+        previous.insert(QStringLiteral("/etc/old"),
+                        meta("/etc/old", "cc33", 30, 30, 0600, 3000));
+        previous.insert(QStringLiteral("/etc/cfg"),
+                        meta("/etc/cfg", "ff66", 40, 50, 0644, 3500));
+        previous.insert(QStringLiteral("/etc/gone"),
+                        meta("/etc/gone", "9191", 20, 60, 0644, 3600));
+
+        QHash<QString, FimFileMeta> current;
+        current.insert(QStringLiteral("/etc/passwd"),
+                       meta("/etc/passwd", "dd44", 120, 10, 0640, 5000));
+        current.insert(QStringLiteral("/etc/hosts"),
+                       meta("/etc/hosts", "bb22", 50, 20, 0644, 2000));
+        current.insert(QStringLiteral("/etc/new"),
+                       meta("/etc/new", "cc33", 30, 30, 0600, 4000));
+        current.insert(QStringLiteral("/etc/cfg"),
+                       meta("/etc/cfg", "ff66", 40, 50, 0600, 3500));
+        current.insert(QStringLiteral("/etc/added"),
+                       meta("/etc/added", "ee55", 10, 40, 0644, 6000));
+
+        const QList<FimChange> changes = diffFim(previous, current, 9000);
+        check(changes.size() == 5, "fim: five drift events");
+
+        int created = 0;
+        int modified = 0;
+        int metadata = 0;
+        int deleted = 0;
+        int renamed = 0;
+        QString renamedFrom;
+        for (const FimChange &change : changes) {
+            switch (change.kind) {
+            case FimChangeKind::Created:
+                ++created;
+                check(change.path == QStringLiteral("/etc/added"),
+                      "fim: created path");
+                break;
+            case FimChangeKind::Modified:
+                ++modified;
+                check(change.path == QStringLiteral("/etc/passwd")
+                          && change.oldHash == QStringLiteral("aa11")
+                          && change.hash == QStringLiteral("dd44"),
+                      "fim: modified hashes");
+                break;
+            case FimChangeKind::Metadata:
+                ++metadata;
+                check(change.path == QStringLiteral("/etc/cfg"),
+                      "fim: metadata path");
+                break;
+            case FimChangeKind::Deleted:
+                ++deleted;
+                check(change.path == QStringLiteral("/etc/gone"),
+                      "fim: deleted path");
+                break;
+            case FimChangeKind::Renamed:
+                ++renamed;
+                renamedFrom = change.oldPath;
+                check(change.path == QStringLiteral("/etc/new")
+                          && change.oldPath == QStringLiteral("/etc/old"),
+                      "fim: rename pair");
+                break;
+            }
+        }
+        check(created == 1 && modified == 1 && metadata == 1 && deleted == 1
+                  && renamed == 1,
+              "fim: change kinds classified");
+        check(renamedFrom == QStringLiteral("/etc/old"),
+              "fim: rename source path");
+
+        QHash<QString, FimFileMeta> same = current;
+        check(diffFim(current, same, 9000).isEmpty(),
+              "fim: identical scans -> no drift");
+
+        FimSnapshot baseline;
+        baseline.enabled = true;
+        baseline.available = true;
+        baseline.baseline = true;
+        baseline.fileCount = 7;
+        baseline.algorithm = QStringLiteral("sha256");
+        check(fimSummaryText(baseline).contains(QStringLiteral("baseline"))
+                  && fimSummaryText(baseline).contains(QStringLiteral("sha256")),
+              "fim: baseline summary");
+
+        FimSnapshot drift;
+        drift.enabled = true;
+        drift.available = true;
+        drift.fileCount = 7;
+        drift.algorithm = QStringLiteral("sha256");
+        drift.changes = changes;
+        check(fimSummaryText(drift).contains(QStringLiteral("5 change")),
+              "fim: drift summary count");
+        const QString detail = fimDetailText(drift);
+        check(detail.contains(QStringLiteral("MODIFIED"))
+                  && detail.contains(QStringLiteral("/etc/passwd"))
+                  && detail.contains(QStringLiteral("RENAMED")),
+              "fim: detail text");
+        check(fimDetailText(FimSnapshot{}).contains(QStringLiteral("disabled")),
+              "fim: disabled detail");
     }
 
     std::printf("%d failure(s)\n", failures);

@@ -483,6 +483,12 @@ void HudWindow::setTlsSnapshot(const TlsSnapshot &snapshot) {
     }
 }
 
+void HudWindow::setFimSnapshot(const FimSnapshot &snapshot) {
+    if (m_panel != nullptr) {
+        m_panel->setFimSnapshot(snapshot);
+    }
+}
+
 void HudWindow::evaluateAlerts() {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     const QList<Alert> fired = m_alerts.update(m_alertInput, now);

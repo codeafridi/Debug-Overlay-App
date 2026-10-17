@@ -239,6 +239,8 @@ DashboardPanel::DashboardPanel(QWidget *parent)
         "#ddSecuritySummary { color: #c4cad1; }"
         "#ddSecurity { color: #9aa2ac; }"
         "#ddThreats { color: #9aa2ac; }"
+        "#ddFimSummary { color: #c4cad1; }"
+        "#ddFim { color: #9aa2ac; }"
         "#ddSoftwareSummary { color: #c4cad1; }"
         "#ddSoftware { color: #9aa2ac; }"
         "#ddPathSummary { color: #c4cad1; }"
@@ -1120,6 +1122,19 @@ QWidget *DashboardPanel::buildSecurityView() {
     layout->addWidget(
         makeCard(QStringLiteral("THREATS (log-based SIEM)"), m_threats, view), 1);
 
+    m_fimSummary = new QLabel(QStringLiteral("--"), view);
+    m_fimSummary->setObjectName(QStringLiteral("ddFimSummary"));
+    m_fimSummary->setFont(monoFont(13, true));
+    layout->addWidget(
+        makeCard(QStringLiteral("FILE INTEGRITY (FIM)"), m_fimSummary, view));
+
+    m_fim = new QLabel(QStringLiteral("--"), view);
+    m_fim->setObjectName(QStringLiteral("ddFim"));
+    m_fim->setFont(monoFont(10));
+    m_fim->setWordWrap(false);
+    layout->addWidget(
+        makeCard(QStringLiteral("FILE CHANGES"), m_fim, view), 1);
+
     return view;
 }
 
@@ -1755,4 +1770,9 @@ void DashboardPanel::setDbmSnapshot(const DbmSnapshot &snapshot) {
 void DashboardPanel::setTlsSnapshot(const TlsSnapshot &snapshot) {
     m_tlsSummary->setText(tlsSummaryText(snapshot));
     m_tls->setText(tlsDetailText(snapshot));
+}
+
+void DashboardPanel::setFimSnapshot(const FimSnapshot &snapshot) {
+    m_fimSummary->setText(fimSummaryText(snapshot));
+    m_fim->setText(fimDetailText(snapshot));
 }
