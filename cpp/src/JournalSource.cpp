@@ -1,5 +1,9 @@
 #include "JournalSource.h"
 
+#if defined(Q_OS_MACOS)
+#include "platform/mac/MacLogSource.h"
+#endif
+
 #include <QDateTime>
 #include <QStandardPaths>
 #include <QTimer>
@@ -47,6 +51,17 @@ void JournalSource::beginQuery() {
         return;
     }
 
+#if defined(Q_OS_MACOS)
+    QByteArray data;
+    if (fetchUnifiedLogJournalJson(data, 300, 300)) {
+        m_stdout.clear();
+        m_running = true;
+        onFinished(0, QProcess::NormalExit);
+        return;
+    }
+    emitFailure(QStringLiteral("unified log unavailable"));
+    return;
+#else
     const QString path = QStandardPaths::findExecutable(QStringLiteral("journalctl"));
     if (path.isEmpty()) {
         emitFailure(QStringLiteral("journalctl not found"));
@@ -58,6 +73,7 @@ void JournalSource::beginQuery() {
     m_process->start(path, {QStringLiteral("-o"), QStringLiteral("json"),
                             QStringLiteral("--no-pager"), QStringLiteral("-n"),
                             QStringLiteral("300")});
+#endif
 }
 
 void JournalSource::onTimeout() {

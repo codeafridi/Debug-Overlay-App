@@ -194,6 +194,8 @@ elseif(APPLE)
         src/platform/mac/MacFocusProvider.h
         src/platform/mac/MacNotifier.mm
         src/platform/mac/MacNotifier.h
+        src/platform/mac/MacLogSource.mm
+        src/platform/mac/MacLogSource.h
         src/platform/mac/MacOverlay.mm
         src/platform/mac/MacOverlay.h)
 elseif(WIN32)
@@ -206,7 +208,8 @@ target_include_directories(syspeek_core PUBLIC src)
 target_link_libraries(syspeek_core PUBLIC Qt6::Widgets Qt6::Network)
 if(APPLE)
     target_link_libraries(syspeek_core PUBLIC
-        "-framework Cocoa" "-framework CoreFoundation" "-framework IOKit")
+        "-framework Cocoa" "-framework CoreFoundation" "-framework IOKit"
+        "-framework OSLog")
     target_compile_options(syspeek_core PUBLIC $<$<COMPILE_LANGUAGE:OBJCXX>:-Wno-deprecated-declarations>)
 elseif(UNIX)
     target_link_libraries(syspeek_core PUBLIC Qt6::DBus)

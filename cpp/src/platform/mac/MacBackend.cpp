@@ -33,6 +33,25 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+namespace {
+// Darwin TCP FSM values (netinet/tcp_fsm.h; not exposed by the SDK
+// userspace netinet/tcp.h):
+// TCPS_CLOSED 0, TCPS_LISTEN 1, TCPS_SYN_SENT 2, TCPS_SYN_RECEIVED 3,
+// TCPS_ESTABLISHED 4, TCPS_CLOSE_WAIT 5, TCPS_FIN_WAIT_1 6,
+// TCPS_CLOSING 7, TCPS_LAST_ACK 8, TCPS_FIN_WAIT_2 9, TCPS_TIME_WAIT 10.
+constexpr int kTcpStateClosed = 0;
+constexpr int kTcpStateListen = 1;
+constexpr int kTcpStateSynSent = 2;
+constexpr int kTcpStateSynReceived = 3;
+constexpr int kTcpStateEstablished = 4;
+constexpr int kTcpStateCloseWait = 5;
+constexpr int kTcpStateFinWait1 = 6;
+constexpr int kTcpStateClosing = 7;
+constexpr int kTcpStateLastAck = 8;
+constexpr int kTcpStateFinWait2 = 9;
+constexpr int kTcpStateTimeWait = 10;
+} // namespace
 #include <cerrno>
 #include <cstring>
 #include <vector>
@@ -201,6 +220,7 @@ QString MacBackend::platformName() const {
 PlatformCapabilities MacBackend::capabilities() const {
     PlatformCapabilities caps;
     caps.systemServices = true;
+    caps.journal = true;
     caps.fim = true;
     return caps;
 }
@@ -364,37 +384,37 @@ QList<linuxproc::SocketInfo> MacBackend::readNetSockets() {
             if (proto == IPPROTO_TCP) {
                 // Darwin TCP FSM (netinet/tcp_fsm.h): TCPS_CLOSED=0 .. TCPS_TIME_WAIT=10.
                 switch (sfi.psi.soi_state) {
-                case TCPS_CLOSED:
+                case kTcpStateClosed:
                     info.state = QStringLiteral("CLOSE");
                     break;
-                case TCPS_LISTEN:
+                case kTcpStateListen:
                     info.state = QStringLiteral("LISTEN");
                     break;
-                case TCPS_SYN_SENT:
+                case kTcpStateSynSent:
                     info.state = QStringLiteral("SYN_SENT");
                     break;
-                case TCPS_SYN_RECEIVED:
+                case kTcpStateSynReceived:
                     info.state = QStringLiteral("SYN_RECV");
                     break;
-                case TCPS_ESTABLISHED:
+                case kTcpStateEstablished:
                     info.state = QStringLiteral("ESTABLISHED");
                     break;
-                case TCPS_CLOSE_WAIT:
+                case kTcpStateCloseWait:
                     info.state = QStringLiteral("CLOSE_WAIT");
                     break;
-                case TCPS_FIN_WAIT_1:
+                case kTcpStateFinWait1:
                     info.state = QStringLiteral("FIN_WAIT1");
                     break;
-                case TCPS_CLOSING:
+                case kTcpStateClosing:
                     info.state = QStringLiteral("CLOSING");
                     break;
-                case TCPS_LAST_ACK:
+                case kTcpStateLastAck:
                     info.state = QStringLiteral("LAST_ACK");
                     break;
-                case TCPS_FIN_WAIT_2:
+                case kTcpStateFinWait2:
                     info.state = QStringLiteral("FIN_WAIT2");
                     break;
-                case TCPS_TIME_WAIT:
+                case kTcpStateTimeWait:
                     info.state = QStringLiteral("TIME_WAIT");
                     break;
                 default:
