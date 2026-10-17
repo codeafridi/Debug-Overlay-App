@@ -6,12 +6,102 @@
 #include <QSet>
 #include <QStringList>
 
+#if defined(Q_OS_MACOS)
+#include <net/if_dl.h>
+#include <sys/mount.h>
+#include <sys/socket.h>
+#include <sys/sysctl.h>
+#endif
+
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <sys/statvfs.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+
+#include <vector>
+
+namespace {
+
+bool macSysctlString(const char *key, QString &out) {
+#if defined(Q_OS_MACOS)
+    size_t size = 0;
+    if (sysctlbyname(key, nullptr, &size, nullptr, 0) != 0 || size == 0) {
+        return false;
+    }
+    QByteArray buf(static_cast<int>(size) + 1, '\0');
+    if (sysctlbyname(key, buf.data(), &size, nullptr, 0) != 0) {
+        return false;
+    }
+    out = QString::fromLatin1(buf.data());
+    return true;
+#else
+    Q_UNUSED(key);
+    Q_UNUSED(out);
+    return false;
+#endif
+}
+
+bool macSysctlInt(const char *key, int &out) {
+#if defined(Q_OS_MACOS)
+    int value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname(key, &value, &size, nullptr, 0) != 0) {
+        return false;
+    }
+    out = value;
+    return true;
+#else
+    Q_UNUSED(key);
+    Q_UNUSED(out);
+    return false;
+#endif
+}
+
+bool macSysctlCaches(const char *key, unsigned long long &out) {
+#if defined(Q_OS_MACOS)
+    unsigned long long value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname(key, &value, &size, nullptr, 0) != 0) {
+        return false;
+    }
+    out = value;
+    return true;
+#else
+    Q_UNUSED(key);
+    Q_UNUSED(out);
+    return false;
+#endif
+}
+
+QString macSwapUsageTotalKb() {
+#if defined(Q_OS_MACOS)
+    QString usage;
+    if (!macSysctlString("vm.swapusage", usage)) {
+        return QString();
+    }
+    const QRegularExpression pattern(
+        QStringLiteral("total\\s*=\\s*([0-9.]+)([KMG])"));
+    const QRegularExpressionMatch match = pattern.match(usage);
+    if (!match.hasMatch()) {
+        return QString();
+    }
+    const double value = match.captured(1).toDouble();
+    const QString unit = match.captured(2);
+    double kb = value;
+    if (unit == QStringLiteral("G")) {
+        kb *= 1024.0 * 1024.0;
+    } else if (unit == QStringLiteral("M")) {
+        kb *= 1024.0;
+    }
+    return QString::number(static_cast<unsigned long long>(kb));
+#else
+    return QString();
+#endif
+}
+
+} // namespace
 
 namespace {
 
@@ -136,7 +226,192 @@ QString parseOsRelease(const QByteArray &osRelease) {
     return name;
 }
 
+#if defined(Q_OS_MACOS)
+HostInfo collectHostInfoMac() {
+    // Datadog pkg/gohai darwin model (cpu_darwin.go, platform_darwin.go,
+    // memory_darwin.go — source reference in /home/nullchan/Research/
+    // datadog-agent, previously REA'd on the agent binary for M39):
+    //   cpu: machdep.cpu.vendor / machdep.cpu.brand_string, hw.packages,
+    //        hw.physicalcpu / hw.logicalcpu, hw.l1dcachesize /
+    //        hw.l2cachesize / hw.l3cachesize, hw.cpufrequency
+    //   mem: hw.memsize (+ vm.swapusage)
+    //   platform: uname fields; Rosetta via sysctl.proc_translated
+    //   filesystems: getfsstat (local mounts)
+    //   network: getifaddrs with AF_LINK MAC (sockaddr_dl), v4/v6 CIDR
+    HostInfo info;
+    info.available = true;
+
+    struct utsname uts {};
+    if (uname(&uts) == 0) {
+        info.platform.kernelName = QString::fromLatin1(uts.sysname);
+        info.platform.kernelRelease = QString::fromLatin1(uts.release);
+        info.platform.kernelVersion = QString::fromLatin1(uts.version);
+        info.platform.machine = QString::fromLatin1(uts.machine);
+        info.platform.os = QString::fromLatin1(uts.sysname);
+    }
+    char hostname[256] = {0};
+    if (gethostname(hostname, sizeof(hostname) - 1) == 0) {
+        info.platform.hostname = QString::fromLatin1(hostname);
+    }
+
+    int translated = 0;
+    if (macSysctlInt("sysctl.proc_translated", translated)
+        && translated == 1) {
+        info.virtualization = QStringLiteral("rosetta2");
+        info.platform.machine = QStringLiteral("arm64");
+    }
+
+    macSysctlString("machdep.cpu.brand_string", info.cpu.modelName);
+    macSysctlString("machdep.cpu.vendor", info.cpu.vendorId);
+    int cores = 0;
+    if (macSysctlInt("hw.physicalcpu", cores) && cores > 0) {
+        info.cpu.cores = cores;
+    }
+    if (macSysctlInt("hw.logicalcpu", cores) && cores > 0) {
+        info.cpu.logicalProcessors = cores;
+    }
+    if (macSysctlInt("hw.packages", cores) && cores > 0) {
+        info.cpu.packages = cores;
+    }
+    unsigned long long cache = 0;
+    QString cacheText;
+    if (macSysctlCaches("hw.l1dcachesize", cache)) {
+        cacheText += QStringLiteral("L1d %1KB").arg(cache / 1024ULL);
+    }
+    if (macSysctlCaches("hw.l2cachesize", cache)) {
+        cacheText += (cacheText.isEmpty() ? QString()
+                                          : QStringLiteral(" + "))
+                     + QStringLiteral("L2 %1KB").arg(cache / 1024ULL);
+    }
+    if (macSysctlCaches("hw.l3cachesize", cache)) {
+        cacheText += (cacheText.isEmpty() ? QString()
+                                          : QStringLiteral(" + "))
+                     + QStringLiteral("L3 %1KB").arg(cache / 1024ULL);
+    }
+    info.cpu.cacheSize = cacheText;
+
+    unsigned long long memsize = 0;
+    size_t size = sizeof(memsize);
+    if (sysctlbyname("hw.memsize", &memsize, &size, nullptr, 0) == 0) {
+        info.memTotalKb = memsize / 1024ULL;
+    }
+    const QString swapKb = macSwapUsageTotalKb();
+    if (!swapKb.isEmpty()) {
+        info.swapTotalKb = swapKb.toULongLong();
+    }
+
+    int fsCount = getfsstat(nullptr, 0, MNT_NOWAIT);
+    if (fsCount > 0) {
+        std::vector<struct statfs> stats(static_cast<size_t>(fsCount));
+        fsCount = getfsstat(stats.data(),
+                            static_cast<int>(stats.size()
+                                                 * sizeof(struct statfs)),
+                            MNT_NOWAIT);
+        for (int i = 0; i < fsCount; ++i) {
+            const struct statfs &st = stats[static_cast<size_t>(i)];
+            if ((st.f_flags & MNT_LOCAL) == 0) {
+                continue;
+            }
+            const QString mountOn =
+                QString::fromLatin1(st.f_mntonname);
+            if (mountOn.startsWith(QStringLiteral("/System/"))) {
+                continue;
+            }
+            HostFsInfo fs;
+            fs.name = QString::fromLatin1(st.f_mntfromname);
+            fs.mountedOn = mountOn;
+            fs.kbSize = static_cast<unsigned long long>(st.f_blocks)
+                        * st.f_bsize / 1024ULL;
+            info.filesystems.append(fs);
+        }
+    }
+
+    QHash<QString, HostNetworkInfo> byName;
+    struct ifaddrs *addrs = nullptr;
+    if (getifaddrs(&addrs) == 0) {
+        for (struct ifaddrs *ifa = addrs; ifa != nullptr;
+             ifa = ifa->ifa_next) {
+            if (ifa->ifa_addr == nullptr) {
+                continue;
+            }
+            const QString name = QString::fromLatin1(ifa->ifa_name);
+            if (name == QStringLiteral("lo0")) {
+                continue;
+            }
+            HostNetworkInfo &entry = byName[name];
+            entry.name = name;
+            const int family = ifa->ifa_addr->sa_family;
+            if (family == AF_LINK) {
+                const auto *sdl = reinterpret_cast<const sockaddr_dl *>(
+                    ifa->ifa_addr);
+                if (sdl->sdl_nlen == name.size()
+                    && sdl->sdl_alen == 6) {
+                    const unsigned char *mac =
+                        reinterpret_cast<const unsigned char *>(
+                            sdl->sdl_data + sdl->sdl_nlen);
+                    entry.macAddress =
+                        QStringLiteral("%1:%2:%3:%4:%5:%6")
+                            .arg(mac[0], 2, 16, QChar('0'))
+                            .arg(mac[1], 2, 16, QChar('0'))
+                            .arg(mac[2], 2, 16, QChar('0'))
+                            .arg(mac[3], 2, 16, QChar('0'))
+                            .arg(mac[4], 2, 16, QChar('0'))
+                            .arg(mac[5], 2, 16, QChar('0'));
+                }
+                continue;
+            }
+            char buf[INET6_ADDRSTRLEN];
+            int prefix = 0;
+            if (ifa->ifa_netmask != nullptr) {
+                if (family == AF_INET) {
+                    const auto *mask =
+                        reinterpret_cast<const sockaddr_in *>(ifa->ifa_netmask);
+                    prefix = __builtin_popcount(
+                        ntohl(mask->sin_addr.s_addr));
+                } else if (family == AF_INET6) {
+                    const auto *mask =
+                        reinterpret_cast<sockaddr_in6 const *>(ifa->ifa_netmask);
+                    const unsigned char *bytes = reinterpret_cast<const unsigned char *>(
+                        &mask->sin6_addr.s6_addr[0]);
+                    for (int i = 0; i < 16; ++i) {
+                        prefix += __builtin_popcount(bytes[i]);
+                    }
+                }
+            }
+            if (family == AF_INET) {
+                inet_ntop(AF_INET,
+                          &reinterpret_cast<const sockaddr_in *>(
+                               ifa->ifa_addr)
+                               ->sin_addr,
+                          buf, sizeof(buf));
+                entry.ipv4 = QStringLiteral("%1/%2")
+                                 .arg(QString::fromLatin1(buf))
+                                 .arg(prefix);
+            } else if (family == AF_INET6) {
+                inet_ntop(AF_INET6,
+                          &reinterpret_cast<const sockaddr_in6 *>(
+                               ifa->ifa_addr)
+                               ->sin6_addr,
+                          buf, sizeof(buf));
+                entry.ipv6 = QStringLiteral("%1/%2")
+                                 .arg(QString::fromLatin1(buf))
+                                 .arg(prefix);
+            }
+        }
+        freeifaddrs(addrs);
+    }
+    for (const HostNetworkInfo &entry : byName) {
+        info.interfaces.append(entry);
+    }
+
+    return info;
+}
+#endif
+
 HostInfo collectHostInfo() {
+#if defined(Q_OS_MACOS)
+    return collectHostInfoMac();
+#endif
     HostInfo info;
     info.available = true;
 

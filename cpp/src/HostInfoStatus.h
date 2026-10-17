@@ -53,6 +53,10 @@ QList<HostFsInfo> parseMounts(const QByteArray &mounts);
 QString parseOsRelease(const QByteArray &osRelease);
 HostInfo collectHostInfo();
 
+#if defined(Q_OS_MACOS)
+HostInfo collectHostInfoMac();
+#endif
+
 QString hostInfoSummaryText(const HostInfo &info);
 QString hostInfoPlatformText(const HostInfo &info);
 QString hostInfoCpuText(const HostInfo &info);
