@@ -30,6 +30,7 @@ struct ServicesSnapshot {
 };
 
 bool parseSystemctlUnits(const QByteArray &text, QList<UnitRow> &out);
+bool parseLaunchctlList(const QByteArray &text, QList<UnitRow> &out);
 int servicesFailedCount(const QList<UnitRow> &units);
 int servicesRunningCount(const QList<UnitRow> &units);
 

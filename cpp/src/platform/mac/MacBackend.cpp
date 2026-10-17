@@ -199,7 +199,10 @@ QString MacBackend::platformName() const {
 }
 
 PlatformCapabilities MacBackend::capabilities() const {
-    return PlatformCapabilities{};
+    PlatformCapabilities caps;
+    caps.systemServices = true;
+    caps.fim = true;
+    return caps;
 }
 
 bool MacBackend::hostCpuTimes(linuxproc::HostCpuTimes &out) {

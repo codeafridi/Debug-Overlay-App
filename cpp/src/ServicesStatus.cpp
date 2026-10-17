@@ -42,6 +42,59 @@ bool parseSystemctlUnits(const QByteArray &text, QList<UnitRow> &out) {
     return any;
 }
 
+bool parseLaunchctlList(const QByteArray &text, QList<UnitRow> &out) {
+    const QList<QByteArray> lines = text.split('\n');
+    bool any = false;
+
+    for (const QByteArray &line : lines) {
+        const QByteArray trimmed = line.trimmed();
+        if (trimmed.isEmpty()) {
+            continue;
+        }
+
+        QList<QByteArray> fields = trimmed.split('\t');
+        if (fields.size() < 2) {
+            fields = trimmed.simplified().split(' ');
+        }
+        if (fields.isEmpty()
+            || fields.first() == QByteArrayLiteral("PID")) {
+            continue;
+        }
+        if (fields.size() < 2) {
+            continue;
+        }
+
+        UnitRow row;
+        row.name = QString::fromUtf8(fields.size() > 2
+                                         ? fields.at(2)
+                                         : fields.at(1));
+        if (row.name.isEmpty()) {
+            continue;
+        }
+        row.load = QStringLiteral("loaded");
+        if (fields.size() > 2) {
+            const QString pid = QString::fromUtf8(fields.at(0));
+            const QString status = QString::fromUtf8(fields.at(1));
+            if (pid != QStringLiteral("-")) {
+                row.active = QStringLiteral("active");
+                row.sub = QStringLiteral("running");
+            } else if (status.toInt() != 0) {
+                row.active = QStringLiteral("failed");
+                row.sub = QStringLiteral("failed");
+            } else {
+                row.active = QStringLiteral("inactive");
+                row.sub = QStringLiteral("dead");
+            }
+        } else {
+            row.active = QStringLiteral("inactive");
+            row.sub = QStringLiteral("dead");
+        }
+        out.append(row);
+        any = true;
+    }
+    return any;
+}
+
 int servicesFailedCount(const QList<UnitRow> &units) {
     int count = 0;
     for (const UnitRow &row : units) {

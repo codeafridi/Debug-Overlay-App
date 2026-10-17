@@ -125,6 +125,24 @@ int main(int argc, char *argv[]) {
               && bulletUnits.at(0).active == QStringLiteral("failed"),
           "parseSystemctlUnits: bullet-prefixed failed unit");
 
+    QList<UnitRow> launchUnits;
+    check(parseLaunchctlList(
+              "PID\tStatus\tLabel\n"
+              "-\t0\tcom.apple.Finder\n"
+              "215\t0\tcom.apple.WindowServer\n"
+              "-\t78\tcom.example.broken\n",
+              launchUnits)
+              && launchUnits.size() == 3
+              && launchUnits.at(0).name == QStringLiteral("com.apple.Finder")
+              && launchUnits.at(0).active == QStringLiteral("inactive")
+              && launchUnits.at(1).active == QStringLiteral("active")
+              && launchUnits.at(1).sub == QStringLiteral("running")
+              && launchUnits.at(2).active == QStringLiteral("failed"),
+          "parseLaunchctlList: pid/status/label rows, header skipped");
+    check(servicesRunningCount(launchUnits) == 1
+              && servicesFailedCount(launchUnits) == 1,
+          "launchctl counts: running + failed");
+
     ServicesSnapshot services;
     services.available = true;
     services.runningCount = 3;
